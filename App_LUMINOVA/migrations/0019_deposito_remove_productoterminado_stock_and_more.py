@@ -10,6 +10,24 @@ class Migration(migrations.Migration):
         ("App_LUMINOVA", "0018_passwordchangerequired"),
     ]
 
+    def inicializar_stock_por_deposito(apps, schema_editor):
+        Deposito = apps.get_model('App_LUMINOVA', 'Deposito')
+        ProductoTerminado = apps.get_model('App_LUMINOVA', 'ProductoTerminado')
+        StockProductoTerminado = apps.get_model('App_LUMINOVA', 'StockProductoTerminado')
+
+        # Crear depósito principal
+        deposito, created = Deposito.objects.get_or_create(
+            nombre='Depósito Central', defaults={'ubicacion': 'Principal', 'descripcion': 'Depósito migrado automáticamente'}
+        )
+
+        # Migrar stock de cada producto terminado
+        for producto in ProductoTerminado.objects.all():
+            StockProductoTerminado.objects.create(
+                producto=producto,
+                deposito=deposito,
+                cantidad=getattr(producto, 'stock', 0)
+            )
+
     operations = [
         migrations.CreateModel(
             name="Deposito",
@@ -31,10 +49,6 @@ class Migration(migrations.Migration):
                 "verbose_name": "Depósito",
                 "verbose_name_plural": "Depósitos",
             },
-        ),
-        migrations.RemoveField(
-            model_name="productoterminado",
-            name="stock",
         ),
         migrations.CreateModel(
             name="StockProductoTerminado",
@@ -71,5 +85,10 @@ class Migration(migrations.Migration):
                 "verbose_name_plural": "Stocks de Productos Terminados por Depósito",
                 "unique_together": {("producto", "deposito")},
             },
+        ),
+        migrations.RunPython(inicializar_stock_por_deposito),
+        migrations.RemoveField(
+            model_name="productoterminado",
+            name="stock",
         ),
     ]
