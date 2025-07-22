@@ -78,6 +78,8 @@ from .models import (
     Reportes,
     RolDescripcion,
     SectorAsignado,
+    Deposito,
+    StockProductoTerminado,
 )
 from .signals import get_client_ip
 
@@ -2761,15 +2763,33 @@ def recibir_pedido_oc_view(request, oc_id):
 def deposito_view(request):
     logger.info("--- deposito_view: INICIO ---")
 
+
     categorias_I = CategoriaInsumo.objects.all()
     categorias_PT = CategoriaProductoTerminado.objects.all()
+    depositos = Deposito.objects.all()
 
+    deposito_id = request.GET.get("deposito_id")
+    deposito_seleccionado = None
+    if deposito_id:
+        deposito_seleccionado = Deposito.objects.filter(id=deposito_id).first()
+    if not deposito_seleccionado and depositos.exists():
+        deposito_seleccionado = depositos.first()
+
+    productos_terminados = ProductoTerminado.objects.all().select_related("categoria")
+    productos_stock_por_deposito = []
+    for pt in productos_terminados:
+        stock_en_deposito = pt.get_stock_en_deposito(deposito_seleccionado) if deposito_seleccionado else pt.get_stock_total()
+        productos_stock_por_deposito.append({
+            "producto": pt,
+            "stock": stock_en_deposito,
+            "deposito": deposito_seleccionado,
+        })
+
+    # Lógica original de OPs y lotes
     ops_pendientes_deposito_list = OrdenProduccion.objects.none()
     ops_pendientes_deposito_count = 0
     try:
-        estado_sol = EstadoOrden.objects.filter(
-            nombre__iexact="Insumos Solicitados"
-        ).first()
+        estado_sol = EstadoOrden.objects.filter(nombre__iexact="Insumos Solicitados").first()
         if estado_sol:
             ops_pendientes_deposito_list = (
                 OrdenProduccion.objects.filter(estado_op=estado_sol)
@@ -2786,53 +2806,64 @@ def deposito_view(request):
         .order_by("-fecha_creacion")
     )
 
-    # --- INICIO DE LA CORRECCIÓN DE LÓGICA ---
+    # Lógica de insumos bajo stock y pedidos
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
     insumos_con_stock_bajo = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
-
-    # Estados que consideramos como "pedido en firme" (ya no es tarea del depósito)
-    UMBRAL_STOCK_BAJO_INSUMOS = 15000
-    insumos_con_stock_bajo = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
-
-    # Estados que consideramos como "pedido en firme" (ya no es tarea del depósito/compras iniciar)
-    ESTADOS_OC_EN_PROCESO = [
-        "APROBADA",
-        "ENVIADA_PROVEEDOR",
-        "EN_TRANSITO",
-        "RECIBIDA_PARCIAL",
-    ]
-
+    ESTADOS_OC_EN_PROCESO = ["APROBADA", "ENVIADA_PROVEEDOR", "EN_TRANSITO", "RECIBIDA_PARCIAL"]
     insumos_a_gestionar = []
     insumos_en_pedido = []
-
     for insumo in insumos_con_stock_bajo:
-        # Buscamos si existe una OC que ya está aprobada y en proceso
         oc_en_proceso = (
-            Orden.objects.filter(
-                insumo_principal=insumo, estado__in=ESTADOS_OC_EN_PROCESO
-            )
+            Orden.objects.filter(insumo_principal=insumo, estado__in=ESTADOS_OC_EN_PROCESO)
             .order_by("-fecha_creacion")
             .first()
         )
-
         if oc_en_proceso:
-            # Si ya está en proceso, va a la tabla "En Pedido"
             insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso})
         else:
-            # Si no hay OC en proceso (puede no existir o estar solo en Borrador),
-            # es una acción pendiente.
             insumos_a_gestionar.append({"insumo": insumo})
-    # --- FIN DE LA CORRECCIÓN DE LÓGICA ---
+
+    from .forms import MovimientoStockProductoTerminadoForm
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    # Procesar movimiento de stock si se envió el formulario
+    if request.method == "POST":
+        form = MovimientoStockProductoTerminadoForm(request.POST)
+        if form.is_valid():
+            producto = form.cleaned_data["producto"]
+            deposito = form.cleaned_data["deposito"]
+            cantidad = form.cleaned_data["cantidad"]
+            tipo_movimiento = form.cleaned_data["tipo_movimiento"]
+            if tipo_movimiento == "ingreso":
+                producto.agregar_stock(cantidad, deposito)
+                messages.success(request, f"Se ingresaron {cantidad} unidades de '{producto}' en '{deposito}'.")
+            elif tipo_movimiento == "egreso":
+                if producto.quitar_stock(cantidad, deposito):
+                    messages.success(request, f"Se egresaron {cantidad} unidades de '{producto}' de '{deposito}'.")
+                else:
+                    messages.error(request, f"No hay suficiente stock de '{producto}' en '{deposito}' para egresar {cantidad} unidades.")
+            # Redirigir para evitar reenvío del formulario
+            return redirect(f"{request.path}?deposito_id={deposito.id}")
+        else:
+            messages.error(request, "Formulario inválido. Verifique los datos ingresados.")
+        form_movimiento_stock = form
+    else:
+        form_movimiento_stock = MovimientoStockProductoTerminadoForm()
 
     context = {
         "categorias_I": categorias_I,
         "categorias_PT": categorias_PT,
+        "depositos": depositos,
+        "deposito_seleccionado": deposito_seleccionado,
+        "productos_stock_por_deposito": productos_stock_por_deposito,
         "ops_pendientes_deposito_list": ops_pendientes_deposito_list,
         "ops_pendientes_deposito_count": ops_pendientes_deposito_count,
         "lotes_productos_terminados_en_stock": lotes_en_stock,
-        "insumos_a_gestionar_list": insumos_a_gestionar,  # Nueva lista para la primera tabla
-        "insumos_en_pedido_list": insumos_en_pedido,  # Nueva lista para la segunda tabla
+        "insumos_a_gestionar_list": insumos_a_gestionar,
+        "insumos_en_pedido_list": insumos_en_pedido,
         "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
+        "form_movimiento_stock": form_movimiento_stock,
     }
 
     return render(request, "deposito/deposito.html", context)

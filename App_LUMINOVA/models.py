@@ -3,7 +3,35 @@
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import ValidationError
 from django.db import models
+
 from django.utils import timezone  # Importar timezone
+
+# --- DEPÓSITOS ---
+class Deposito(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    ubicacion = models.CharField(max_length=255, blank=True, null=True)
+    descripcion = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Depósito"
+        verbose_name_plural = "Depósitos"
+
+    def __str__(self):
+        return self.nombre
+
+# --- STOCK POR DEPÓSITO ---
+class StockProductoTerminado(models.Model):
+    producto = models.ForeignKey('ProductoTerminado', on_delete=models.CASCADE, related_name='stocks')
+    deposito = models.ForeignKey('Deposito', on_delete=models.CASCADE, related_name='stocks_productos')
+    cantidad = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ('producto', 'deposito')
+        verbose_name = "Stock de Producto Terminado por Depósito"
+        verbose_name_plural = "Stocks de Productos Terminados por Depósito"
+
+    def __str__(self):
+        return f"{self.producto} en {self.deposito}: {self.cantidad}"
 
 
 # --- CATEGORÍAS Y ENTIDADES BASE ---
@@ -29,7 +57,7 @@ class ProductoTerminado(models.Model):
         related_name="productos_terminados",
     )
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    stock = models.IntegerField(default=0)
+    # stock eliminado, ahora se gestiona por depósito
     modelo = models.CharField(max_length=50, blank=True, null=True)
     potencia = models.IntegerField(blank=True, null=True)
     acabado = models.CharField(max_length=50, blank=True, null=True)
@@ -39,6 +67,31 @@ class ProductoTerminado(models.Model):
 
     def __str__(self):
         return f"{self.descripcion} (Modelo: {self.modelo or 'N/A'})"
+
+    def get_stock_total(self):
+        """Devuelve el stock total sumando todos los depósitos."""
+        return sum(stock.cantidad for stock in self.stocks.all())
+
+    def get_stock_en_deposito(self, deposito):
+        """Devuelve el stock en un depósito específico."""
+        stock = self.stocks.filter(deposito=deposito).first()
+        return stock.cantidad if stock else 0
+
+    def agregar_stock(self, cantidad, deposito):
+        """Agrega stock en el depósito indicado."""
+        stock, created = self.stocks.get_or_create(deposito=deposito, defaults={"cantidad": 0})
+        stock.cantidad += cantidad
+        stock.save()
+        return stock.cantidad
+
+    def quitar_stock(self, cantidad, deposito):
+        """Quita stock en el depósito indicado (si hay suficiente)."""
+        stock = self.stocks.filter(deposito=deposito).first()
+        if stock and stock.cantidad >= cantidad:
+            stock.cantidad -= cantidad
+            stock.save()
+            return True
+        return False
 
 
 class CategoriaInsumo(models.Model):

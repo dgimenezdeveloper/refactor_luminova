@@ -50,7 +50,7 @@ class ComponenteProductoInline(admin.TabularInline):
 
 @admin.register(ProductoTerminado)
 class ProductoTerminadoAdmin(admin.ModelAdmin):
-    list_display = ("descripcion", "categoria", "stock", "precio_unitario", "modelo")
+    list_display = ("descripcion", "categoria", "precio_unitario", "modelo")
     list_filter = ("categoria",)
     search_fields = ("descripcion", "modelo")
     inlines = [ComponenteProductoInline]

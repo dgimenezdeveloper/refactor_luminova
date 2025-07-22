@@ -1,3 +1,13 @@
+from django import forms
+
+class MovimientoStockProductoTerminadoForm(forms.Form):
+    producto_id = forms.IntegerField(widget=forms.HiddenInput())
+    deposito_id = forms.IntegerField(widget=forms.HiddenInput())
+    cantidad = forms.IntegerField(label="Cantidad", min_value=1, widget=forms.NumberInput(attrs={"class": "form-control"}))
+    tipo_movimiento = forms.ChoiceField(
+        choices=[("ingreso", "Ingreso"), ("egreso", "Egreso")],
+        widget=forms.Select(attrs={"class": "form-select"})
+    )
 import logging
 from datetime import timedelta, timezone
 
