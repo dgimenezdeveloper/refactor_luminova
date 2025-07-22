@@ -1,3 +1,12 @@
+from .models import Deposito
+
+def deposito_selector_view(request):
+    depositos = Deposito.objects.all()
+    if request.method == "GET" and "deposito_id" in request.GET:
+        deposito_id = request.GET.get("deposito_id")
+        if deposito_id:
+            return redirect(f"/deposito/deposito/?deposito_id={deposito_id}")
+    return render(request, "deposito/deposito_selector.html", {"depositos": depositos})
 import logging
 from datetime import timedelta
 
@@ -2244,12 +2253,15 @@ def produccion_detalle_op_view(request, op_id):
                 cantidad_producida = op_actualizada.cantidad_a_producir
                 if producto_terminado_obj and cantidad_producida > 0:
 
-                    # 1. Actualizar el stock principal del ProductoTerminado
-                    producto_terminado_obj.stock = F("stock") + cantidad_producida
-                    producto_terminado_obj.save(update_fields=["stock"])
-                    logger.info(
-                        f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida}."
-                    )
+                    # 1. Actualizar el stock en el depósito correspondiente (Depósito Central por defecto)
+                    deposito_central = Deposito.objects.filter(nombre__iexact="Depósito Central").first()
+                    if deposito_central:
+                        producto_terminado_obj.agregar_stock(cantidad_producida, deposito_central)
+                        logger.info(
+                            f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida} en '{deposito_central.nombre}'."
+                        )
+                    else:
+                        logger.error("No se encontró el Depósito Central para registrar el stock producido.")
 
                     # 2. Crear el lote para registro y envío
                     LoteProductoTerminado.objects.create(
@@ -2770,6 +2782,8 @@ def deposito_view(request):
 
     deposito_id = request.GET.get("deposito_id")
     deposito_seleccionado = None
+    if not deposito_id:
+        return redirect('App_LUMINOVA:deposito_selector')
     if deposito_id:
         deposito_seleccionado = Deposito.objects.filter(id=deposito_id).first()
     if not deposito_seleccionado and depositos.exists():
@@ -2779,6 +2793,9 @@ def deposito_view(request):
     productos_stock_por_deposito = []
     for pt in productos_terminados:
         stock_en_deposito = pt.get_stock_en_deposito(deposito_seleccionado) if deposito_seleccionado else pt.get_stock_total()
+        # Si no hay stock, mostrar 0 explícitamente
+        if stock_en_deposito is None:
+            stock_en_deposito = 0
         productos_stock_por_deposito.append({
             "producto": pt,
             "stock": stock_en_deposito,
@@ -2825,7 +2842,6 @@ def deposito_view(request):
 
     from .forms import MovimientoStockProductoTerminadoForm
     from django.contrib import messages
-    from django.shortcuts import redirect
 
     # Procesar movimiento de stock si se envió el formulario
     if request.method == "POST":
@@ -2990,18 +3006,22 @@ def deposito_enviar_lote_pt_view(request, lote_id):
     producto_terminado = lote.producto
     cantidad_a_enviar = lote.cantidad
 
-    if producto_terminado.stock < cantidad_a_enviar:
-        messages.error(
-            request,
-            f"Error de consistencia de datos: No hay stock suficiente para '{producto_terminado.descripcion}' para enviar el lote. Stock actual: {producto_terminado.stock}, se necesita: {cantidad_a_enviar}.",
-        )
-        return redirect("App_LUMINOVA:deposito_view")
 
-    producto_terminado.stock -= cantidad_a_enviar
-    producto_terminado.save(update_fields=["stock"])
-    logger.info(
-        f"Stock de '{producto_terminado.descripcion}' descontado en {cantidad_a_enviar}."
-    )
+    deposito_central = Deposito.objects.filter(nombre__iexact="Depósito Central").first()
+    if deposito_central:
+        stock_obj = StockProductoTerminado.objects.filter(producto=producto_terminado, deposito=deposito_central).first()
+        if not stock_obj or stock_obj.cantidad < cantidad_a_enviar:
+            messages.error(
+                request,
+                f"Error de consistencia de datos: No hay stock suficiente para '{producto_terminado.descripcion}' en '{deposito_central.nombre}' para enviar el lote. Stock actual: {stock_obj.cantidad if stock_obj else 0}, se necesita: {cantidad_a_enviar}.",
+            )
+            return redirect("App_LUMINOVA:deposito_view")
+        producto_terminado.quitar_stock(cantidad_a_enviar, deposito_central)
+        logger.info(
+            f"Stock de '{producto_terminado.descripcion}' descontado en {cantidad_a_enviar} en '{deposito_central.nombre}'."
+        )
+    else:
+        logger.error("No se encontró el Depósito Central para descontar el stock enviado.")
 
     lote.enviado = True
     lote.save(update_fields=["enviado"])

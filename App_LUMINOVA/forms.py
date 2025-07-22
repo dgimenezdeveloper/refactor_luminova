@@ -1,13 +1,26 @@
 from django import forms
 
 class MovimientoStockProductoTerminadoForm(forms.Form):
-    producto_id = forms.IntegerField(widget=forms.HiddenInput())
-    deposito_id = forms.IntegerField(widget=forms.HiddenInput())
+    producto = forms.ModelChoiceField(
+        queryset=None,
+        label="Producto Terminado",
+        widget=forms.Select(attrs={"class": "form-select"})
+    )
+    deposito = forms.ModelChoiceField(
+        queryset=None,
+        label="Depósito",
+        widget=forms.Select(attrs={"class": "form-select"})
+    )
     cantidad = forms.IntegerField(label="Cantidad", min_value=1, widget=forms.NumberInput(attrs={"class": "form-control"}))
     tipo_movimiento = forms.ChoiceField(
         choices=[("ingreso", "Ingreso"), ("egreso", "Egreso")],
         widget=forms.Select(attrs={"class": "form-select"})
     )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import ProductoTerminado, Deposito
+        self.fields['producto'].queryset = ProductoTerminado.objects.all()
+        self.fields['deposito'].queryset = Deposito.objects.all()
 import logging
 from datetime import timedelta, timezone
 
@@ -158,7 +171,7 @@ class ItemOrdenVentaForm(forms.ModelForm):
         self.fields["producto_terminado"].empty_label = "Seleccionar Producto..."
         # Mostrar precio y stock en el dropdown del producto para ayudar al usuario
         self.fields["producto_terminado"].label_from_instance = (
-            lambda obj: f"{obj.descripcion} (Stock: {obj.stock} | P.U: ${obj.precio_unitario})"
+            lambda obj: f"{obj.descripcion} (Stock: {obj.get_stock_total()} | P.U: ${obj.precio_unitario})"
         )
         # El precio unitario se llenará con JS al seleccionar el producto.
 

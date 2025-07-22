@@ -84,15 +84,6 @@
 
     <div class="col-md-4 bg-primary border-start border-5 border-white"
         style="margin-left: 0px; padding: 20px; border-radius: 25px;">
-        <!-- Selector de depósito -->
-        <form method="get" class="mb-3">
-            <label for="deposito_id" class="form-label text-white">Seleccionar depósito:</label>
-            <select name="deposito_id" id="deposito_id" class="form-select" onchange="this.form.submit()">
-                {% for deposito in depositos %}
-                    <option value="{{ deposito.id }}" {% if deposito_seleccionado and deposito.id == deposito_seleccionado.id %}selected{% endif %}>{{ deposito.nombre }}</option>
-                {% endfor %}
-            </select>
-        </form>
         <table class="table table-borderless text-white">
             {# ... Tabla de Órdenes de Producción ... #}
             <thead>
@@ -131,42 +122,44 @@
                 </tr>
             </tbody>
 
-            <!-- Tabla de Productos Terminados por Depósito -->
+            {# ... Tabla de Productos Terminados en Stock ... #}
             <thead>
                 <tr style="border-top: 3px solid white; margin-top: 3px;">
-                    <th colspan="3" class="bg-primary text-white text-center pt-3" style="padding-left: 0px;">
-                        <h4>Stock de Productos Terminados en {{ deposito_seleccionado.nombre }}</h4>
+                    <th colspan="4" class="bg-primary text-white text-center pt-3" style="padding-left: 0px;">
+                        <h4>Productos Terminados en Stock</h4>
                     </th>
                 </tr>
             </thead>
             <tbody class="bg-white text-dark">
                 <tr>
-                    <th class="text-white" style="background-color: #014BAC; width: 60%;">Descripción</th>
-                    <th class="text-white text-center" style="background-color: #014BAC; width: 25%;">Stock</th>
-                    <th class="text-white text-center" style="background-color: #014BAC; width: 15%;">Acción</th>
+                    <th class="text-white text-center" style="background-color: #014BAC; width: 20%;">N° OP</th>
+                    <th class="text-white" style="background-color: #014BAC; width: 50%;">Descripción</th>
+                    <th class="text-white text-center" style="background-color: #014BAC; width: 30%;">Stock</th>
+                    <th class="text-white text-center" style="background-color: #014BAC; width: 30%;">Acciones</th>
                 </tr>
-                {% for item in productos_stock_por_deposito %}
+                {% for lote in lotes_productos_terminados_en_stock %}
                 <tr class="{% if forloop.counter|divisibleby:2 %}table-row-even{% else %}table-row-odd{% endif %}">
-                    <td class="text-white">{{ item.producto.descripcion|truncatechars:25 }}</td>
-                    <td class="text-white text-center fw-bold">{{ item.stock }}</td>
+                    <td class="text-white text-center">{{ lote.op_asociada.numero_op }}</td>
+                    <td class="text-white">{{ lote.producto.descripcion|truncatechars:20 }}</td>
+                    <td class="text-white text-center">{{ lote.cantidad }}</td>
                     <td class="text-white text-center">
-                        <form method="post" style="display:inline-block;">
+                        <form id="form-enviar-lote-{{ lote.id }}" method="post" action="{% url 'App_LUMINOVA:deposito_enviar_lote_pt' lote.id %}" style="display: inline;">
                             {% csrf_token %}
-                            <input type="hidden" name="producto" value="{{ item.producto.id }}">
-                            <input type="hidden" name="deposito" value="{{ deposito_seleccionado.id }}">
-                            <input type="number" name="cantidad" min="1" max="9999" style="width:60px;" required>
-                            <select name="tipo_movimiento" style="width:90px;">
-                                <option value="ingreso">Ingreso</option>
-                                <option value="egreso">Egreso</option>
-                            </select>
-                            <button type="submit" class="btn btn-sm btn-primary">OK</button>
+                            <button type="button" class="btn btn-success btn-sm btn-enviar-lote"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#confirmarEnvioModal"
+                                    data-lote-id="{{ lote.id }}"
+                                    data-lote-info="lote de {{lote.cantidad}} x {{lote.producto.descripcion}}"
+                                    title="Enviar lote de {{lote.cantidad}} x {{lote.producto.descripcion}}">
+                                 Enviar
+                            </button>
                         </form>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="3" class="text-white text-center" style="background-color: #A19898;">
-                        No hay productos terminados en este depósito.
+                    <td colspan="4" class="text-white text-center" style="background-color: #A19898;">
+                        No hay lotes de productos terminados en stock pendientes de envío.
                     </td>
                 </tr>
                 {% endfor %}
