@@ -1,0 +1,127 @@
+{% extends 'padre.html' %}
+{% load static %}
+{% load django_bootstrap5 %} {# Asegúrate que django_bootstrap5 esté cargado #}
+
+{% block title %}Agregar Nuevo Insumo{% endblock %}
+
+{% block sidebar_content %}
+    <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end full-height" style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
+        <div class="position-sticky pt-4">
+            <h6 class="sidebar-heading d-flex justify-content-center align-items-center px-3 mt-4 mb-1 text-white fw-bold">
+                <a href="{% url 'App_LUMINOVA:deposito_view' %}"><span style="color: white;">Depósito</span></a>
+            </h6>
+            <hr class="text-white">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center active" href="{% url 'App_LUMINOVA:insumo_create' %}">
+                        <i class="bi bi-plus-square-fill me-2"></i> <span class="ms-2">Agregar Insumo</span>
+                    </a>
+                </li>
+                <li class="nav-item mt-2">
+                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:deposito_view' %}">
+                        <i class="bi bi-arrow-left-circle-fill me-2"></i> <span class="ms-2">Volver a Depósito</span>
+                    </a>
+                </li>
+                {# ... otros enlaces del sidebar ... #}
+            </ul>
+        </div>
+    </nav>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Agregar Nuevo Insumo</h2>
+    <hr>
+
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {# Mostrar errores generales del formulario (non-field errors) #}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                    <p class="mb-0">{{ error }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Renderizar campos individualmente para mostrar errores junto a cada campo #}
+        {# O usa {% bootstrap_form form layout='vertical' %} si prefieres que django-bootstrap5 maneje todo #}
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                {% bootstrap_field form.descripcion layout='vertical' %}
+            </div>
+            <div class="col-md-6 mb-3">
+                {% bootstrap_field form.categoria layout='vertical' %}
+                 {% if request.GET.categoria %}
+                    <small class="form-text text-muted">Categoría preseleccionada desde la vista anterior.</small>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                {% bootstrap_field form.fabricante layout='vertical' %}
+            </div>
+            <div class="col-md-6 mb-3">
+                {# Proveedor ya no está en el modelo Insumo directamente #}
+                {# Si tienes un campo 'proveedor_sugerido' o similar en el form, renderízalo aquí #}
+            </div>
+        </div>
+
+        <div class="row">
+            {# Precio unitario y tiempo de entrega ya no están en Insumo, sino en OfertaProveedor #}
+            <div class="col-md-6 mb-3"> {# Ajustado a col-md-6 si quitas precio y tiempo de aquí #}
+                {% bootstrap_field form.stock layout='vertical' %}
+            </div>
+            
+        </div>
+
+        <div class="mb-3">
+            {% bootstrap_field form.imagen layout='vertical' %}
+        </div>
+        
+
+        <div class="mt-3 d-flex justify-content-end">
+            <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar Insumo</button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var form = document.querySelector('form');
+        if (form) {
+            var elements = form.elements;
+            for (var i = 0; i < elements.length; i++) {
+                var element = elements[i];
+                var tagName = element.tagName.toLowerCase();
+                var type = element.type ? element.type.toLowerCase() : '';
+
+                if (tagName === 'input' && (type === 'text' || type === 'email' || type === 'number' || type === 'password' || type === 'url' || type === 'search' || type === 'tel' || type === 'date' || type === 'datetime-local' || type === 'month' || type === 'week' || type === 'time')) {
+                    element.classList.add('form-control');
+                } else if (tagName === 'select') {
+                    element.classList.add('form-select');
+                } else if (tagName === 'textarea') {
+                    element.classList.add('form-control');
+                } else if (tagName === 'input' && type === 'file') {
+                    element.classList.add('form-control');
+                }
+            }
+            const urlParams = new URLSearchParams(window.location.search);
+            const categoriaId = urlParams.get('categoria');
+            if (categoriaId) {
+                const categoriaSelect = form.querySelector('#id_categoria');
+                if (categoriaSelect) {
+                    categoriaSelect.value = categoriaId;
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

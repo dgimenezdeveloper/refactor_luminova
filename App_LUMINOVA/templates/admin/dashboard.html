@@ -1,0 +1,214 @@
+{% extends 'padre.html' %}
+{% load humanize %}
+
+{% block title %}Dashboard | Luminova{% endblock %}
+
+{% block head_extra %}
+<style>
+    /* Estilos existentes (sin cambios) */
+    .kpi-card .card-body {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .kpi-value {
+        font-size: 2.2rem;
+        font-weight: bold;
+    }
+    .stock-progress-bar {
+        height: 6px;
+        background-color: #e9ecef;
+        border-radius: .25rem;
+        overflow: hidden;
+    }
+    .stock-progress {
+        height: 100%;
+        background-color: #dc3545; /* Rojo para crítico */
+        width: var(--stock-percent, 0%);
+    }
+    .timeline-item {
+        display: flex;
+        align-items: center;
+        padding: .5rem 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .timeline-item:last-child {
+        border-bottom: none;
+    }
+    .timeline-icon {
+        width: 38px;
+        height: 38px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        margin-right: 15px;
+    }
+</style>
+{% endblock head_extra %}
+
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom flex-column">
+    <h1 class="h1">Dashboard Administrador</h1>
+</div>
+
+<div class="alert alert-info text-center" role="alert">
+    Bienvenido/a <strong>{{ request.user.username }}</strong> al panel de administración.
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-4 mb-4">
+    
+    <!-- Tarjeta: Actividad Reciente -->
+    <div class="col">
+        <div class="card h-100 border-success shadow-sm">
+            {# --- INICIO DE LA CORRECCIÓN --- #}
+            <div class="card-body d-flex flex-column">
+            {# --- FIN DE LA CORRECCIÓN --- #}
+                <h5 class="card-title mb-3"><i class="bi bi-clock-history me-2"></i>Actividad Reciente</h5>
+                <div class="timeline">
+                    {% if ultima_ov %}
+                    <div class="timeline-item">
+                        <div class="timeline-icon bg-primary"><i class="bi bi-cart-plus-fill"></i></div>
+                        <div class="flex-grow-1">
+                            <a href="{% url 'App_LUMINOVA:ventas_detalle_ov' ultima_ov.id %}">{{ ultima_ov.numero_ov }}</a> creada
+                            <small class="d-block text-muted">{{ ultima_ov.fecha_creacion|timesince }} atrás</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if ultima_op_completada %}
+                    <div class="timeline-item">
+                        <div class="timeline-icon bg-success"><i class="bi bi-check2-circle"></i></div>
+                        <div class="flex-grow-1">
+                            <a href="{% url 'App_LUMINOVA:produccion_detalle_op' ultima_op_completada.id %}">{{ ultima_op_completada.numero_op }}</a> completada
+                            <small class="d-block text-muted">{{ ultima_op_completada.fecha_fin_real|timesince }} atrás</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                     {% if ultimo_reporte %}
+                    <div class="timeline-item">
+                        <div class="timeline-icon bg-danger"><i class="bi bi-exclamation-octagon-fill"></i></div>
+                        <div class="flex-grow-1">
+                            Reporte <a href="{% url 'App_LUMINOVA:reportes_produccion' %}">{{ ultimo_reporte.n_reporte }}</a> generado
+                            <small class="d-block text-muted">{{ ultimo_reporte.fecha|timesince }} atrás</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {# --- INICIO DE LA CORRECCIÓN --- #}
+                {% if not ultima_ov and not ultima_op_completada and not ultimo_reporte %}
+                    {# Si no hay actividad, este div ocupa el resto del espacio y centra el mensaje #}
+                    <div class="flex-grow-1 d-flex align-items-center justify-content-center text-muted p-3">
+                        No hay actividad reciente.
+                    </div>
+                {% else %}
+                    {# Si hay actividad, este div empuja todo el contenido hacia arriba #}
+                    <div class="mt-auto"></div>
+                {% endif %}
+                {# --- FIN DE LA CORRECCIÓN --- #}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta: Stock Crítico -->
+    <div class="col">
+        <div class="card h-100 border-warning shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-box-seam me-2"></i>Stock Crítico</h5>
+                <p class="card-text small text-muted">Stock < {{ umbral_stock_bajo|intcomma }}</p>
+                <ul class="list-group list-group-flush">
+                    {% for item_data in insumos_criticos_list %}
+                    <li class="list-group-item px-0 py-2">
+                        <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' item_data.insumo.id %}" class="text-decoration-none d-block" title="Iniciar compra para {{ item.insumo.descripcion }}">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ item_data.insumo.descripcion|truncatechars:25 }}</span>
+                                <span class="fw-bold text-danger">{{ item_data.insumo.stock|intcomma }}</span>
+                            </div>
+                            <div class="stock-progress-bar mt-1">
+                                <div class="stock-progress" style="--stock-percent: {{ item_data.porcentaje_stock }}%;"></div>
+                            </div>
+                        </a>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item px-0 text-success"><i class="bi bi-check-circle-fill"></i> No hay insumos críticos.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta: Indicadores de Producción -->
+    <div class="col">
+        <div class="card h-100 border-info shadow-sm kpi-card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-graph-up me-2"></i>Producción (Últimos 30 días)</h5>
+                <div class="text-center my-3">
+                    <p class="text-muted mb-1">Luminarias Ensambladas</p>
+                    <div class="kpi-value text-info">{{ total_luminarias_ensambladas|intcomma }}</div>
+                </div>
+                <div class="d-flex justify-content-around text-center">
+                    <div>
+                        <p class="text-muted mb-0">A Tiempo</p>
+                        <p class="fs-4 fw-bold text-success mb-0">{{ ops_a_tiempo }}</p>
+                    </div>
+                    <div>
+                        <p class="text-muted mb-0">Con Retraso</p>
+                        <p class="fs-4 fw-bold text-danger mb-0">{{ ops_con_retraso }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tarjeta: Acciones Urgentes -->
+    <div class="col">
+        <div class="card h-100 border-danger shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title mb-3 text-danger"><i class="bi bi-lightning-charge-fill me-2" ></i>Acciones Urgentes</h5>
+                <div class="list-group list-group-flush">
+                    {% if total_notificaciones > 0 %}
+                        {% if insumos_stock_bajo_count > 0 %}
+                            <a href="{% url 'App_LUMINOVA:compras_desglose' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                                Insumos con Stock Bajo
+                                <span class="badge bg-info rounded-pill">{{ insumos_stock_bajo_count }}</span>
+                            </a>
+                        {% endif %}
+                        {% if ops_con_problemas_count > 0 %}
+                            <a href="{% url 'App_LUMINOVA:reportes_produccion' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                                OPs con Problemas
+                                <span class="badge bg-danger rounded-pill">{{ ops_con_problemas_count }}</span>
+                            </a>
+                        {% endif %}
+                        {% if solicitudes_insumos_pendientes_count > 0 %}
+                            <a href="{% url 'App_LUMINOVA:deposito_solicitudes_insumos' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                                Solicitudes de Insumos
+                                <span class="badge bg-warning text-dark rounded-pill">{{ solicitudes_insumos_pendientes_count }}</span>
+                            </a>
+                        {% endif %}
+                        {% if ocs_para_aprobar_count > 0 %}
+                            <a href="{% url 'App_LUMINOVA:compras_lista_oc' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                                OCs para Aprobar
+                                <span class="badge bg-info text-dark rounded-pill">{{ ocs_para_aprobar_count }}</span>
+                            </a>
+                        {% endif %}
+                        {% if ocs_en_transito_count > 0 %}
+                             <a href="{% url 'App_LUMINOVA:deposito_recepcion_pedidos' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                                Pedidos por Recibir
+                                <span class="badge bg-success rounded-pill">{{ ocs_en_transito_count }}</span>
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        <div class="list-group-item text-success px-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>No hay acciones urgentes.
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="mt-auto"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

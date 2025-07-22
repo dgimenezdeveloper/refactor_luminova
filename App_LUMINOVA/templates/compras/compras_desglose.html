@@ -1,0 +1,91 @@
+{# App_LUMINOVA/templates/compras/compras_desglose.html #}
+{% extends 'padre.html' %}
+{% load static %}
+{% load django_bootstrap5 %}
+
+{% block title %}{{ titulo_seccion|default:"Gestionar Compra por Stock Bajo" }}{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'compras/compras_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_seccion }}</h1>
+</div>
+
+
+
+
+{# Comprobar la lista que realmente se pasa desde la vista #}
+{% if insumos_criticos_list_con_estado %} 
+<div class="table-responsive mt-3">
+    <table class="table table-hover table-sm align-middle">
+        <thead class="color-thead">
+            <tr>
+                <th class="color-thead" style="background-color: #014BAC;">Insumo</th>
+                <th class="color-thead" style="background-color: #014BAC;">Categoría</th>
+                <th class="text-center color-thead" style="background-color: #014BAC;">Stock Actual</th>
+                <th class="text-center color-thead" style="background-color: #014BAC;">Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {# --- INICIO DE LA CORRECCIÓN --- #}
+            {# El bucle ahora itera sobre `insumos_criticos_list_con_estado` y la variable se llama `insumo_item` #}
+            {% for insumo_item in insumos_criticos_list_con_estado %} 
+            <tr>
+                <td>
+                    {% if insumo_item.imagen %}
+                        <img src="{{ insumo_item.imagen.url }}" alt="{{ insumo_item.descripcion }}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 3px; margin-right: 5px;">
+                    {% endif %}
+                    {{ insumo_item.descripcion|truncatechars:40 }}
+                </td>
+                <td>{{ insumo_item.categoria.nombre|default_if_none:"N/A" }}</td>
+                <td class="text-center fw-bold text-danger">{{ insumo_item.stock }}</td>
+                <td class="text-center">
+                    {# La URL ahora usa `insumo_item.id`, que está garantizado que tiene un valor #}
+                    <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' insumo_item.id %}" 
+                       class="btn btn-sm btn-primary" 
+                       title="Seleccionar Proveedor para {{ insumo_item.descripcion }}">
+                        <i class="bi bi-people-fill"></i> Sel. Proveedor
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+            {# --- FIN DE LA CORRECCIÓN --- #}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-success mt-3" role="alert">
+    <i class="bi bi-check-circle-fill"></i> No hay insumos críticos que requieran gestión de compra inmediata (stock ≥ {{ umbral_stock_bajo }} o ya tienen OC en proceso).
+</div>
+{% endif %}
+
+<div class="mt-4">
+    <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left-circle"></i> Volver a Depósito
+    </a>
+    <a href="{% url 'App_LUMINOVA:compras_lista_oc' %}" class="btn btn-outline-info ms-2">
+        <i class="bi bi-list-ul"></i> Ver Todas las Órdenes de Compra
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<!-- <style>
+    /* Puedes mantener tus estilos de .color-thead aquí o en custom.css */
+    .color-thead { 
+        background-color: #014BAC !important; /* Ejemplo, usa tu color deseado */
+        color: white !important;
+    }
+    /* Estilo para filas de insumos que ya tienen una OC pendiente */
+    .table-info-light-custom { 
+        background-color: #e6f3ff !important; /* Un azul muy claro */
+        /* color: #004085 !important; Si necesitas cambiar el color del texto también */
+    }
+     .img-thumbnail { /* Si usas esta clase para las imágenes */
+        padding: 0.1rem;
+    }
+</style> -->
+{% endblock %}

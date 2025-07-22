@@ -1,0 +1,84 @@
+{% load static %}
+<header>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm p-0">
+        <div class="container-fluid d-flex align-items-center">
+            <div class="col-md-3 col-lg-1">
+                <a class="navbar-brand d-flex align-items-center ms-3" href="{% url 'App_LUMINOVA:dashboard' %}">
+                    <img src="{% static 'img/logo.png' %}" alt="Luminova Logo" height="100" width="100" class="d-inline-block align-text-top me-2">
+                </a>
+            </div>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
+                    aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarContent" style="padding-left: 5%;">
+                <ul class="navbar-nav mb-2 mb-lg-0 d-flex justify-content-around w-100">
+                    <li class="nav-item"><a class="nav-link text-primary fw-bold" href="{% url 'App_LUMINOVA:compras_lista_oc' %} ">Compras</a></li>
+                    <li class="nav-item"><a class="nav-link text-primary fw-bold" href="{% url 'App_LUMINOVA:produccion_principal' %}">Producción</a></li>
+                    <li class="nav-item"><a class="nav-link text-primary fw-bold" href="{% url 'App_LUMINOVA:ventas_lista_ov' %}">Ventas</a></li>
+                    <li class="nav-item"><a class="nav-link text-primary fw-bold" href="{% url 'App_LUMINOVA:deposito_view' %}">Depósito</a></li>
+                    <li class="nav-item"><a class="nav-link text-primary fw-bold" href="{% url 'App_LUMINOVA:control_calidad_view' %}">Control de Calidad</a></li>
+                </ul>
+
+                <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
+                    {% if user.is_authenticated %}
+                        
+                        <div class="nav-item dropdown">
+                            <a class="nav-link px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones">
+                                <!-- Se cambia a text-primary -->
+                                <i class="bi bi-bell-fill fs-5 position-relative text-primary"> 
+                                    {% if total_notificaciones > 0 %}
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6em;">{{ total_notificaciones }}</span>
+                                    {% endif %}
+                                </i>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="width: 300px;">
+                                <li class="dropdown-header">Acciones Urgentes</li>
+                                <li><hr class="dropdown-divider"></li>
+                                {% if insumos_stock_bajo_count > 0 %}
+                                <li>
+                                    <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'App_LUMINOVA:compras_desglose' %}">
+                                        Insumos con Stock Bajo
+                                        <span class="badge bg-info rounded-pill">{{ insumos_stock_bajo_count }}</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+                                {% if ops_con_problemas_count > 0 %}<li><a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'App_LUMINOVA:reportes_produccion' %}">OPs con Problemas <span class="badge bg-danger rounded-pill">{{ ops_con_problemas_count }}</span></a></li>{% endif %}
+                                {% if solicitudes_insumos_count > 0 %}<li><a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'App_LUMINOVA:deposito_solicitudes_insumos' %}">Solicitudes de Insumos <span class="badge bg-warning text-dark rounded-pill">{{ solicitudes_insumos_count }}</span></a></li>{% endif %}
+                                {% if ocs_para_aprobar_count > 0 %}<li><a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'App_LUMINOVA:compras_lista_oc' %}">OCs para Aprobar <span class="badge bg-info text-dark rounded-pill">{{ ocs_para_aprobar_count }}</span></a></li>{% endif %}
+                                {% if ocs_en_transito_count > 0 %}
+                                <li>
+                                    <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'App_LUMINOVA:deposito_recepcion_pedidos' %}">
+                                        Pedidos por Recibir 
+                                        <span class="badge bg-success rounded-pill">{{ ocs_en_transito_count }}</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+                                {% if total_notificaciones == 0 %}<li><p class="dropdown-item-text text-center text-muted small py-3">No hay notificaciones.</p></li>{% endif %}
+                            </ul>
+                        </div>
+                        
+                        <div class="nav-item">
+                            <!-- Se cambia a text-primary -->
+                             <a class="nav-link px-2" href="#" title="Mensajes"><i class="bi bi-envelope-fill fs-5 text-primary"></i></a>
+                        </div>
+                        
+                        <div class="vr mx-3 d-none d-lg-block"></div>
+
+                        <div class="nav-item d-flex align-items-center">
+                            <!-- Se cambia a text-primary -->
+                             <i class="bi bi-person-circle fs-5 text-primary"></i>
+                             <span class="ms-2 fw-bold text-primary">{{ user.first_name|default:user.username|capfirst }}</span>
+                        </div>
+                         
+                        <div class="nav-item ms-3">
+                            <a class="btn btn-outline-primary btn-sm" href="{% url 'App_LUMINOVA:logout' %}">Cerrar sesión</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+</header>

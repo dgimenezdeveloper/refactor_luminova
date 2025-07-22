@@ -1,0 +1,85 @@
+{% extends 'padre.html' %}
+
+{% block sidebar_content %}
+    <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end full-height" style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
+        <div class="position-sticky pt-4">
+            <h6 class="sidebar-heading d-flex justify-content-center align-items-center px-3 mt-4 mb-1 text-white fw-bold">
+                <a href="{% url 'App_LUMINOVA:deposito_view' %}"><span style="color: white;">Depósito</span></a>
+            </h6>
+            <hr class="text-white">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:producto_terminado_create' %}?categoria={{ categoria_PT.id }}">
+                        <i class="bi bi-plus-square me-2"></i> <span class="ms-2">Agregar Producto Terminado</span>
+                    </a>
+                </li>
+                 <li class="nav-item mt-2">
+                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:deposito_view' %}">
+                        <i class="bi bi-arrow-left-circle-fill me-2"></i> <span class="ms-2">Volver a Depósito</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+{% endblock %}
+
+{% block content %}
+
+    <div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmar Eliminación de Producto Terminado</h4>
+                </div>
+                <div class="card-body">
+                    {% if producto_terminado %}
+                        <p class="fs-5">¿Estás seguro de que deseas eliminar permanentemente el producto terminado:</p>
+                        <p class="lead"><strong>"{{ producto_terminado.descripcion }}"</strong>?</p>
+
+                        <p class="text-muted small">Esta acción no se puede deshacer.</p>
+
+                        {% with ordenes_venta_usando=producto_terminado.items_ov.all ordenes_produccion_usando=producto_terminado.ops_producto.all %}
+                            {% if ordenes_venta_usando or ordenes_produccion_usando %}
+                                <div class="alert alert-warning mt-3" role="alert">
+                                    <h5 class="alert-heading">¡Atención! Producto en Uso</h5>
+                                    <p>Este producto terminado (<strong>{{ producto_terminado.descripcion }}</strong>) no puede ser eliminado directamente porque está referenciado en:</p>
+                                    <ul class="mb-0">
+                                    {% for item_ov in ordenes_venta_usando %}
+                                        <li>Orden de Venta N° {{ item_ov.orden_venta.numero_ov }}</li>
+                                    {% endfor %}
+                                    {% for op in ordenes_produccion_usando %}
+                                        <li>Orden de Producción N° {{ op.numero_op }}</li>
+                                    {% endfor %}
+                                    </ul>
+                                    <hr>
+                                    <p class="mb-0 small">La eliminación fallará si estas relaciones están protegidas (lo cual es recomendable).</p>
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+
+                        <form method="post" action="{% url 'App_LUMINOVA:producto_terminado_delete' producto_terminado.pk %}">
+                            {% csrf_token %}
+                            <hr class="my-4">
+                            <div class="d-flex justify-content-end mt-3">
+                                <a href="{% if producto_terminado.categoria_id %}{% url 'App_LUMINOVA:categoria_pt_detail' producto_terminado.categoria.id %}{% else %}{% url 'App_LUMINOVA:deposito_view' %}{% endif %}" class="btn btn-outline-secondary me-2">
+                                    <i class="bi bi-x-circle"></i> Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-danger"
+                                        {% if producto_terminado.items_ov.all or producto_terminado.ops_producto.all %}
+                                            disabled title="No se puede eliminar directamente: el producto está en uso."
+                                        {% endif %}>
+                                    <i class="bi bi-trash3-fill"></i> Sí, Eliminar Producto
+                                </button>
+                            </div>
+                        </form>
+                    {% else %}
+                        <p class="text-danger">Error: No se ha especificado un producto terminado para eliminar.</p>
+                        <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-primary">Volver a Depósito</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
