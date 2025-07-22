@@ -23,6 +23,8 @@ from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAs
     Reportes,
     RolDescripcion,
     SectorAsignado,
+    Deposito,
+    StockProductoTerminado,
 )
 
 
@@ -315,3 +317,6 @@ class LoteProductoTerminadoAdmin(admin.ModelAdmin):
     list_display = ("producto", "op_asociada", "cantidad", "enviado", "fecha_creacion")
     list_filter = ("enviado", "producto")
     search_fields = ("producto__descripcion", "op_asociada__numero_op")
+
+admin.site.register(Deposito)
+admin.site.register(StockProductoTerminado)
