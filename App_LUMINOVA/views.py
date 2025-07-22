@@ -3447,7 +3447,28 @@ class ProductoTerminadoUpdateView(UpdateView):
     fields = "__all__"
     context_object_name = "producto_terminado"
 
+
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        # Guardar el stock en el depósito principal
+        producto = self.object
+        stock_value = self.request.POST.get("stock_principal")
+        if stock_value is not None:
+            try:
+                cantidad = int(stock_value)
+                # Buscar el depósito principal
+                from .models import Deposito, StockProductoTerminado
+                deposito = Deposito.objects.filter(nombre__iexact="Depósito Central").first()
+                if deposito:
+                    stock_obj, _ = StockProductoTerminado.objects.get_or_create(producto=producto, deposito=deposito)
+                    stock_obj.cantidad = cantidad
+                    stock_obj.save()
+            except Exception as e:
+                import logging
+                logging.error(f"Error actualizando stock principal: {e}")
+        return response
 
 
 class ProductoTerminadoDeleteView(DeleteView):
