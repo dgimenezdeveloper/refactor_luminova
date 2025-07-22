@@ -3442,6 +3442,19 @@ class ProductoTerminadoCreateView(CreateView):
 
 
 class ProductoTerminadoUpdateView(UpdateView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from .models import Deposito, StockProductoTerminado
+        depositos = Deposito.objects.all()
+        context['depositos'] = depositos
+        # Diccionario: {deposito.id: cantidad}
+        stock_por_deposito = {}
+        producto = self.object
+        for deposito in depositos:
+            stock_obj = StockProductoTerminado.objects.filter(producto=producto, deposito=deposito).first()
+            stock_por_deposito[deposito.id] = stock_obj.cantidad if stock_obj else 0
+        context['stock_por_deposito'] = stock_por_deposito
+        return context
     model = ProductoTerminado
     template_name = "deposito/productoterminado_editar.html"
     fields = "__all__"
@@ -3452,22 +3465,21 @@ class ProductoTerminadoUpdateView(UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        # Guardar el stock en el depósito principal
         producto = self.object
-        stock_value = self.request.POST.get("stock_principal")
-        if stock_value is not None:
-            try:
-                cantidad = int(stock_value)
-                # Buscar el depósito principal
-                from .models import Deposito, StockProductoTerminado
-                deposito = Deposito.objects.filter(nombre__iexact="Depósito Central").first()
-                if deposito:
+        from .models import Deposito, StockProductoTerminado
+        depositos = Deposito.objects.all()
+        for deposito in depositos:
+            stock_key = f"stock_{deposito.id}"
+            stock_value = self.request.POST.get(stock_key)
+            if stock_value is not None:
+                try:
+                    cantidad = int(stock_value)
                     stock_obj, _ = StockProductoTerminado.objects.get_or_create(producto=producto, deposito=deposito)
                     stock_obj.cantidad = cantidad
                     stock_obj.save()
-            except Exception as e:
-                import logging
-                logging.error(f"Error actualizando stock principal: {e}")
+                except Exception as e:
+                    import logging
+                    logging.error(f"Error actualizando stock para depósito {deposito.nombre}: {e}")
         return response
 
 

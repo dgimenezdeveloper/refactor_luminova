@@ -1,4 +1,7 @@
+
 {% extends 'padre.html' %}
+{% load static %}
+{% load custom_filters %}
 
 {% block sidebar_content %}
     <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end full-height" style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
@@ -96,8 +99,13 @@
                         {% if form.precio_unitario.errors %}<div class="invalid-feedback d-block">{{ form.precio_unitario.errors }}</div>{% endif %}
                     </div>
                     <div style="flex:1; margin-left:20px;">
-                        <label class="form-label">Stock</label>
-                        <input type="number" name="stock_principal" value="{{ producto_terminado.get_stock_en_deposito|default:0 }}" min="0" class="form-control" />
+                        <label class="form-label">Stock por Depósito</label>
+                        {% for deposito in depositos %}
+                            <div class="mb-2">
+                                <span>{{ deposito.nombre }}</span>
+                                <input type="number" name="stock_{{ deposito.id }}" value="{{ stock_por_deposito|default_if_none:0|dict_get:deposito.id }}" min="0" class="form-control" />
+                            </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
