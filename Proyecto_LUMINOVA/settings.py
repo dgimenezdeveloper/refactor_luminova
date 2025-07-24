@@ -41,6 +41,13 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "App_LUMINOVA",
     "django_bootstrap5",
+    # Apps modularizadas
+    "depositos",
+    "productos",
+    "insumos",
+    "movimientos",
+    "reportes",
+    "core",
 ]
 
 MIDDLEWARE = [
