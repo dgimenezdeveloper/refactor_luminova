@@ -3,29 +3,8 @@
 
 from django.contrib import admin, messages
 
-from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAsignado
-    AuditoriaAcceso,
-    CategoriaInsumo,
-    CategoriaProductoTerminado,
-    Cliente,
-    ComponenteProducto,
-    EstadoOrden,
-    Fabricante,
-    Factura,
-    Insumo,
-    ItemOrdenVenta,
-    OfertaProveedor,
-    Orden,
-    OrdenProduccion,
-    OrdenVenta,
-    ProductoTerminado,
-    Proveedor,
-    Reportes,
-    RolDescripcion,
-    SectorAsignado,
-    Deposito,
-    StockProductoTerminado,
-)
+from .models import AuditoriaAcceso, CategoriaInsumo, Cliente, ComponenteProducto, EstadoOrden, Fabricante, Factura, Insumo, ItemOrdenVenta, OfertaProveedor, Orden, OrdenProduccion, OrdenVenta, Proveedor, Reportes, RolDescripcion, SectorAsignado
+from productos.models import ProductoTerminado, CategoriaProductoTerminado
 
 
 class OfertaProveedorInline(admin.TabularInline):  # O admin.StackedInline
@@ -50,13 +29,6 @@ class ComponenteProductoInline(admin.TabularInline):
     fields = ("insumo", "cantidad_necesaria")
 
 
-@admin.register(ProductoTerminado)
-class ProductoTerminadoAdmin(admin.ModelAdmin):
-    list_display = ("descripcion", "categoria", "precio_unitario", "modelo")
-    list_filter = ("categoria",)
-    search_fields = ("descripcion", "modelo")
-    inlines = [ComponenteProductoInline]
-    autocomplete_fields = ["categoria"]
 
 
 @admin.register(Insumo)
@@ -169,9 +141,6 @@ class CategoriaInsumoAdmin(admin.ModelAdmin):
     search_fields = ("nombre",)
 
 
-@admin.register(CategoriaProductoTerminado)
-class CategoriaProductoTerminadoAdmin(admin.ModelAdmin):
-    search_fields = ("nombre",)
 
 
 @admin.register(EstadoOrden)
@@ -318,5 +287,3 @@ class LoteProductoTerminadoAdmin(admin.ModelAdmin):
     list_filter = ("enviado", "producto")
     search_fields = ("producto__descripcion", "op_asociada__numero_op")
 
-admin.site.register(Deposito)
-admin.site.register(StockProductoTerminado)

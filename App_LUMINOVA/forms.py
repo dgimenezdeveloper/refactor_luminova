@@ -1,3 +1,4 @@
+from productos.models import ProductoTerminado
 from django import forms
 
 class MovimientoStockProductoTerminadoForm(forms.Form):
@@ -18,7 +19,8 @@ class MovimientoStockProductoTerminadoForm(forms.Form):
     )
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from .models import ProductoTerminado, Deposito
+        from productos.models import ProductoTerminado
+        from depositos.models import Deposito
         self.fields['producto'].queryset = ProductoTerminado.objects.all()
         self.fields['deposito'].queryset = Deposito.objects.all()
 import logging
@@ -27,24 +29,9 @@ from datetime import timedelta, timezone
 from django import apps, forms
 from django.contrib.auth.models import Group, Permission
 from django.db.models import Q
-
-from .models import (
-    CategoriaInsumo,
-    CategoriaProductoTerminado,
-    Cliente,
-    EstadoOrden,
-    Factura,
-    Insumo,
-    ItemOrdenVenta,
-    OfertaProveedor,
-    Orden,
-    OrdenProduccion,
-    OrdenVenta,
-    ProductoTerminado,
-    Proveedor,
-    Reportes,
-    SectorAsignado,
-)
+from .models import CategoriaInsumo, Cliente, EstadoOrden, Factura, Insumo, ItemOrdenVenta, OfertaProveedor, Orden, OrdenProduccion, OrdenVenta, Reportes
+from productos.models import CategoriaProductoTerminado
+''
 
 logger = logging.getLogger(__name__)
 
@@ -93,14 +80,12 @@ from django import forms
 
 from .models import (  # EstadoOrden y SectorAsignado son los que tenías para OP
     CategoriaInsumo,
-    CategoriaProductoTerminado,
     Cliente,
     EstadoOrden,
     Insumo,
     ItemOrdenVenta,
     OrdenProduccion,
     OrdenVenta,
-    ProductoTerminado,
     Proveedor,
     SectorAsignado,
 )

@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect
-from .models import Deposito
+from depositos.models import Deposito
 
 def deposito_selector_view(request):
     depositos = Deposito.objects.all()

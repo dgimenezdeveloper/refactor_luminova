@@ -1,4 +1,29 @@
-from .models import Deposito
+from productos.models import CategoriaProductoTerminado
+from depositos.models import Deposito, StockProductoTerminado
+from App_LUMINOVA.models import (
+    AuditoriaAcceso,
+    CategoriaInsumo,
+    # CategoriaProductoTerminado,
+    Cliente,
+    ComponenteProducto,
+    EstadoOrden,
+    Fabricante,
+    Factura,
+    HistorialOV,
+    Insumo,
+    ItemOrdenVenta,
+    LoteProductoTerminado,
+    OfertaProveedor,
+    Orden,
+    OrdenProduccion,
+    OrdenVenta,
+    PasswordChangeRequired,
+    ProductoTerminado,
+    Proveedor,
+    Reportes,
+    RolDescripcion,
+    SectorAsignado,
+)
 
 def deposito_selector_view(request):
     depositos = Deposito.objects.all()
@@ -64,32 +89,7 @@ from .forms import (
 )
 
 # Local Application Imports (Models)
-from .models import (
-    AuditoriaAcceso,
-    CategoriaInsumo,
-    CategoriaProductoTerminado,
-    Cliente,
-    ComponenteProducto,
-    EstadoOrden,
-    Fabricante,
-    Factura,
-    HistorialOV,
-    Insumo,
-    ItemOrdenVenta,
-    LoteProductoTerminado,
-    OfertaProveedor,
-    Orden,
-    OrdenProduccion,
-    OrdenVenta,
-    PasswordChangeRequired,
-    ProductoTerminado,
-    Proveedor,
-    Reportes,
-    RolDescripcion,
-    SectorAsignado,
-    Deposito,
-    StockProductoTerminado,
-)
+from depositos.models import Deposito, StockProductoTerminado
 from .signals import get_client_ip
 
 from .services.document_services import generar_siguiente_numero_documento
@@ -3444,7 +3444,7 @@ class ProductoTerminadoCreateView(CreateView):
 class ProductoTerminadoUpdateView(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        from .models import Deposito, StockProductoTerminado
+        from depositos.models import Deposito, StockProductoTerminado
         depositos = Deposito.objects.all()
         context['depositos'] = depositos
         # Diccionario: {deposito.id: cantidad}
@@ -3466,7 +3466,7 @@ class ProductoTerminadoUpdateView(UpdateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         producto = self.object
-        from .models import Deposito, StockProductoTerminado
+        from depositos.models import Deposito, StockProductoTerminado
         depositos = Deposito.objects.all()
         for deposito in depositos:
             stock_key = f"stock_{deposito.id}"
