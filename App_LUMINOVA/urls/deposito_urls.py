@@ -1,4 +1,5 @@
 from django.urls import path
+from ..views import deposito_selector_view, deposito_view, deposito_solicitudes_insumos_view, deposito_detalle_solicitud_op_view, deposito_enviar_insumos_op_view, deposito_enviar_lote_pt_view, recepcion_pedidos_view, recibir_pedido_oc_view, ProveedorListView, ProveedorDetailView, proveedor_create_view, ProveedorUpdateView, ProveedorDeleteView, FabricanteDetailView, FabricanteCreateView, FabricanteUpdateView, FabricanteDeleteView, Categoria_IDetailView, Categoria_ICreateView, Categoria_IUpdateView, Categoria_IDeleteView, Categoria_PTDetailView, Categoria_PTCreateView, Categoria_PTUpdateView, Categoria_PTDeleteView, InsumoCreateView, InsumoUpdateView, InsumoDeleteView, ProductoTerminadoCreateView, ProductoTerminadoUpdateView, ProductoTerminadoDeleteView
 from ..views import (
     deposito_view,
     deposito_solicitudes_insumos_view,
@@ -34,6 +35,7 @@ from ..views import (
 
 # Rutas de Ventas
 urlpatterns = [
+    path("deposito/selector/", deposito_selector_view, name="deposito_selector"),
     path("deposito/", deposito_view, name="deposito_view"),
     path(
         "deposito/solicitudes-insumos/",

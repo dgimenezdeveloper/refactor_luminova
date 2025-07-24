@@ -1,0 +1,38 @@
+{% extends 'padre.html' %}
+{% load static %}
+
+{% block title %}Seleccionar Depósito - Luminova{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'deposito/deposito_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8 col-12">
+            <div class="card shadow-sm" style="border-radius: 18px;">
+                <div class="card-header bg-primary text-white text-center" style="border-radius: 18px 18px 0 0;">
+                    <h2 class="mb-0">Seleccionar Depósito</h2>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'App_LUMINOVA:deposito_view' %}">
+                        <div class="mb-3">
+                            <label for="deposito_id" class="form-label">Depósito:</label>
+                            <select name="deposito_id" id="deposito_id" class="form-select" required>
+                                <option value="" disabled selected>Seleccione un depósito...</option>
+                                {% for deposito in depositos %}
+                                    <option value="{{ deposito.id }}">{{ deposito.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary px-4">Ingresar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

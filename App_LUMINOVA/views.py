@@ -1,3 +1,12 @@
+from .models import Deposito
+
+def deposito_selector_view(request):
+    depositos = Deposito.objects.all()
+    if request.method == "GET" and "deposito_id" in request.GET:
+        deposito_id = request.GET.get("deposito_id")
+        if deposito_id:
+            return redirect(f"/deposito/deposito/?deposito_id={deposito_id}")
+    return render(request, "deposito/deposito_selector.html", {"depositos": depositos})
 import logging
 from datetime import timedelta
 
@@ -78,6 +87,8 @@ from .models import (
     Reportes,
     RolDescripcion,
     SectorAsignado,
+    Deposito,
+    StockProductoTerminado,
 )
 from .signals import get_client_ip
 
@@ -2242,12 +2253,15 @@ def produccion_detalle_op_view(request, op_id):
                 cantidad_producida = op_actualizada.cantidad_a_producir
                 if producto_terminado_obj and cantidad_producida > 0:
 
-                    # 1. Actualizar el stock principal del ProductoTerminado
-                    producto_terminado_obj.stock = F("stock") + cantidad_producida
-                    producto_terminado_obj.save(update_fields=["stock"])
-                    logger.info(
-                        f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida}."
-                    )
+                    # 1. Actualizar el stock en el depósito correspondiente (Depósito Central por defecto)
+                    deposito_central = Deposito.objects.filter(nombre__iexact="Depósito Central").first()
+                    if deposito_central:
+                        producto_terminado_obj.agregar_stock(cantidad_producida, deposito_central)
+                        logger.info(
+                            f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida} en '{deposito_central.nombre}'."
+                        )
+                    else:
+                        logger.error("No se encontró el Depósito Central para registrar el stock producido.")
 
                     # 2. Crear el lote para registro y envío
                     LoteProductoTerminado.objects.create(
@@ -2761,15 +2775,38 @@ def recibir_pedido_oc_view(request, oc_id):
 def deposito_view(request):
     logger.info("--- deposito_view: INICIO ---")
 
+
     categorias_I = CategoriaInsumo.objects.all()
     categorias_PT = CategoriaProductoTerminado.objects.all()
+    depositos = Deposito.objects.all()
 
+    deposito_id = request.GET.get("deposito_id")
+    deposito_seleccionado = None
+    if not deposito_id:
+        return redirect('App_LUMINOVA:deposito_selector')
+    if deposito_id:
+        deposito_seleccionado = Deposito.objects.filter(id=deposito_id).first()
+    if not deposito_seleccionado and depositos.exists():
+        deposito_seleccionado = depositos.first()
+
+    productos_terminados = ProductoTerminado.objects.all().select_related("categoria")
+    productos_stock_por_deposito = []
+    for pt in productos_terminados:
+        stock_en_deposito = pt.get_stock_en_deposito(deposito_seleccionado) if deposito_seleccionado else pt.get_stock_total()
+        # Si no hay stock, mostrar 0 explícitamente
+        if stock_en_deposito is None:
+            stock_en_deposito = 0
+        productos_stock_por_deposito.append({
+            "producto": pt,
+            "stock": stock_en_deposito,
+            "deposito": deposito_seleccionado,
+        })
+
+    # Lógica original de OPs y lotes
     ops_pendientes_deposito_list = OrdenProduccion.objects.none()
     ops_pendientes_deposito_count = 0
     try:
-        estado_sol = EstadoOrden.objects.filter(
-            nombre__iexact="Insumos Solicitados"
-        ).first()
+        estado_sol = EstadoOrden.objects.filter(nombre__iexact="Insumos Solicitados").first()
         if estado_sol:
             ops_pendientes_deposito_list = (
                 OrdenProduccion.objects.filter(estado_op=estado_sol)
@@ -2786,53 +2823,63 @@ def deposito_view(request):
         .order_by("-fecha_creacion")
     )
 
-    # --- INICIO DE LA CORRECCIÓN DE LÓGICA ---
+    # Lógica de insumos bajo stock y pedidos
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
     insumos_con_stock_bajo = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
-
-    # Estados que consideramos como "pedido en firme" (ya no es tarea del depósito)
-    UMBRAL_STOCK_BAJO_INSUMOS = 15000
-    insumos_con_stock_bajo = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
-
-    # Estados que consideramos como "pedido en firme" (ya no es tarea del depósito/compras iniciar)
-    ESTADOS_OC_EN_PROCESO = [
-        "APROBADA",
-        "ENVIADA_PROVEEDOR",
-        "EN_TRANSITO",
-        "RECIBIDA_PARCIAL",
-    ]
-
+    ESTADOS_OC_EN_PROCESO = ["APROBADA", "ENVIADA_PROVEEDOR", "EN_TRANSITO", "RECIBIDA_PARCIAL"]
     insumos_a_gestionar = []
     insumos_en_pedido = []
-
     for insumo in insumos_con_stock_bajo:
-        # Buscamos si existe una OC que ya está aprobada y en proceso
         oc_en_proceso = (
-            Orden.objects.filter(
-                insumo_principal=insumo, estado__in=ESTADOS_OC_EN_PROCESO
-            )
+            Orden.objects.filter(insumo_principal=insumo, estado__in=ESTADOS_OC_EN_PROCESO)
             .order_by("-fecha_creacion")
             .first()
         )
-
         if oc_en_proceso:
-            # Si ya está en proceso, va a la tabla "En Pedido"
             insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso})
         else:
-            # Si no hay OC en proceso (puede no existir o estar solo en Borrador),
-            # es una acción pendiente.
             insumos_a_gestionar.append({"insumo": insumo})
-    # --- FIN DE LA CORRECCIÓN DE LÓGICA ---
+
+    from .forms import MovimientoStockProductoTerminadoForm
+    from django.contrib import messages
+
+    # Procesar movimiento de stock si se envió el formulario
+    if request.method == "POST":
+        form = MovimientoStockProductoTerminadoForm(request.POST)
+        if form.is_valid():
+            producto = form.cleaned_data["producto"]
+            deposito = form.cleaned_data["deposito"]
+            cantidad = form.cleaned_data["cantidad"]
+            tipo_movimiento = form.cleaned_data["tipo_movimiento"]
+            if tipo_movimiento == "ingreso":
+                producto.agregar_stock(cantidad, deposito)
+                messages.success(request, f"Se ingresaron {cantidad} unidades de '{producto}' en '{deposito}'.")
+            elif tipo_movimiento == "egreso":
+                if producto.quitar_stock(cantidad, deposito):
+                    messages.success(request, f"Se egresaron {cantidad} unidades de '{producto}' de '{deposito}'.")
+                else:
+                    messages.error(request, f"No hay suficiente stock de '{producto}' en '{deposito}' para egresar {cantidad} unidades.")
+            # Redirigir para evitar reenvío del formulario
+            return redirect(f"{request.path}?deposito_id={deposito.id}")
+        else:
+            messages.error(request, "Formulario inválido. Verifique los datos ingresados.")
+        form_movimiento_stock = form
+    else:
+        form_movimiento_stock = MovimientoStockProductoTerminadoForm()
 
     context = {
         "categorias_I": categorias_I,
         "categorias_PT": categorias_PT,
+        "depositos": depositos,
+        "deposito_seleccionado": deposito_seleccionado,
+        "productos_stock_por_deposito": productos_stock_por_deposito,
         "ops_pendientes_deposito_list": ops_pendientes_deposito_list,
         "ops_pendientes_deposito_count": ops_pendientes_deposito_count,
         "lotes_productos_terminados_en_stock": lotes_en_stock,
-        "insumos_a_gestionar_list": insumos_a_gestionar,  # Nueva lista para la primera tabla
-        "insumos_en_pedido_list": insumos_en_pedido,  # Nueva lista para la segunda tabla
+        "insumos_a_gestionar_list": insumos_a_gestionar,
+        "insumos_en_pedido_list": insumos_en_pedido,
         "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
+        "form_movimiento_stock": form_movimiento_stock,
     }
 
     return render(request, "deposito/deposito.html", context)
@@ -2959,18 +3006,22 @@ def deposito_enviar_lote_pt_view(request, lote_id):
     producto_terminado = lote.producto
     cantidad_a_enviar = lote.cantidad
 
-    if producto_terminado.stock < cantidad_a_enviar:
-        messages.error(
-            request,
-            f"Error de consistencia de datos: No hay stock suficiente para '{producto_terminado.descripcion}' para enviar el lote. Stock actual: {producto_terminado.stock}, se necesita: {cantidad_a_enviar}.",
-        )
-        return redirect("App_LUMINOVA:deposito_view")
 
-    producto_terminado.stock -= cantidad_a_enviar
-    producto_terminado.save(update_fields=["stock"])
-    logger.info(
-        f"Stock de '{producto_terminado.descripcion}' descontado en {cantidad_a_enviar}."
-    )
+    deposito_central = Deposito.objects.filter(nombre__iexact="Depósito Central").first()
+    if deposito_central:
+        stock_obj = StockProductoTerminado.objects.filter(producto=producto_terminado, deposito=deposito_central).first()
+        if not stock_obj or stock_obj.cantidad < cantidad_a_enviar:
+            messages.error(
+                request,
+                f"Error de consistencia de datos: No hay stock suficiente para '{producto_terminado.descripcion}' en '{deposito_central.nombre}' para enviar el lote. Stock actual: {stock_obj.cantidad if stock_obj else 0}, se necesita: {cantidad_a_enviar}.",
+            )
+            return redirect("App_LUMINOVA:deposito_view")
+        producto_terminado.quitar_stock(cantidad_a_enviar, deposito_central)
+        logger.info(
+            f"Stock de '{producto_terminado.descripcion}' descontado en {cantidad_a_enviar} en '{deposito_central.nombre}'."
+        )
+    else:
+        logger.error("No se encontró el Depósito Central para descontar el stock enviado.")
 
     lote.enviado = True
     lote.save(update_fields=["enviado"])
@@ -3391,12 +3442,45 @@ class ProductoTerminadoCreateView(CreateView):
 
 
 class ProductoTerminadoUpdateView(UpdateView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from .models import Deposito, StockProductoTerminado
+        depositos = Deposito.objects.all()
+        context['depositos'] = depositos
+        # Diccionario: {deposito.id: cantidad}
+        stock_por_deposito = {}
+        producto = self.object
+        for deposito in depositos:
+            stock_obj = StockProductoTerminado.objects.filter(producto=producto, deposito=deposito).first()
+            stock_por_deposito[deposito.id] = stock_obj.cantidad if stock_obj else 0
+        context['stock_por_deposito'] = stock_por_deposito
+        return context
     model = ProductoTerminado
     template_name = "deposito/productoterminado_editar.html"
     fields = "__all__"
     context_object_name = "producto_terminado"
 
+
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        producto = self.object
+        from .models import Deposito, StockProductoTerminado
+        depositos = Deposito.objects.all()
+        for deposito in depositos:
+            stock_key = f"stock_{deposito.id}"
+            stock_value = self.request.POST.get(stock_key)
+            if stock_value is not None:
+                try:
+                    cantidad = int(stock_value)
+                    stock_obj, _ = StockProductoTerminado.objects.get_or_create(producto=producto, deposito=deposito)
+                    stock_obj.cantidad = cantidad
+                    stock_obj.save()
+                except Exception as e:
+                    import logging
+                    logging.error(f"Error actualizando stock para depósito {deposito.nombre}: {e}")
+        return response
 
 
 class ProductoTerminadoDeleteView(DeleteView):

@@ -46,70 +46,43 @@
 
 
         {% if productos_de_categoria %}
-            <div class="table-responsive rounded">
-                <table class="table mb-0">
-                    <thead>
-                        <tr>
-                            <th colspan="10" class="text-center py-3 color-title-depo">
-                                <div class="d-flex justify-content-center align-items-center">
-
-                                    <h3 class="mb-0">{{ categoria_PT.nombre }}</h3>
-                                </div>
-                            </th>
-                        </tr>
-                        <tr>
-                            <th scope="col" class="text-center color-thead-depo"></th>
-                            <th scope="col" class="text-center color-thead-depo">Imagen</th>
-                            <th scope="col" class="text-center color-thead-depo">ID</th>
-                            <th scope="col" class="color-thead-depo">Descripción</th>
-                            <th scope="col" class="text-center color-thead-depo">Modelo</th>
-                            <th scope="col" class="text-center color-thead-depo">Potencia</th>
-                            <th scope="col" class="text-center color-thead-depo">Color de Luz</th>
-                            <th scope="col" class="text-center color-thead-depo">Material</th>
-                            <th scope="col" class="text-center color-thead-depo">Cantidad</th>
-                            <th scope="col" class="text-center color-thead-depo">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for producto in productos_de_categoria %}
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
-                            <td class="text-center align-middle">
-                                {% if producto.stock < 10 %}
-                                    <div style="width: 18px; height: 18px; background-color:red; border-radius: 4px; display: inline-block; border: 1px solid #555;" title="Stock: {{ producto.stock }} (Bajo)"></div>
-                                {% elif producto.stock < 50 %}
-                                    <div style="width: 18px; height: 18px; background-color:yellow; border-radius: 4px; display: inline-block;" title="Stock: {{ producto.stock }} (Medio)"></div>
-                                {% else %}
-                                    <div style="width: 18px; height: 18px; background-color:green; border-radius: 4px; display: inline-block;" title="Stock: {{ producto.stock }} (Alto)"></div>
-                                {% endif %}
-                            </td>
-                            <td class="text-center align-middle">
-                                {% if producto.imagen %}
-                                    <img src="{{ producto.imagen.url }}" alt="{{ producto.descripcion }}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">
-                                {% else %}
-                                    <img src="{% static 'img/placeholder_producto.png' %}" alt="No image" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;"> {# Placeholder específico #}
-                                {% endif %}
-                            </td>
-                            <td class="text-center align-middle">{{ producto.id }}</td>
-                            <td class="align-middle">
-                                {% if producto.descripcion %}
-                                    <span title="{{ producto.descripcion }}">{{ producto.descripcion|truncatewords:10 }}</span>
-                                {% else %}
-                                    <span title="Sin descripción">N/A</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center align-middle">{{ producto.modelo|default:"N/A" }}</td>
-                            <td class="text-center align-middle">{{ producto.potencia }}W</td>
-                            <td class="text-center align-middle">{{ producto.color_luz }}</td>
-                            <td class="text-center align-middle">{{ producto.material }}</td>
-                            <td class="text-center align-middle">{{ producto.stock }}</td>
-                            <td class="text-center align-middle">
-                                <a href="{% url 'App_LUMINOVA:producto_terminado_edit' producto.pk %}" class="btn btn-sm btn-outline-primary me-1" title="Editar Producto"><i class="bi bi-pencil-fill"></i></a>
-                                <a href="{% url 'App_LUMINOVA:producto_terminado_delete' producto.pk %}" class="btn btn-sm btn-outline-danger me-1" title="Eliminar Producto"><i class="bi bi-trash-fill"></i></a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 mt-2">
+                {% for producto in productos_de_categoria %}
+                {% with stock_total=producto.get_stock_total %}
+                <div class="col">
+                    <div class="card h-100 shadow-sm border-0" style="border-radius: 18px;">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center" style="border-radius: 18px 18px 0 0;">
+                            <span class="fw-bold text-primary">#{{ producto.id }}</span>
+                            {% if stock_total < 10 %}
+                                <span class="badge bg-danger">Stock bajo</span>
+                            {% elif stock_total < 50 %}
+                                <span class="badge bg-warning text-dark">Stock medio</span>
+                            {% else %}
+                                <span class="badge bg-success">Stock alto</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                            {% if producto.imagen %}
+                                <img src="{{ producto.imagen.url }}" alt="{{ producto.descripcion }}" class="mb-2" style="width: 120px; height: 120px; object-fit: contain; border-radius: 12px; border: 1px solid #014BAC; background: #f8f9fa;">
+                            {% else %}
+                                <img src="{% static 'img/placeholder_producto.png' %}" alt="No image" class="mb-2" style="width: 120px; height: 120px; object-fit: contain; border-radius: 12px; border: 1px solid #014BAC; background: #f8f9fa;">
+                            {% endif %}
+                            <h5 class="card-title text-center text-dark mb-1">{{ producto.descripcion|default:"Sin descripción" }}</h5>
+                            <div class="mb-2 text-muted small">Modelo: <span class="fw-bold">{{ producto.modelo|default:"N/A" }}</span></div>
+                            <div class="mb-2 text-muted small">Potencia: <span class="fw-bold">{{ producto.potencia|default:"-" }}W</span></div>
+                            <div class="mb-2 text-muted small">Color de luz: <span class="fw-bold">{{ producto.color_luz|default:"-" }}</span></div>
+                            <div class="mb-2 text-muted small">Material: <span class="fw-bold">{{ producto.material|default:"-" }}</span></div>
+                            <div class="mb-2 text-dark fs-5">Stock: <span class="fw-bold">{{ stock_total }}</span></div>
+                        </div>
+                        <div class="card-footer bg-white d-flex justify-content-center gap-2" style="border-radius: 0 0 18px 18px;">
+                            <a href="{% url 'App_LUMINOVA:producto_terminado_edit' producto.pk %}" class="btn btn-outline-primary btn-sm" title="Editar"><i class="bi bi-pencil-fill"></i></a>
+                            <a href="{% url 'App_LUMINOVA:producto_terminado_delete' producto.pk %}" class="btn btn-outline-danger btn-sm" title="Eliminar"><i class="bi bi-trash-fill"></i></a>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+                {% endfor %}
+            </div>
             </div>
             <div class="mt-3 text-white d-flex justify-content-center align-items-center p-2 rounded" style="background-color: #014BAC;">
                 <strong class="me-3">Estados de Stock:</strong>

@@ -23,6 +23,8 @@ from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAs
     Reportes,
     RolDescripcion,
     SectorAsignado,
+    Deposito,
+    StockProductoTerminado,
 )
 
 
@@ -50,7 +52,7 @@ class ComponenteProductoInline(admin.TabularInline):
 
 @admin.register(ProductoTerminado)
 class ProductoTerminadoAdmin(admin.ModelAdmin):
-    list_display = ("descripcion", "categoria", "stock", "precio_unitario", "modelo")
+    list_display = ("descripcion", "categoria", "precio_unitario", "modelo")
     list_filter = ("categoria",)
     search_fields = ("descripcion", "modelo")
     inlines = [ComponenteProductoInline]
@@ -315,3 +317,6 @@ class LoteProductoTerminadoAdmin(admin.ModelAdmin):
     list_display = ("producto", "op_asociada", "cantidad", "enviado", "fecha_creacion")
     list_filter = ("enviado", "producto")
     search_fields = ("producto__descripcion", "op_asociada__numero_op")
+
+admin.site.register(Deposito)
+admin.site.register(StockProductoTerminado)
