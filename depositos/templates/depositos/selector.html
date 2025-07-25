@@ -1,0 +1,15 @@
+{% extends 'padre.html' %}
+{% block content %}
+<h2>Seleccionar depósito</h2>
+<form method="get" action="">
+    <div class="mb-3">
+        <label for="deposito" class="form-label">Depósito</label>
+        <select name="deposito_id" id="deposito" class="form-select">
+            {% for deposito in depositos %}
+                <option value="{{ deposito.id }}">{{ deposito.nombre }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Ver stock</button>
+</form>
+{% endblock %}
