@@ -402,19 +402,6 @@ class Orden(models.Model):
         super().save(*args, **kwargs)
 
 
-class LoteProductoTerminado(models.Model):
-    producto = models.ForeignKey(
-        ProductoTerminado, on_delete=models.PROTECT, related_name="lotes"
-    )
-    op_asociada = models.ForeignKey(
-        OrdenProduccion, on_delete=models.PROTECT, related_name="lotes_pt"
-    )
-    cantidad = models.PositiveIntegerField()
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    enviado = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"Lote de {self.producto.descripcion} - OP {self.op_asociada.numero_op} ({self.cantidad})"
 
 
 class HistorialOV(models.Model):

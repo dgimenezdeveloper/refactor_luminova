@@ -12,7 +12,6 @@ from App_LUMINOVA.models import (
     HistorialOV,
     Insumo,
     ItemOrdenVenta,
-    LoteProductoTerminado,
     OfertaProveedor,
     Orden,
     OrdenProduccion,
@@ -24,6 +23,7 @@ from App_LUMINOVA.models import (
     RolDescripcion,
     SectorAsignado,
 )
+from productos.models import LoteProductoTerminado
 
 def deposito_selector_view(request):
     depositos = Deposito.objects.all()

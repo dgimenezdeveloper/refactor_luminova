@@ -1,6 +1,22 @@
 
 from django.db import models
 
+class LoteProductoTerminado(models.Model):
+    producto = models.ForeignKey(
+        'ProductoTerminado', on_delete=models.PROTECT, related_name="lotes"
+    )
+    op_asociada = models.ForeignKey(
+        'App_LUMINOVA.OrdenProduccion', on_delete=models.PROTECT, related_name="lotes_pt"
+    )
+    cantidad = models.PositiveIntegerField()
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    enviado = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Lote de {self.producto.descripcion} - OP {self.op_asociada.numero_op} ({self.cantidad})"
+
+from django.db import models
+
 class CategoriaProductoTerminado(models.Model):
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre Categoría PT")
     imagen = models.ImageField(upload_to="categorias_productos/", null=True, blank=True)

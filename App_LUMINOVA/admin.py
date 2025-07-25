@@ -278,7 +278,9 @@ class OrdenAdmin(admin.ModelAdmin):
     )
 
 
-from .models import LoteProductoTerminado
+
+from productos.models import LoteProductoTerminado
+
 
 
 @admin.register(LoteProductoTerminado)
