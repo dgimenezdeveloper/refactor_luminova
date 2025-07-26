@@ -182,7 +182,7 @@
                 {% for item in insumos_a_gestionar_list %}
                 <tr class="{% if forloop.counter|divisibleby:2 %}table-row-even{% else %}table-row-odd{% endif %}">
                     <td class="text-white" colspan="2">{{ item.insumo.descripcion|truncatechars:25 }}</td>
-                    <td class="text-white text-center fw-bold text-danger">{{ item.insumo.stock }}</td>
+                    <td class="text-white text-center fw-bold text-danger">{{ item.insumo.cantidad }}</td>
                     <td class="text-white text-center">
                         <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' item.insumo.id %}" class="btn btn-success btn-sm" title="Seleccionar proveedor para comprar {{ item.insumo.descripcion }}">
                             <i class="bi bi-cart-plus-fill"></i>

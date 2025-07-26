@@ -41,7 +41,7 @@
                     {{ insumo_item.descripcion|truncatechars:40 }}
                 </td>
                 <td>{{ insumo_item.categoria.nombre|default_if_none:"N/A" }}</td>
-                <td class="text-center fw-bold text-danger">{{ insumo_item.stock }}</td>
+                <td class="text-center fw-bold text-danger">{{ insumo_item.cantidad }}</td>
                 <td class="text-center">
                     {# La URL ahora usa `insumo_item.id`, que está garantizado que tiene un valor #}
                     <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' insumo_item.id %}" 

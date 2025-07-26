@@ -3,7 +3,8 @@
 
 from django.contrib import admin, messages
 
-from .models import AuditoriaAcceso, CategoriaInsumo, Cliente, ComponenteProducto, EstadoOrden, Fabricante, Factura, Insumo, ItemOrdenVenta, OfertaProveedor, Orden, OrdenProduccion, OrdenVenta, Proveedor, Reportes, RolDescripcion, SectorAsignado
+from .models import AuditoriaAcceso, Cliente, ComponenteProducto, EstadoOrden, Factura, ItemOrdenVenta, Orden, OrdenProduccion, OrdenVenta, Reportes, RolDescripcion, SectorAsignado
+from insumos.models import CategoriaInsumo, Proveedor, Fabricante, Insumo, OfertaProveedor
 from productos.models import ProductoTerminado, CategoriaProductoTerminado
 
 
@@ -34,9 +35,8 @@ class ComponenteProductoInline(admin.TabularInline):
 @admin.register(Insumo)
 class InsumoAdmin(admin.ModelAdmin):
     list_display = (
-        "descripcion",
+        "nombre",
         "categoria",
-        "stock",
         "fabricante",
         "mostrar_ofertas_resumen",
     )  # 'mostrar_ofertas_resumen' es el nombre del método

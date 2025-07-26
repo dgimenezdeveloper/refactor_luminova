@@ -5,7 +5,9 @@ from django.contrib.auth.models import Group, User
 from django.core.exceptions import ValidationError
 from django.db import models
 
+
 from django.utils import timezone  # Importar timezone
+from insumos.models import Insumo, Proveedor
 
 
 
@@ -13,91 +15,7 @@ from django.utils import timezone  # Importar timezone
 
 
 
-class CategoriaInsumo(models.Model):
-    nombre = models.CharField(
-        max_length=100, unique=True, verbose_name="Nombre Categoría Insumo"
-    )
-    imagen = models.ImageField(upload_to="categorias_insumos/", null=True, blank=True)
 
-    class Meta:
-        verbose_name = "Categoría de Insumo"
-        verbose_name_plural = "Categorías de Insumos"
-
-    def __str__(self):
-        return self.nombre
-
-
-class Proveedor(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    contacto = models.CharField(max_length=100, blank=True)
-    telefono = models.CharField(max_length=25, blank=True)
-    email = models.EmailField(blank=True, null=True)
-
-    def __str__(self):
-        return self.nombre
-
-
-class Fabricante(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    contacto = models.CharField(max_length=100, blank=True)
-    telefono = models.CharField(max_length=25, blank=True)  # Aumentado max_length
-    email = models.EmailField(blank=True, null=True)
-
-    def __str__(self):
-        return self.nombre
-
-
-class Insumo(models.Model):
-    descripcion = models.CharField(max_length=255)
-    categoria = models.ForeignKey(
-        CategoriaInsumo, on_delete=models.PROTECT, related_name="insumos"
-    )
-    fabricante = models.ForeignKey(
-        Fabricante,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="insumos_fabricados",
-    )
-    imagen = models.ImageField(null=True, blank=True, upload_to="insumos/")
-    stock = models.IntegerField(default=0)
-    cantidad_en_pedido = models.PositiveIntegerField(
-        default=0, verbose_name="Cantidad en Pedido", blank=True, null=True
-    )
-
-    def __str__(self):
-        return self.descripcion
-
-
-# --- NUEVO MODELO INTERMEDIO ---
-class OfertaProveedor(models.Model):
-    insumo = models.ForeignKey(
-        Insumo, on_delete=models.CASCADE, related_name="ofertas_de_proveedores"
-    )
-    proveedor = models.ForeignKey(
-        Proveedor, on_delete=models.CASCADE, related_name="provee_insumos"
-    )
-    precio_unitario_compra = models.DecimalField(
-        max_digits=10, decimal_places=2, verbose_name="Precio de Compra Unitario"
-    )
-    tiempo_entrega_estimado_dias = models.IntegerField(
-        default=0, verbose_name="Tiempo de Entrega Estimado (días)"
-    )
-    fecha_actualizacion_precio = models.DateTimeField(
-        default=timezone.now, verbose_name="Última Actualización del Precio"
-    )
-
-    class Meta:
-        unique_together = (
-            "insumo",
-            "proveedor",
-        )
-        verbose_name = "Oferta de Proveedor por Insumo"
-        verbose_name_plural = "Ofertas de Proveedores por Insumos"
-        ordering = ["insumo__descripcion", "proveedor__nombre"]
-
-    def __str__(self):
-        return f"{self.insumo.descripcion} - {self.proveedor.nombre} (${self.precio_unitario_compra})"
 
 
 class ComponenteProducto(models.Model):

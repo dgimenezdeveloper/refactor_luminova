@@ -2,27 +2,23 @@ from productos.models import CategoriaProductoTerminado
 from depositos.models import Deposito, StockProductoTerminado
 from App_LUMINOVA.models import (
     AuditoriaAcceso,
-    CategoriaInsumo,
     # CategoriaProductoTerminado,
     Cliente,
     ComponenteProducto,
     EstadoOrden,
-    Fabricante,
     Factura,
     HistorialOV,
-    Insumo,
     ItemOrdenVenta,
-    OfertaProveedor,
     Orden,
     OrdenProduccion,
     OrdenVenta,
     PasswordChangeRequired,
     ProductoTerminado,
-    Proveedor,
     Reportes,
     RolDescripcion,
     SectorAsignado,
 )
+from insumos.models import CategoriaInsumo, Proveedor, Fabricante, Insumo, OfertaProveedor
 from productos.models import LoteProductoTerminado
 
 def deposito_selector_view(request):
@@ -194,12 +190,12 @@ def dashboard_view(request):
     # --- 2. Tarjeta: Stock Crítico ---
     UMBRAL_STOCK_BAJO = 15000
     insumos_criticos_query = Insumo.objects.filter(
-        stock__lt=UMBRAL_STOCK_BAJO
-    ).order_by("stock")[:5]
+        cantidad__lt=UMBRAL_STOCK_BAJO
+    ).order_by("cantidad")[:5]
     insumos_criticos_con_porcentaje = []
     for insumo in insumos_criticos_query:
         porcentaje_stock = (
-            int((insumo.stock / UMBRAL_STOCK_BAJO) * 100)
+            int((insumo.cantidad / UMBRAL_STOCK_BAJO) * 100)
             if UMBRAL_STOCK_BAJO > 0
             else 0
         )
@@ -1374,10 +1370,10 @@ def compras_desglose_view(request):
     # 2. Buscamos insumos críticos, EXCLUYENDO los que ya están gestionados.
     #    La lista resultante solo contendrá insumos sin OC o con OC en 'BORRADOR'.
     insumos_criticos_para_gestionar = (
-        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+        Insumo.objects.filter(cantidad__lt=UMBRAL_STOCK_BAJO_INSUMOS)
         .exclude(id__in=insumos_ya_gestionados_ids)
         .select_related("categoria")
-        .order_by("categoria__nombre", "stock", "descripcion")
+        .order_by("categoria__nombre", "cantidad", "descripcion")
     )
 
     logger.info(
@@ -3093,14 +3089,14 @@ class Categoria_IDetailView(DetailView):
 class Categoria_ICreateView(CreateView):
     model = CategoriaInsumo
     template_name = "deposito/categoria_insumo_crear.html"
-    fields = ("nombre", "imagen")
+    fields = ("nombre",)
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
 
 
 class Categoria_IUpdateView(UpdateView):
     model = CategoriaInsumo
     template_name = "deposito/categoria_insumo_editar.html"
-    fields = ("nombre", "imagen")
+    fields = ("nombre",)
     context_object_name = "categoria"
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
 
@@ -3252,7 +3248,7 @@ class InsumoCreateView(CreateView):
     model = Insumo
     template_name = "deposito/insumo_crear.html"
     # Define los campos que SÍ están en el modelo Insumo y quieres en el formulario de creación
-    fields = ["descripcion", "categoria", "fabricante", "stock", "imagen"]
+    fields = ["descripcion", "categoria", "fabricante", "cantidad", "imagen"]
     # success_url = reverse_lazy('App_LUMINOVA:deposito_view') # Redirige a la vista principal de depósito
 
     def form_valid(self, form):
@@ -3304,7 +3300,7 @@ class InsumoUpdateView(UpdateView):
         "descripcion",
         "categoria",
         "fabricante",
-        "stock",
+        "cantidad",
         "imagen",
     ]  # Lista los campos que quieres que sean editables
     # O usa un formulario personalizado:

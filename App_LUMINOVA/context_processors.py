@@ -41,7 +41,7 @@ def notificaciones_context(request):
     ).values_list("insumo_principal_id", flat=True)
 
     insumos_stock_bajo_count = (
-        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO)
+        Insumo.objects.filter(cantidad__lt=UMBRAL_STOCK_BAJO)
         .exclude(id__in=insumos_con_oc_en_firme)
         .count()
     )

@@ -29,7 +29,8 @@ from datetime import timedelta, timezone
 from django import apps, forms
 from django.contrib.auth.models import Group, Permission
 from django.db.models import Q
-from .models import CategoriaInsumo, Cliente, EstadoOrden, Factura, Insumo, ItemOrdenVenta, OfertaProveedor, Orden, OrdenProduccion, OrdenVenta, Reportes
+from .models import Cliente, EstadoOrden, Factura, ItemOrdenVenta, Orden, OrdenProduccion, OrdenVenta, Reportes
+from insumos.models import CategoriaInsumo, Insumo, OfertaProveedor
 from productos.models import CategoriaProductoTerminado
 ''
 
@@ -79,16 +80,14 @@ class PermisosRolForm(forms.Form):
 from django import forms
 
 from .models import (  # EstadoOrden y SectorAsignado son los que tenías para OP
-    CategoriaInsumo,
     Cliente,
     EstadoOrden,
-    Insumo,
     ItemOrdenVenta,
     OrdenProduccion,
     OrdenVenta,
-    Proveedor,
     SectorAsignado,
 )
+from insumos.models import CategoriaInsumo, Insumo, Proveedor
 
 
 class ClienteForm(forms.ModelForm):
@@ -365,18 +364,12 @@ class OrdenProduccionUpdateForm(forms.ModelForm):
 class ProveedorForm(forms.ModelForm):
     class Meta:
         model = Proveedor
-        fields = ["nombre", "contacto", "telefono", "email"]
+        fields = ["nombre", "telefono", "email"]
         widgets = {
             "nombre": forms.TextInput(
                 attrs={
                     "class": "form-control mb-2",
                     "placeholder": "Nombre del Proveedor",
-                }
-            ),
-            "contacto": forms.TextInput(
-                attrs={
-                    "class": "form-control mb-2",
-                    "placeholder": "Persona de contacto",
                 }
             ),
             "telefono": forms.TextInput(

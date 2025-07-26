@@ -66,12 +66,12 @@
                         {% for insumo in insumos_de_categoria %}
                         <tr style="border-bottom: 1px solid rgba(255,255,255,0.2);">
                             <td class="text-center align-middle">
-                                {% if insumo.stock < 15000 %}
-                                    <div style="width: 18px; height: 18px; background-color:red; border-radius: 4px; display: inline-block; border: 1px solid #555;" title="Stock: {{ insumo.stock }} (Bajo)"></div>
-                                {% elif insumo.stock < 30000 %}
-                                    <div style="width: 18px; height: 18px; background-color:yellow; border-radius: 4px; display: inline-block;" title="Stock: {{ insumo.stock }} (Medio)"></div>
+                                {% if insumo.cantidad < 15000 %}
+                                    <div style="width: 18px; height: 18px; background-color:red; border-radius: 4px; display: inline-block; border: 1px solid #555;" title="Stock: {{ insumo.cantidad }} (Bajo)"></div>
+                                {% elif insumo.cantidad < 30000 %}
+                                    <div style="width: 18px; height: 18px; background-color:yellow; border-radius: 4px; display: inline-block;" title="Stock: {{ insumo.cantidad }} (Medio)"></div>
                                 {% else %}
-                                    <div style="width: 18px; height: 18px; background-color:green; border-radius: 4px; display: inline-block;" title="Stock: {{ insumo.stock }} (Alto)"></div>
+                                    <div style="width: 18px; height: 18px; background-color:green; border-radius: 4px; display: inline-block;" title="Stock: {{ insumo.cantidad }} (Alto)"></div>
                                 {% endif %}
                             </td>
                             <td class="text-center align-middle">
@@ -90,7 +90,7 @@
                                 {% endif %}
                             </td>
                             <td class="text-center align-middle">{{ insumo.fabricante|default:"N/A" }}</td>
-                            <td class="text-center align-middle">{{ insumo.stock }}</td>
+                            <td class="text-center align-middle">{{ insumo.cantidad }}</td>
                             <td class="text-center align-middle">
                                 <a href="{% url 'App_LUMINOVA:insumo_edit' insumo.pk %}" class="btn btn-sm btn-outline-primary me-1" title="Editar Insumo"><i class="bi bi-pencil-fill"></i></a>
                                 <a href="{% url 'App_LUMINOVA:insumo_delete' insumo.pk %}" class="btn btn-sm btn-outline-danger" title="Eliminar Insumo"><i class="bi bi-trash-fill"></i></a>
