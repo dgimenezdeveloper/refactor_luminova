@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from App_LUMINOVA.models import HistorialOV, OrdenProduccion, OrdenVenta
+from App_LUMINOVA.models import HistorialOV, OrdenVenta
+from productos.models import OrdenProduccion
 
 @receiver(post_save, sender=OrdenVenta)
 def registrar_creacion_ov(sender, instance, created, **kwargs):

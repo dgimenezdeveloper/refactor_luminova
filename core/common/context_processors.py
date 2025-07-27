@@ -1,4 +1,5 @@
-from App_LUMINOVA.models import Insumo, Orden, OrdenProduccion, Reportes
+from productos.models import OrdenProduccion, Reportes
+from insumos.models import Insumo, Orden
 
 def notificaciones_context(request):
     if not request.user.is_authenticated:
