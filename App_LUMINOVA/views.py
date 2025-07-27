@@ -151,14 +151,14 @@ def custom_logout_view(request):
     Gestiona el cierre de sesión y registra el evento en la auditoría ANTES de desloguear.
     """
     user = request.user
-
-    # Registrar el evento de cierre de sesión con toda la información disponible
-    AuditoriaAcceso.objects.create(
-        usuario=user,
-        accion="Cierre de sesión",
-        ip_address=get_client_ip(request),
-        user_agent=request.META.get("HTTP_USER_AGENT", ""),
-    )
+    # Registrar el evento de cierre de sesión solo si el usuario está autenticado
+    if user.is_authenticated:
+        AuditoriaAcceso.objects.create(
+            usuario=user,
+            accion="Cierre de sesión",
+            ip_address=get_client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        )
 
     # Llamar a la función de logout de Django para limpiar la sesión
     auth_logout_function(request)
@@ -286,11 +286,11 @@ def crear_usuario(request):
             messages.error(
                 request, f"El nombre de usuario '{username}' ya está en uso."
             )
-            return redirect("App_LUMINOVA:lista_usuarios")
+            return redirect("core:lista_usuarios")
 
         if not username or not email or not rol_name or not estado_str:
             messages.error(request, "Todos los campos son obligatorios.")
-            return redirect("App_LUMINOVA:lista_usuarios")
+            return redirect("core:lista_usuarios")
 
         try:
             # La creación del usuario y la asignación de grupo ocurren dentro de una transacción
@@ -335,7 +335,7 @@ def crear_usuario(request):
                 messages.error(request, f"Error inesperado al crear usuario: {e}")
 
     # Redirige a la lista de usuarios en cualquier caso (éxito, error, o si no es POST)
-    return redirect("App_LUMINOVA:lista_usuarios")
+    return redirect("core:lista_usuarios")
 
 
 @login_required
@@ -356,7 +356,7 @@ def change_password_view(request):
                 request,
                 "¡Tu contraseña ha sido actualizada exitosamente! Ya puedes navegar por el sitio.",
             )
-            return redirect("App_LUMINOVA:dashboard")
+            return redirect("core:dashboard")
         else:
             # --- CAMBIO AQUÍ: También modificar el form con errores ---
             form.fields["old_password"].widget.attrs[
@@ -367,7 +367,7 @@ def change_password_view(request):
             messages.error(request, "Por favor, corrige los errores a continuación.")
     else:
         if not PasswordChangeRequired.objects.filter(user=request.user).exists():
-            return redirect("App_LUMINOVA:dashboard")
+            return redirect("core:dashboard")
 
         form = PasswordChangeForm(request.user)
         # --- CAMBIO AQUÍ: Modificar el form antes de renderizarlo ---
