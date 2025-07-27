@@ -86,11 +86,11 @@ from .forms import (
 
 # Local Application Imports (Models)
 from depositos.models import Deposito, StockProductoTerminado
-from .signals import get_client_ip
+from core.common.utils import get_client_ip
 
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
-from .utils import es_admin, es_admin_o_rol
+from core.common.utils import es_admin, es_admin_o_rol
 
 logger = logging.getLogger(__name__)
 

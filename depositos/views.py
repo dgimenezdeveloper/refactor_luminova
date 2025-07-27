@@ -1,12 +1,10 @@
 
+
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render, get_object_or_404
 from .models import Deposito, StockProductoTerminado
-from django.contrib.auth.models import Group
+from core.common.utils import es_admin
 
-# Verifica si el usuario es admin (superuser o grupo Administradores)
-def es_admin(user):
-    return user.is_superuser or user.groups.filter(name="Administradores").exists()
 
 @login_required
 def deposito_stock_view(request, deposito_id):
