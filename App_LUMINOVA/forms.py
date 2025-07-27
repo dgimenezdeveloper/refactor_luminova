@@ -29,7 +29,9 @@ from datetime import timedelta, timezone
 from django import apps, forms
 from django.contrib.auth.models import Group, Permission
 from django.db.models import Q
-from .models import Cliente, EstadoOrden, Factura, ItemOrdenVenta, Orden, OrdenProduccion, OrdenVenta, Reportes
+from .models import Cliente, Factura, ItemOrdenVenta, OrdenVenta
+from productos.models import EstadoOrden, OrdenProduccion, Reportes
+from insumos.models import Orden
 from insumos.models import CategoriaInsumo, Insumo, OfertaProveedor
 from productos.models import CategoriaProductoTerminado
 ''
@@ -79,14 +81,12 @@ class PermisosRolForm(forms.Form):
 
 from django import forms
 
-from .models import (  # EstadoOrden y SectorAsignado son los que tenías para OP
+from .models import (
     Cliente,
-    EstadoOrden,
     ItemOrdenVenta,
-    OrdenProduccion,
     OrdenVenta,
-    SectorAsignado,
 )
+from productos.models import EstadoOrden, SectorAsignado, OrdenProduccion
 from insumos.models import CategoriaInsumo, Insumo, Proveedor
 
 

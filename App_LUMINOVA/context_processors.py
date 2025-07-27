@@ -1,5 +1,6 @@
 # TP_LUMINOVA-main/App_LUMINOVA/context_processors.py
-from .models import Insumo, Orden, OrdenProduccion, Reportes
+from productos.models import OrdenProduccion, Reportes
+from insumos.models import Insumo, Orden
 
 
 def notificaciones_context(request):

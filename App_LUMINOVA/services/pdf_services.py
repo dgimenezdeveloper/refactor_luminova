@@ -7,7 +7,8 @@ from reportlab.platypus import Paragraph, Table, TableStyle
 from reportlab.lib import colors
 
 # Importante: Usamos importación relativa porque estamos dentro de la misma app.
-from ..models import OrdenVenta, ItemOrdenVenta, OrdenProduccion
+from ..models import OrdenVenta, ItemOrdenVenta
+from productos.models import OrdenProduccion
 
 
 def generar_pdf_factura(factura):

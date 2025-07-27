@@ -3,7 +3,9 @@
 
 from django.contrib import admin, messages
 
-from .models import AuditoriaAcceso, Cliente, ComponenteProducto, EstadoOrden, Factura, ItemOrdenVenta, Orden, OrdenProduccion, OrdenVenta, Reportes, RolDescripcion, SectorAsignado
+from .models import AuditoriaAcceso, Cliente, Factura, ItemOrdenVenta, OrdenVenta, RolDescripcion
+from productos.models import ComponenteProducto, EstadoOrden, OrdenProduccion, Reportes, SectorAsignado, ProductoTerminado, CategoriaProductoTerminado
+from insumos.models import Orden, CategoriaInsumo, Proveedor, Fabricante, Insumo, OfertaProveedor
 from insumos.models import CategoriaInsumo, Proveedor, Fabricante, Insumo, OfertaProveedor
 from productos.models import ProductoTerminado, CategoriaProductoTerminado
 

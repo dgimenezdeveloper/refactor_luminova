@@ -1,12 +1,13 @@
-
 from django.db import models
+from django.contrib.auth.models import User
+from django.utils import timezone
 
 class LoteProductoTerminado(models.Model):
     producto = models.ForeignKey(
         'ProductoTerminado', on_delete=models.PROTECT, related_name="lotes"
     )
     op_asociada = models.ForeignKey(
-        'App_LUMINOVA.OrdenProduccion', on_delete=models.PROTECT, related_name="lotes_pt"
+        'productos.OrdenProduccion', on_delete=models.PROTECT, related_name="lotes_pt"
     )
     cantidad = models.PositiveIntegerField()
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -14,8 +15,6 @@ class LoteProductoTerminado(models.Model):
 
     def __str__(self):
         return f"Lote de {self.producto.descripcion} - OP {self.op_asociada.numero_op} ({self.cantidad})"
-
-from django.db import models
 
 class CategoriaProductoTerminado(models.Model):
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre Categoría PT")
@@ -62,3 +61,114 @@ class ProductoTerminado(models.Model):
             stock.save()
             return True
         return False
+
+class ComponenteProducto(models.Model):
+    producto_terminado = models.ForeignKey(
+        'productos.ProductoTerminado',
+        on_delete=models.CASCADE,
+        related_name="componentes_requeridos",
+    )
+    insumo = models.ForeignKey('insumos.Insumo', on_delete=models.PROTECT)
+    cantidad_necesaria = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        unique_together = ("producto_terminado", "insumo")
+        verbose_name = "Componente de Producto (BOM)"
+        verbose_name_plural = "Componentes de Productos (BOM)"
+
+    def __str__(self):
+        return f"{self.cantidad_necesaria} x {self.insumo.descripcion} para {self.producto_terminado.descripcion}"
+
+class EstadoOrden(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+class SectorAsignado(models.Model):
+    nombre = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.nombre
+
+class OrdenProduccion(models.Model):
+    numero_op = models.CharField(
+        max_length=20, unique=True, verbose_name="N° Orden de Producción"
+    )
+    orden_venta_origen = models.ForeignKey(
+        'App_LUMINOVA.OrdenVenta',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ops_generadas",
+    )
+    producto_a_producir = models.ForeignKey(
+        'productos.ProductoTerminado', on_delete=models.PROTECT, related_name="ordenes_produccion"
+    )
+    cantidad_a_producir = models.PositiveIntegerField()
+    estado_op = models.ForeignKey(
+        EstadoOrden,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ops_estado",
+    )
+    fecha_solicitud = models.DateTimeField(default=timezone.now)
+    fecha_inicio_real = models.DateTimeField(null=True, blank=True)
+    fecha_inicio_planificada = models.DateField(null=True, blank=True)
+    fecha_fin_real = models.DateTimeField(null=True, blank=True)
+    fecha_fin_planificada = models.DateField(null=True, blank=True)
+    sector_asignado_op = models.ForeignKey(
+        SectorAsignado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ops_sector",
+    )
+    notas = models.TextField(null=True, blank=True, verbose_name="Notas")
+
+    def get_estado_op_display(self):
+        if self.estado_op:
+            return self.estado_op.nombre
+        return "Sin Estado Asignado"
+
+    def __str__(self):
+        return f"OP: {self.numero_op} - {self.cantidad_a_producir} x {self.producto_a_producir.descripcion}"
+
+class Reportes(models.Model):
+    orden_produccion_asociada = models.ForeignKey(
+        OrdenProduccion,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reportes_incidencia",
+    )
+    n_reporte = models.CharField(max_length=20, unique=True)
+    fecha = models.DateTimeField(default=timezone.now)
+    tipo_problema = models.CharField(max_length=100)
+    informe_reporte = models.TextField(blank=True, null=True)
+    resuelto = models.BooleanField(default=False, verbose_name="¿Problema Resuelto?")
+    fecha_resolucion = models.DateTimeField(
+        null=True, blank=True, verbose_name="Fecha de Resolución"
+    )
+    reportado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reportes_creados",
+    )
+    sector_reporta = models.ForeignKey(
+        SectorAsignado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reportes_originados_aqui",
+    )
+    def __str__(self):
+        op_num = (
+            self.orden_produccion_asociada.numero_op
+            if self.orden_produccion_asociada
+            else "N/A"
+        )
+        return f"Reporte {self.n_reporte} (OP: {op_num})"
