@@ -1,0 +1,25 @@
+{% extends 'padre.html' %}
+{% block content %}
+<h2>Crear reporte de incidencia</h2>
+<form method="post">
+    {% csrf_token %}
+    <!-- Aquí iría el formulario de reporte -->
+    <div class="form-group">
+        <label for="deposito">Depósito:</label>
+        <input type="text" id="deposito" name="deposito" class="form-control">
+    </div>
+    <div class="form-group">
+        <label for="usuario">Usuario:</label>
+        <input type="text" id="usuario" name="usuario" class="form-control">
+    </div>
+    <div class="form-group">
+        <label for="tipo">Tipo:</label>
+        <input type="text" id="tipo" name="tipo" class="form-control">
+    </div>
+    <div class="form-group">
+        <label for="descripcion">Descripción:</label>
+        <textarea id="descripcion" name="descripcion" class="form-control"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Crear reporte</button>
+</form>
+{% endblock %}

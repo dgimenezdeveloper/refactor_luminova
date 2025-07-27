@@ -1,0 +1,32 @@
+{% extends 'padre.html' %}
+{% block content %}
+<h2>Órdenes de compra</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Insumo</th>
+            <th>Proveedor</th>
+            <th>Cantidad</th>
+            <th>Precio unitario</th>
+            <th>Estado</th>
+            <th>Solicitante</th>
+            <th>Fecha creación</th>
+            <th>Fecha recibida</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for compra in compras %}
+        <tr>
+            <td>{{ compra.insumo }}</td>
+            <td>{{ compra.proveedor }}</td>
+            <td>{{ compra.cantidad }}</td>
+            <td>{{ compra.precio_unitario }}</td>
+            <td>{{ compra.get_estado_display }}</td>
+            <td>{{ compra.usuario_solicitante }}</td>
+            <td>{{ compra.fecha_creacion }}</td>
+            <td>{{ compra.fecha_recibida }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

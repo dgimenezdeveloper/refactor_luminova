@@ -1,0 +1,30 @@
+{% extends 'padre.html' %}
+{% block content %}
+<h2>Movimientos registrados</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Producto</th>
+            <th>Origen</th>
+            <th>Destino</th>
+            <th>Tipo</th>
+            <th>Cantidad</th>
+            <th>Usuario</th>
+            <th>Fecha</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for movimiento in movimientos %}
+        <tr>
+            <td>{{ movimiento.producto }}</td>
+            <td>{{ movimiento.deposito_origen }}</td>
+            <td>{{ movimiento.deposito_destino }}</td>
+            <td>{{ movimiento.get_tipo_display }}</td>
+            <td>{{ movimiento.cantidad }}</td>
+            <td>{{ movimiento.usuario }}</td>
+            <td>{{ movimiento.fecha }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

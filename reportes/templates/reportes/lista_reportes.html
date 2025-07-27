@@ -1,0 +1,30 @@
+{% extends 'padre.html' %}
+{% block content %}
+<h2>Reportes de incidencias</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Depósito</th>
+            <th>Usuario</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+            <th>Resuelto</th>
+            <th>Fecha reporte</th>
+            <th>Fecha resolución</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for reporte in reportes %}
+        <tr>
+            <td>{{ reporte.deposito }}</td>
+            <td>{{ reporte.usuario }}</td>
+            <td>{{ reporte.get_tipo_display }}</td>
+            <td>{{ reporte.descripcion }}</td>
+            <td>{{ reporte.resuelto|yesno:"Sí,No" }}</td>
+            <td>{{ reporte.fecha_reporte }}</td>
+            <td>{{ reporte.fecha_resolucion }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
