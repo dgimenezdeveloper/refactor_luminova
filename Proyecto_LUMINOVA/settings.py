@@ -66,7 +66,18 @@ ROOT_URLCONF = "Proyecto_LUMINOVA.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, "App_LUMINOVA", "templates")],
+        "DIRS": [
+            os.path.join(BASE_DIR, "App_LUMINOVA", "templates"),
+            os.path.join(BASE_DIR, "depositos", "templates"),
+            os.path.join(BASE_DIR, "productos", "templates"),
+            os.path.join(BASE_DIR, "insumos", "templates"),
+            os.path.join(BASE_DIR, "movimientos", "templates"),
+            os.path.join(BASE_DIR, "reportes", "templates"),
+            os.path.join(BASE_DIR, "core", "templates"),
+            os.path.join(BASE_DIR, "compras", "templates"),
+            os.path.join(BASE_DIR, "ventas", "templates"),
+            os.path.join(BASE_DIR, "control_calidad", "templates"),
+        ],
         "APP_DIRS": True,  # Dejar en True por si otras apps lo necesitan
         "OPTIONS": {
             "context_processors": [

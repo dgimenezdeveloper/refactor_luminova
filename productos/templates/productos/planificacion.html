@@ -1,0 +1,78 @@
+{% extends 'padre.html' %}
+{% load static %}
+{% load django_bootstrap5 %}
+
+{% block title %}{{ titulo_seccion|default:"Planificación de Producción" }}{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'produccion/produccion_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_seccion }}</h1>
+</div>
+
+{% regroup ops_para_planificar_list by get_estado_op_display as ops_por_estado %}
+
+{% if ops_por_estado %}
+    {% for estado_grupo in ops_por_estado %}
+        <h4 class="mt-4 mb-3">{{ estado_grupo.grouper }} ({{ estado_grupo.list|length }})</h4>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="background-color: #014BAC; color: white;">N° OP</th>
+                        <th style="background-color: #014BAC; color: white;">Producto</th>
+                        <th class="text-center" style="background-color: #014BAC; color: white;">Cant.</th>
+                        <th style="background-color: #014BAC; color: white;">Cliente</th>
+                        <th style="background-color: #014BAC; color: white;">Asignar Sector</th>
+                        <th style="background-color: #014BAC; color: white;">Inicio Plan.</th>
+                        <th style="background-color: #014BAC; color: white;">Fin Plan.</th>
+                        <th class="text-center" style="width: 120px; background-color: #014BAC; color: white;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for op in estado_grupo.list %}
+                    <form method="post" action="{% url 'App_LUMINOVA:planificacion_produccion' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="op_id" value="{{ op.id }}">
+                        <tr>
+                            <td><a href="{% url 'App_LUMINOVA:produccion_detalle_op' op.id %}">{{ op.numero_op }}</a></td>
+                            <td>{{ op.producto_a_producir.descripcion|truncatechars:25 }}</td>
+                            <td class="text-center">{{ op.cantidad_a_producir }}</td>
+                            <td>{{ op.orden_venta_origen.cliente.nombre|default_if_none:"N/A" }}</td>
+                            <td>
+                                <select name="sector_asignado_op" class="form-select form-select-sm">
+                                    <option value="">----</option>
+                                    {% for sector in sectores_list %}
+                                    <option value="{{ sector.id }}" {% if op.sector_asignado_op == sector %}selected{% endif %}>
+                                        {{ sector.nombre }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="date" name="fecha_inicio_planificada" value="{{ op.fecha_inicio_planificada|date:'Y-m-d'|default:'' }}" class="form-control form-control-sm">
+                            </td>
+                            <td>
+                                <input type="date" name="fecha_fin_planificada" value="{{ op.fecha_fin_planificada|date:'Y-m-d'|default:'' }}" class="form-control form-control-sm">
+                            </td>
+                            <td class="text-center">
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-save"></i> Guardar
+                                </button>
+                            </td>
+                        </tr>
+                    </form>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="alert alert-success mt-3" role="alert">
+        <i class="bi bi-check-circle-fill"></i> ¡Excelente! No hay órdenes de producción activas para planificar.
+    </div>
+{% endif %}
+{% endblock %}

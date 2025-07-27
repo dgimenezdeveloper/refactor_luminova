@@ -43,7 +43,7 @@ def produccion_lista_op_view(request):
         "ops_finalizadas_list": ops_finalizadas,
         "titulo_seccion": "Listado de Órdenes de Producción",
     }
-    return render(request, "produccion/produccion_lista_op.html", context)
+    return render(request, "productos/produccion_lista_op.html", context)
 
 @login_required
 def planificacion_produccion_view(request):
@@ -78,7 +78,7 @@ def planificacion_produccion_view(request):
         "sectores_list": sectores,
         "titulo_seccion": "Planificación de Órdenes de Producción",
     }
-    return render(request, "produccion/planificacion.html", context)
+    return render(request, "productos/planificacion.html", context)
 
 @login_required
 @require_POST
@@ -215,7 +215,7 @@ def produccion_detalle_op_view(request, op_id):
         "mostrar_boton_reportar": mostrar_boton_reportar,
         "titulo_seccion": f"Detalle OP: {op.numero_op}",
     }
-    return render(request, "produccion/produccion_detalle_op.html", context)
+    return render(request, "productos/produccion_detalle_op.html", context)
 
 @login_required
 def reportes_produccion_view(request, reporte_id=None, resolver=False):
@@ -246,7 +246,7 @@ def reportes_produccion_view(request, reporte_id=None, resolver=False):
         "reportes_resueltos": reportes_resueltos,
         "titulo_seccion": "Reportes de Producción",
     }
-    return render(request, "produccion/reportes.html", context)
+    return render(request, "productos/reportes.html", context)
 
 @login_required
 @transaction.atomic
@@ -272,4 +272,4 @@ def crear_reporte_produccion_view(request, op_id):
         "orden_produccion": orden_produccion,
         "titulo_seccion": f"Crear Reporte para OP: {orden_produccion.numero_op}",
     }
-    return render(request, "produccion/crear_reporte.html", context)
+    return render(request, "productos/crear_reporte.html", context)

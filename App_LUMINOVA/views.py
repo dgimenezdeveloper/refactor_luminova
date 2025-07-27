@@ -1511,7 +1511,7 @@ def compras_seleccionar_proveedor_para_insumo_view(request, insumo_id):
     ofertas = (
         OfertaProveedor.objects.filter(insumo_id=insumo_id)
         .select_related("proveedor")
-        .order_by("precio_unitario_compra", "tiempo_entrega_estimado_dias")
+        .order_by("precio")
     )
     insumo_objetivo = get_object_or_404(
         Insumo, id=insumo_id
