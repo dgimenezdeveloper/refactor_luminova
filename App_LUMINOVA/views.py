@@ -2821,7 +2821,7 @@ def deposito_view(request):
 
     # Lógica de insumos bajo stock y pedidos
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
-    insumos_con_stock_bajo = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    insumos_con_stock_bajo = Insumo.objects.filter(cantidad__lt=UMBRAL_STOCK_BAJO_INSUMOS)
     ESTADOS_OC_EN_PROCESO = ["APROBADA", "ENVIADA_PROVEEDOR", "EN_TRANSITO", "RECIBIDA_PARCIAL"]
     insumos_a_gestionar = []
     insumos_en_pedido = []
