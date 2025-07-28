@@ -13,9 +13,8 @@ class OfertaProveedorInline(admin.TabularInline):  # O admin.StackedInline
     extra = 1
     fields = (
         "proveedor",
-        "precio_unitario_compra",
-        "tiempo_entrega_estimado_dias",
-        "fecha_actualizacion_precio",
+        "precio",
+        "fecha_oferta",
     )
     autocomplete_fields = ["proveedor"]
     verbose_name = "Oferta de Proveedor"
