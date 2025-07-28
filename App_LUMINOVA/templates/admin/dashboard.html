@@ -125,7 +125,7 @@
                         <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' item_data.insumo.id %}" class="text-decoration-none d-block" title="Iniciar compra para {{ item.insumo.descripcion }}">
                             <div class="d-flex justify-content-between">
                                 <span>{{ item_data.insumo.descripcion|truncatechars:25 }}</span>
-                                <span class="fw-bold text-danger">{{ item_data.insumo.stock|intcomma }}</span>
+                                <span class="fw-bold text-danger">{{ item_data.insumo.cantidad|intcomma }}</span>
                             </div>
                             <div class="stock-progress-bar mt-1">
                                 <div class="stock-progress" style="--stock-percent: {{ item_data.porcentaje_stock }}%;"></div>

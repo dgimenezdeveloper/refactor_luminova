@@ -2094,6 +2094,10 @@ def solicitar_insumos_op_view(request, op_id):
 @login_required
 @transaction.atomic
 def produccion_detalle_op_view(request, op_id):
+    # Definiciones necesarias para lógica posterior
+    ESTADO_OP_COMPLETADA_LOWER = "completada"
+    ESTADO_OP_CANCELADA_LOWER = "cancelada"
+    ESTADO_OP_PAUSADA_LOWER = "pausada"
     op = get_object_or_404(
         OrdenProduccion.objects.select_related(
             "producto_a_producir__categoria",
@@ -2118,7 +2122,7 @@ def produccion_detalle_op_view(request, op_id):
             cantidad_total_requerida_para_op = (
                 comp.cantidad_necesaria * op.cantidad_a_producir
             )
-            suficiente = comp.insumo.stock >= cantidad_total_requerida_para_op
+            suficiente = comp.insumo.cantidad >= cantidad_total_requerida_para_op
             if not suficiente:
                 todos_los_insumos_disponibles = False
             insumos_necesarios_data.append(
@@ -2126,7 +2130,7 @@ def produccion_detalle_op_view(request, op_id):
                     "insumo_descripcion": comp.insumo.descripcion,
                     "cantidad_por_unidad_pt": comp.cantidad_necesaria,
                     "cantidad_total_requerida_op": cantidad_total_requerida_para_op,
-                    "stock_actual_insumo": comp.insumo.stock,
+                    "stock_actual_insumo": comp.insumo.cantidad,
                     "suficiente_stock": suficiente,
                     "insumo_id": comp.insumo.id,
                 }
@@ -2136,8 +2140,7 @@ def produccion_detalle_op_view(request, op_id):
 
     puede_solicitar_insumos = False
     mostrar_boton_reportar = False
-    estado_op_queryset_para_form = EstadoOrden.objects.all().order_by("nombre")
-
+    # Restaurar lógica de restricción de estados permitidos según el estado actual de la OP
     ESTADO_OP_PENDIENTE_LOWER = "pendiente"
     ESTADO_OP_PLANIFICADA_LOWER = "planificada"
     ESTADO_OP_INSUMOS_SOLICITADOS_LOWER = "insumos solicitados"
@@ -2149,61 +2152,52 @@ def produccion_detalle_op_view(request, op_id):
     ESTADO_OP_COMPLETADA_LOWER = NOMBRE_ESTADO_OP_COMPLETADA_CONST.lower()
     ESTADO_OP_CANCELADA_LOWER = "cancelada"
 
+    estado_op_queryset_para_form = EstadoOrden.objects.none()
+    nombres_permitidos_dropdown = []
     if op.estado_op:
         estado_actual_nombre_lower = op.estado_op.nombre.lower()
         estado_actual_nombre_original = op.estado_op.nombre
         nombres_permitidos_dropdown = [estado_actual_nombre_original]
 
         if (
-            estado_actual_nombre_lower
-            in [ESTADO_OP_PENDIENTE_LOWER, ESTADO_OP_PLANIFICADA_LOWER]
+            estado_actual_nombre_lower in [ESTADO_OP_PENDIENTE_LOWER, ESTADO_OP_PLANIFICADA_LOWER]
             and op.sector_asignado_op
         ):
             puede_solicitar_insumos = True
-        elif estado_actual_nombre_lower == ESTADO_OP_INSUMOS_SOLICITADOS_LOWER:
-            nombres_permitidos_dropdown.extend(["Pausada", "Cancelada"])
+        if estado_actual_nombre_lower == ESTADO_OP_INSUMOS_SOLICITADOS_LOWER:
+            nombres_permitidos_dropdown.extend(["Pausada", "Cancelada", "Insumos Recibidos"])
         elif estado_actual_nombre_lower == ESTADO_OP_INSUMOS_RECIBIDOS_LOWER:
-            nombres_permitidos_dropdown.extend(
-                ["Producción Iniciada", "Pausada", "Cancelada"]
-            )
+            nombres_permitidos_dropdown.extend([
+                "Insumos Recibidos",
+                "Producción Iniciada",
+                "Pausada",
+                "Cancelada"
+            ])
         elif estado_actual_nombre_lower == ESTADO_OP_PRODUCCION_INICIADA_LOWER:
-            nombres_permitidos_dropdown.extend(
-                ["En Proceso", "Pausada", "Completada", "Cancelada"]
-            )
+            nombres_permitidos_dropdown.extend(["En Proceso", "Pausada", "Completada", "Cancelada"])
         elif estado_actual_nombre_lower == ESTADO_OP_EN_PROCESO_LOWER:
             nombres_permitidos_dropdown.extend(["Pausada", "Completada", "Cancelada"])
         elif estado_actual_nombre_lower == ESTADO_OP_PAUSADA_LOWER:
             nombres_permitidos_dropdown.extend(["Cancelada"])
-            if EstadoOrden.objects.filter(
-                nombre__iexact=ESTADO_OP_INSUMOS_RECIBIDOS_LOWER
-            ).exists():
+            if EstadoOrden.objects.filter(nombre__iexact=ESTADO_OP_INSUMOS_RECIBIDOS_LOWER).exists():
                 nombres_permitidos_dropdown.append("Insumos Recibidos")
-            if EstadoOrden.objects.filter(
-                nombre__iexact=ESTADO_OP_PRODUCCION_INICIADA_LOWER
-            ).exists():
+            if EstadoOrden.objects.filter(nombre__iexact=ESTADO_OP_PRODUCCION_INICIADA_LOWER).exists():
                 nombres_permitidos_dropdown.append("Producción Iniciada")
-            if EstadoOrden.objects.filter(
-                nombre__iexact=ESTADO_OP_PENDIENTE_LOWER
-            ).exists():
+            if EstadoOrden.objects.filter(nombre__iexact=ESTADO_OP_PENDIENTE_LOWER).exists():
                 nombres_permitidos_dropdown.append("Pendiente")
 
-        if estado_actual_nombre_lower not in [
-            ESTADO_OP_COMPLETADA_LOWER,
-            ESTADO_OP_CANCELADA_LOWER,
-        ]:
+        # El botón de reportar solo se oculta si la OP está completada o cancelada
+        if estado_actual_nombre_lower not in [ESTADO_OP_COMPLETADA_LOWER, ESTADO_OP_CANCELADA_LOWER]:
             mostrar_boton_reportar = True
 
-        q_permitidos = Q()
-        for n in list(set(nombres_permitidos_dropdown)):
-            q_permitidos |= Q(nombre__iexact=n)
-        if q_permitidos:
-            estado_op_queryset_para_form = EstadoOrden.objects.filter(
-                q_permitidos
-            ).order_by("nombre")
-        elif op.estado_op:
-            estado_op_queryset_para_form = EstadoOrden.objects.filter(
-                id=op.estado_op.id
-            )
+        # Filtrar solo los estados que existen exactamente en la base de datos
+        nombres_permitidos_dropdown = list(dict.fromkeys(nombres_permitidos_dropdown))  # Quitar duplicados, mantener orden
+        estado_op_queryset_para_form = EstadoOrden.objects.filter(
+            nombre__in=nombres_permitidos_dropdown
+        ).order_by("nombre")
+        # Si por algún motivo no hay estados, al menos mostrar el actual
+        if not estado_op_queryset_para_form.exists() and op.estado_op:
+            estado_op_queryset_para_form = EstadoOrden.objects.filter(id=op.estado_op.id)
 
     if request.method == "POST":
         form_update = OrdenProduccionUpdateForm(
@@ -2355,6 +2349,8 @@ def produccion_detalle_op_view(request, op_id):
         "puede_solicitar_insumos": puede_solicitar_insumos,
         "mostrar_boton_reportar": mostrar_boton_reportar,
         "titulo_seccion": f"Detalle OP: {op.numero_op}",
+        "nombres_permitidos_dropdown": nombres_permitidos_dropdown,  # Para depuración visual en el template
+        "estados_permitidos_queryset": estado_op_queryset_para_form,  # Para depuración visual
     }
     return render(request, "produccion/produccion_detalle_op.html", context)
 
@@ -2518,27 +2514,28 @@ def deposito_enviar_insumos_op_view(request, op_id):
         for comp in componentes_requeridos:
             cantidad_a_descontar = comp.cantidad_necesaria * op.cantidad_a_producir
             try:
-                # Bloquear la fila del insumo para evitar condiciones de carrera (si tu DB lo soporta bien)
-                # insumo_a_actualizar = Insumo.objects.select_for_update().get(id=comp.insumo.id)
-                insumo_a_actualizar = Insumo.objects.get(
-                    id=comp.insumo.id
-                )  # Versión más simple
-
-                if insumo_a_actualizar.stock >= cantidad_a_descontar:
-                    # Usar F() expression para una actualización atómica es preferible
-                    Insumo.objects.filter(id=insumo_a_actualizar.id).update(
-                        stock=F("stock") - cantidad_a_descontar
-                    )
-                    logger.info(
-                        f"Stock de '{insumo_a_actualizar.descripcion}' (ID: {insumo_a_actualizar.id}) descontado en {cantidad_a_descontar}."
-                    )
+                insumo_a_actualizar = Insumo.objects.get(id=comp.insumo.id)
+                if hasattr(insumo_a_actualizar, 'cantidad'):
+                    if insumo_a_actualizar.cantidad >= cantidad_a_descontar:
+                        Insumo.objects.filter(id=insumo_a_actualizar.id).update(
+                            cantidad=F("cantidad") - cantidad_a_descontar
+                        )
+                        logger.info(
+                            f"Stock de '{insumo_a_actualizar.descripcion}' (ID: {insumo_a_actualizar.id}) descontado en {cantidad_a_descontar}."
+                        )
+                    else:
+                        errores_stock.append(
+                            f"Stock insuficiente para '{insumo_a_actualizar.descripcion}'. Requeridos: {cantidad_a_descontar}, Disponible: {insumo_a_actualizar.cantidad}"
+                        )
+                        insumos_descontados_correctamente = False
+                        # Si quieres detenerte en el primer error, descomenta la siguiente línea:
+                        # break
                 else:
                     errores_stock.append(
-                        f"Stock insuficiente para '{insumo_a_actualizar.descripcion}'. Requeridos: {cantidad_a_descontar}, Disponible: {insumo_a_actualizar.stock}"
+                        f"El insumo '{insumo_a_actualizar.descripcion}' no tiene el atributo 'cantidad'."
                     )
                     insumos_descontados_correctamente = False
-                    # Aquí podrías decidir si continuar verificando otros insumos o hacer break.
-                    # Si haces break, solo se reportará el primer error de stock.
+                    break
             except Insumo.DoesNotExist:
                 errores_stock.append(
                     f"Insumo '{comp.insumo.descripcion}' (ID: {comp.insumo.id}) no encontrado durante el descuento. Error de datos."
@@ -2953,7 +2950,7 @@ def deposito_detalle_solicitud_op_view(request, op_id):
 
         for comp in componentes_requeridos:
             cantidad_total_req = comp.cantidad_necesaria * op.cantidad_a_producir
-            suficiente = comp.insumo.stock >= cantidad_total_req
+            suficiente = comp.insumo.cantidad >= cantidad_total_req
             if not suficiente:
                 todos_los_insumos_disponibles = False
             insumos_necesarios_data.append(
@@ -2961,7 +2958,7 @@ def deposito_detalle_solicitud_op_view(request, op_id):
                     "insumo_id": comp.insumo.id,
                     "insumo_descripcion": comp.insumo.descripcion,
                     "cantidad_total_requerida_op": cantidad_total_req,
-                    "stock_actual_insumo": comp.insumo.stock,
+                    "stock_actual_insumo": comp.insumo.cantidad,
                     "suficiente_stock": suficiente,
                 }
             )

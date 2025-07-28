@@ -42,7 +42,7 @@
                     {{ item_data.insumo.descripcion|truncatechars:40 }}
                 </td>
                 <td>{{ item_data.insumo.categoria.nombre|default_if_none:"N/A" }}</td>
-                <td class="text-center fw-bold text-danger">{{ item_data.insumo.stock }}</td>
+                <td class="text-center fw-bold text-danger">{{ item_data.insumo.cantidad }}</td>
                 
                 {# --- INICIO DE LA CORRECCIÓN --- #}
                 <td class="text-center">

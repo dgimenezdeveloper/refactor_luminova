@@ -1,6 +1,9 @@
 {% load static %}
 
 {% url 'App_LUMINOVA:deposito_selector' as url_deposito_principal %}
+{% if deposito_seleccionado %}
+    {% url 'depositos:deposito_view' as url_deposito_dashboard %}
+{% endif %}
 {% url 'App_LUMINOVA:insumo_create' as url_insumo_create %}
 {% url 'App_LUMINOVA:producto_terminado_create' as url_pt_create %}
 {% url 'App_LUMINOVA:categoria_i_create' as url_cat_i_create %}
@@ -13,7 +16,7 @@
 <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end vh-100" style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
     <div class="position-sticky pt-4">
         <h6 class="sidebar-heading d-flex justify-content-center align-items-center px-3 mt-4 mb-1 text-white fw-bold">
-            <a href="{{ url_deposito_principal }}"><span style="color: white;">Depósito</span></a>
+            <a href="{% if deposito_seleccionado %}{{ url_deposito_dashboard }}?deposito_id={{ deposito_seleccionado.id }}{% else %}{{ url_deposito_principal }}{% endif %}"><span style="color: white;">Depósito</span></a>
         </h6>
         <hr class="text-white">
         <ul class="nav flex-column">

@@ -45,23 +45,19 @@ class InsumoAdmin(admin.ModelAdmin):
     inlines = [OfertaProveedorInline]
 
     # No necesitas @admin.display aquí si el método está en la clase ModelAdmin
+
     def mostrar_ofertas_resumen(self, obj):
-        # 'obj' aquí es una instancia del modelo Insumo
-        ofertas = (
-            obj.ofertas_de_proveedores.all()
-        )  # Usando el related_name de OfertaProveedor.insumo
+        ofertas = obj.ofertaproveedor_set.all()
         if not ofertas:
             return "Ninguna"
 
         resumen = []
-        for o in ofertas[:3]:  # Mostrar hasta 3 ofertas
+        for o in ofertas[:3]:
             resumen.append(
-                f"{o.proveedor.nombre}: ${o.precio_unitario_compra} ({o.tiempo_entrega_estimado_dias}d)"
+                f"{o.proveedor.nombre}: ${o.precio} (oferta: {o.fecha_oferta})"
             )
-
         if ofertas.count() > 3:
             resumen.append("...")
-
         return ", ".join(resumen)
 
     mostrar_ofertas_resumen.short_description = (
