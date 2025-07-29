@@ -1,0 +1,33 @@
+{% extends "padre.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Depósito: {{ deposito.nombre }}</h2>
+    <p><strong>Ubicación:</strong> {{ deposito.ubicacion }}</p>
+    <p><strong>Descripción:</strong> {{ deposito.descripcion }}</p>
+
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-primary mb-3">
+                <div class="card-header">Insumos</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ insumos_count }}</h5>
+                    <p class="card-text">Cantidad de insumos en este depósito.</p>
+                    <a href="{% url 'App_LUMINOVA:insumos_list' %}?deposito={{ deposito.id }}" class="btn btn-light">Ver Insumos</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success mb-3">
+                <div class="card-header">Productos Terminados</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ productos_count }}</h5>
+                    <p class="card-text">Cantidad de productos terminados en este depósito.</p>
+                    <a href="{% url 'App_LUMINOVA:productos_terminados_list' %}?deposito={{ deposito.id }}" class="btn btn-light">Ver Productos</a>
+                </div>
+            </div>
+        </div>
+        <!-- Puedes agregar más tarjetas/resúmenes aquí -->
+    </div>
+</div>
+{% endblock %}

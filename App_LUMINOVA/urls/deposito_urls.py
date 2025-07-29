@@ -31,6 +31,7 @@ from ..views import (
     ProductoTerminadoUpdateView,
     ProductoTerminadoDeleteView,
 )
+from ..views_deposito import seleccionar_deposito_view, deposito_dashboard_view
 
 # Rutas de Ventas
 urlpatterns = [
@@ -65,6 +66,8 @@ urlpatterns = [
         recibir_pedido_oc_view,
         name="deposito_recibir_pedido",
     ),
+    path('deposito/seleccionar/', seleccionar_deposito_view, name='seleccionar_deposito'),
+    path('deposito/dashboard/', deposito_dashboard_view, name='deposito_dashboard'),
     # CRUDs para Fabricantes, Proveedores (Class-Based Views)
     path(
         "ventas/proveedores/proveedor/",

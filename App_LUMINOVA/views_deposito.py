@@ -61,6 +61,7 @@ from .models import (
     CategoriaProductoTerminado,
     Cliente,
     ComponenteProducto,
+    Deposito,
     EstadoOrden,
     Fabricante,
     Factura,
@@ -84,9 +85,36 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Deposito, Insumo, ProductoTerminado
 
 logger = logging.getLogger(__name__)
 
+
+# --- SELECTOR DE DEPÓSITOS ---
+def seleccionar_deposito_view(request):
+    depositos = Deposito.objects.all()
+    if request.method == "POST":
+        deposito_id = request.POST.get("deposito_id")
+        if deposito_id:
+            request.session["deposito_seleccionado"] = deposito_id
+            return redirect("App_LUMINOVA:deposito_dashboard")
+    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos})
+
+
+def deposito_dashboard_view(request):
+    deposito_id = request.session.get("deposito_seleccionado")
+    if not deposito_id:
+        return redirect("App_LUMINOVA:seleccionar_deposito")
+    deposito = get_object_or_404(Deposito, id=deposito_id)
+    insumos_count = Insumo.objects.filter(deposito=deposito).count()
+    productos_count = ProductoTerminado.objects.filter(deposito=deposito).count()
+    context = {
+        "deposito": deposito,
+        "insumos_count": insumos_count,
+        "productos_count": productos_count,
+    }
+    return render(request, "deposito/deposito_dashboard.html", context)
 
 # --- DEPÓSITO VIEWS ---
 @login_required
