@@ -65,6 +65,8 @@ class CategoriaInsumo(models.Model):
         "Deposito",
         on_delete=models.CASCADE,
         related_name="categorias_insumo",
+        null=True,
+        blank=True,
     )
 
     class Meta:
@@ -386,6 +388,18 @@ class AuditoriaAcceso(models.Model):
 
 
 class Orden(models.Model):
+    @staticmethod
+    def pedidos_por_deposito(deposito_id):
+        """
+        Devuelve las órdenes de compra cuyo insumo principal pertenece al depósito indicado.
+        """
+        return Orden.objects.filter(insumo_principal__deposito_id=deposito_id)
+    @staticmethod
+    def solicitudes_por_deposito(deposito_id):
+        """
+        Devuelve las solicitudes de insumos (OPs) cuyo producto a producir pertenece al depósito indicado.
+        """
+        return OrdenProduccion.objects.filter(producto_a_producir__deposito_id=deposito_id)
     TIPO_ORDEN_CHOICES = [
         ("compra", "Orden de Compra"),
     ]
