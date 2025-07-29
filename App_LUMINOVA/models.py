@@ -12,6 +12,13 @@ class CategoriaProductoTerminado(models.Model):
         max_length=100, unique=True, verbose_name="Nombre Categoría PT"
     )  # Aumentado max_length
     imagen = models.ImageField(upload_to="categorias_productos/", null=True, blank=True)
+    deposito = models.ForeignKey(
+        "Deposito",
+        on_delete=models.CASCADE,
+        related_name="categorias_producto_terminado",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Categoría de Producto Terminado"
@@ -36,6 +43,14 @@ class ProductoTerminado(models.Model):
     color_luz = models.CharField(max_length=50, blank=True, null=True)
     material = models.CharField(max_length=50, blank=True, null=True)
     imagen = models.ImageField(null=True, blank=True, upload_to="productos_terminados/")
+    deposito = models.ForeignKey(
+        "Deposito",
+        on_delete=models.PROTECT,
+        related_name="productos_terminados",
+        null=True,
+        blank=True,
+        help_text="Depósito al que pertenece este producto terminado",
+    )
 
     def __str__(self):
         return f"{self.descripcion} (Modelo: {self.modelo or 'N/A'})"
@@ -46,6 +61,13 @@ class CategoriaInsumo(models.Model):
         max_length=100, unique=True, verbose_name="Nombre Categoría Insumo"
     )
     imagen = models.ImageField(upload_to="categorias_insumos/", null=True, blank=True)
+    deposito = models.ForeignKey(
+        "Deposito",
+        on_delete=models.CASCADE,
+        related_name="categorias_insumo",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Categoría de Insumo"
@@ -91,6 +113,14 @@ class Insumo(models.Model):
     stock = models.IntegerField(default=0)
     cantidad_en_pedido = models.PositiveIntegerField(
         default=0, verbose_name="Cantidad en Pedido", blank=True, null=True
+    )
+    deposito = models.ForeignKey(
+        "Deposito",
+        on_delete=models.PROTECT,
+        related_name="insumos",
+        null=True,
+        blank=True,
+        help_text="Depósito al que pertenece este insumo",
     )
 
     def __str__(self):
@@ -358,6 +388,18 @@ class AuditoriaAcceso(models.Model):
 
 
 class Orden(models.Model):
+    @staticmethod
+    def pedidos_por_deposito(deposito_id):
+        """
+        Devuelve las órdenes de compra cuyo insumo principal pertenece al depósito indicado.
+        """
+        return Orden.objects.filter(insumo_principal__deposito_id=deposito_id)
+    @staticmethod
+    def solicitudes_por_deposito(deposito_id):
+        """
+        Devuelve las solicitudes de insumos (OPs) cuyo producto a producir pertenece al depósito indicado.
+        """
+        return OrdenProduccion.objects.filter(producto_a_producir__deposito_id=deposito_id)
     TIPO_ORDEN_CHOICES = [
         ("compra", "Orden de Compra"),
     ]
@@ -440,6 +482,14 @@ class LoteProductoTerminado(models.Model):
     cantidad = models.PositiveIntegerField()
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     enviado = models.BooleanField(default=False)
+    deposito = models.ForeignKey(
+        "Deposito",
+        on_delete=models.PROTECT,
+        related_name="lotes_productos_terminados",
+        null=True,
+        blank=True,
+        help_text="Depósito donde se encuentra el lote",
+    )
 
     def __str__(self):
         return f"Lote de {self.producto.descripcion} - OP {self.op_asociada.numero_op} ({self.cantidad})"
@@ -483,3 +533,12 @@ class PasswordChangeRequired(models.Model):
 
     def __str__(self):
         return f"El usuario {self.user.username} debe cambiar su contraseña."
+
+# Modelo para los depósitos
+class Deposito(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    ubicacion = models.CharField(max_length=255, blank=True)
+    descripcion = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.nombre

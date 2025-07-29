@@ -61,6 +61,7 @@ from .models import (
     CategoriaProductoTerminado,
     Cliente,
     ComponenteProducto,
+    Deposito,
     EstadoOrden,
     Fabricante,
     Factura,
@@ -84,9 +85,36 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Deposito, Insumo, ProductoTerminado
 
 logger = logging.getLogger(__name__)
 
+
+# --- SELECTOR DE DEPÓSITOS ---
+def seleccionar_deposito_view(request):
+    depositos = Deposito.objects.all()
+    if request.method == "POST":
+        deposito_id = request.POST.get("deposito_id")
+        if deposito_id:
+            request.session["deposito_seleccionado"] = deposito_id
+            return redirect("App_LUMINOVA:deposito_view")
+    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos})
+
+
+def deposito_dashboard_view(request):
+    deposito_id = request.session.get("deposito_seleccionado")
+    if not deposito_id:
+        return redirect("App_LUMINOVA:seleccionar_deposito")
+    deposito = get_object_or_404(Deposito, id=deposito_id)
+    insumos_count = Insumo.objects.filter(deposito=deposito).count()
+    productos_count = ProductoTerminado.objects.filter(deposito=deposito).count()
+    context = {
+        "deposito": deposito,
+        "insumos_count": insumos_count,
+        "productos_count": productos_count,
+    }
+    return render(request, "deposito/deposito_dashboard.html", context)
 
 # --- DEPÓSITO VIEWS ---
 @login_required
@@ -392,9 +420,13 @@ def recibir_pedido_oc_view(request, oc_id):
 def deposito_view(request):
     logger.info("--- deposito_view: INICIO ---")
 
-    categorias_I = CategoriaInsumo.objects.all()
-    categorias_PT = CategoriaProductoTerminado.objects.all()
+    deposito_id = request.session.get("deposito_seleccionado")
+    deposito = get_object_or_404(Deposito, id=deposito_id)
 
+    categorias_I = CategoriaInsumo.objects.filter(deposito=deposito)
+    categorias_PT = CategoriaProductoTerminado.objects.filter(deposito=deposito)
+
+    # OPs pendientes SOLO del depósito seleccionado
     ops_pendientes_deposito_list = OrdenProduccion.objects.none()
     ops_pendientes_deposito_count = 0
     try:
@@ -403,7 +435,10 @@ def deposito_view(request):
         ).first()
         if estado_sol:
             ops_pendientes_deposito_list = (
-                OrdenProduccion.objects.filter(estado_op=estado_sol)
+                OrdenProduccion.objects.filter(
+                    estado_op=estado_sol,
+                    producto_a_producir__deposito=deposito
+                )
                 .select_related("producto_a_producir")
                 .order_by("fecha_solicitud")
             )
@@ -411,21 +446,20 @@ def deposito_view(request):
     except Exception as e_op:
         logger.error(f"Deposito_view (OPs): Excepción al cargar OPs: {e_op}")
 
+    # Lotes de productos terminados en stock SOLO de este depósito
     lotes_en_stock = (
-        LoteProductoTerminado.objects.filter(enviado=False)
+        LoteProductoTerminado.objects.filter(enviado=False, producto__deposito=deposito)
         .select_related("producto", "op_asociada")
         .order_by("-fecha_creacion")
     )
 
-    # --- INICIO DE LA CORRECCIÓN DE LÓGICA ---
+    # Insumos con stock bajo SOLO de este depósito
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
-    insumos_con_stock_bajo = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    insumos_con_stock_bajo = Insumo.objects.filter(
+        stock__lt=UMBRAL_STOCK_BAJO_INSUMOS, deposito=deposito
+    )
 
-    # Estados que consideramos como "pedido en firme" (ya no es tarea del depósito)
-    UMBRAL_STOCK_BAJO_INSUMOS = 15000
-    insumos_con_stock_bajo = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
-
-    # Estados que consideramos como "pedido en firme" (ya no es tarea del depósito/compras iniciar)
+    # Estados que consideramos como "pedido en firme"
     ESTADOS_OC_EN_PROCESO = [
         "APROBADA",
         "ENVIADA_PROVEEDOR",
@@ -437,7 +471,6 @@ def deposito_view(request):
     insumos_en_pedido = []
 
     for insumo in insumos_con_stock_bajo:
-        # Buscamos si existe una OC que ya está aprobada y en proceso
         oc_en_proceso = (
             Orden.objects.filter(
                 insumo_principal=insumo, estado__in=ESTADOS_OC_EN_PROCESO
@@ -445,24 +478,20 @@ def deposito_view(request):
             .order_by("-fecha_creacion")
             .first()
         )
-
         if oc_en_proceso:
-            # Si ya está en proceso, va a la tabla "En Pedido"
             insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso})
         else:
-            # Si no hay OC en proceso (puede no existir o estar solo en Borrador),
-            # es una acción pendiente.
             insumos_a_gestionar.append({"insumo": insumo})
-    # --- FIN DE LA CORRECCIÓN DE LÓGICA ---
 
     context = {
+        "deposito": deposito,
         "categorias_I": categorias_I,
         "categorias_PT": categorias_PT,
         "ops_pendientes_deposito_list": ops_pendientes_deposito_list,
         "ops_pendientes_deposito_count": ops_pendientes_deposito_count,
         "lotes_productos_terminados_en_stock": lotes_en_stock,
-        "insumos_a_gestionar_list": insumos_a_gestionar,  # Nueva lista para la primera tabla
-        "insumos_en_pedido_list": insumos_en_pedido,  # Nueva lista para la segunda tabla
+        "insumos_a_gestionar_list": insumos_a_gestionar,
+        "insumos_en_pedido_list": insumos_en_pedido,
         "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
     }
 

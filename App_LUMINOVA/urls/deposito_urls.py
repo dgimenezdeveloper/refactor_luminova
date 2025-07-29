@@ -1,4 +1,7 @@
 from django.urls import path
+
+from App_LUMINOVA.views_insumos import InsumosListView
+from App_LUMINOVA.views_productos import ProductoTerminadosListView
 from ..views import (
     deposito_view,
     deposito_solicitudes_insumos_view,
@@ -31,6 +34,7 @@ from ..views import (
     ProductoTerminadoUpdateView,
     ProductoTerminadoDeleteView,
 )
+from ..views_deposito import seleccionar_deposito_view, deposito_dashboard_view
 
 # Rutas de Ventas
 urlpatterns = [
@@ -65,6 +69,8 @@ urlpatterns = [
         recibir_pedido_oc_view,
         name="deposito_recibir_pedido",
     ),
+    path('deposito/seleccionar/', seleccionar_deposito_view, name='seleccionar_deposito'),
+    path('deposito/dashboard/', deposito_dashboard_view, name='deposito_dashboard'),
     # CRUDs para Fabricantes, Proveedores (Class-Based Views)
     path(
         "ventas/proveedores/proveedor/",
@@ -163,7 +169,7 @@ urlpatterns = [
         InsumoDeleteView.as_view(),
         name="insumo_delete",
     ),
-    # path('deposito/insumos/', InsumosListView.as_view(), name='insumos_list'), # Descomentar si necesitas una lista general de todos los insumos
+    path("deposito/insumos/", InsumosListView.as_view(), name="insumos_list"),
     path(
         "deposito/productos-terminados/crear/",
         ProductoTerminadoCreateView.as_view(),
@@ -178,5 +184,10 @@ urlpatterns = [
         "deposito/productos-terminados/eliminar/<int:pk>/",
         ProductoTerminadoDeleteView.as_view(),
         name="producto_terminado_delete",
+    ),
+    path(
+        "deposito/productos-terminados/",
+        ProductoTerminadosListView.as_view(),
+        name="productos_terminados_list",
     ),
 ]
