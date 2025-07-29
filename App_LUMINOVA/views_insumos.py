@@ -96,8 +96,8 @@ class InsumosListView(ListView):
     context_object_name = "insumos"
 
     def get_queryset(self):
+        deposito_id = self.request.session.get("deposito_seleccionado")
         queryset = super().get_queryset()
-        deposito_id = self.request.GET.get("deposito")
         if deposito_id:
             queryset = queryset.filter(deposito_id=deposito_id)
         return queryset

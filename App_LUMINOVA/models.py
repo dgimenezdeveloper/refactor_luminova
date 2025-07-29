@@ -12,6 +12,13 @@ class CategoriaProductoTerminado(models.Model):
         max_length=100, unique=True, verbose_name="Nombre Categoría PT"
     )  # Aumentado max_length
     imagen = models.ImageField(upload_to="categorias_productos/", null=True, blank=True)
+    deposito = models.ForeignKey(
+        "Deposito",
+        on_delete=models.CASCADE,
+        related_name="categorias_producto_terminado",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Categoría de Producto Terminado"
@@ -54,6 +61,11 @@ class CategoriaInsumo(models.Model):
         max_length=100, unique=True, verbose_name="Nombre Categoría Insumo"
     )
     imagen = models.ImageField(upload_to="categorias_insumos/", null=True, blank=True)
+    deposito = models.ForeignKey(
+        "Deposito",
+        on_delete=models.CASCADE,
+        related_name="categorias_insumo",
+    )
 
     class Meta:
         verbose_name = "Categoría de Insumo"

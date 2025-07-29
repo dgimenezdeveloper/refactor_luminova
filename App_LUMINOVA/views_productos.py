@@ -96,8 +96,8 @@ class ProductoTerminadosListView(ListView):
     context_object_name = "productos_terminados"
 
     def get_queryset(self):
+        deposito_id = self.request.session.get("deposito_seleccionado")
         queryset = super().get_queryset()
-        deposito_id = self.request.GET.get("deposito")
         if deposito_id:
             queryset = queryset.filter(deposito_id=deposito_id)
         return queryset
@@ -105,8 +105,9 @@ class ProductoTerminadosListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         from .models import Deposito
+        deposito_id = self.request.session.get("deposito_seleccionado")
         context["depositos"] = Deposito.objects.all()
-        context["deposito_seleccionado"] = self.request.GET.get("deposito", "")
+        context["deposito_seleccionado"] = deposito_id
         return context
 
 
