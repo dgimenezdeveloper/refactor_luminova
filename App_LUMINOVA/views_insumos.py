@@ -52,6 +52,7 @@ from .forms import (
     ProveedorForm,
     ReporteProduccionForm,
     RolForm,
+    InsumoForm,
 )
 
 # Local Application Imports (Models)
@@ -88,14 +89,25 @@ from .utils import es_admin, es_admin_o_rol
 logger = logging.getLogger(__name__)
 
 
-
-
-
 # Funciones para el CRUD de Insumos
 class InsumosListView(ListView):
     model = Insumo
-    template_name = "deposito/insumos_list.html"  # Para una vista de todos los insumos si es necesaria
+    template_name = "deposito/insumos_list.html"
     context_object_name = "insumos"
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        deposito_id = self.request.GET.get("deposito")
+        if deposito_id:
+            queryset = queryset.filter(deposito_id=deposito_id)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from .models import Deposito
+        context["depositos"] = Deposito.objects.all()
+        context["deposito_seleccionado"] = self.request.GET.get("deposito", "")
+        return context
 
 
 class InsumoDetailView(DetailView):
@@ -103,12 +115,11 @@ class InsumoDetailView(DetailView):
     template_name = "deposito/insumo_detail.html"
     context_object_name = "insumo"
 
+
 class InsumoCreateView(CreateView):
     model = Insumo
     template_name = "deposito/insumo_crear.html"
-    # Define los campos que SÍ están en el modelo Insumo y quieres en el formulario de creación
-    fields = ["descripcion", "categoria", "fabricante", "stock", "imagen"]
-    # success_url = reverse_lazy('App_LUMINOVA:deposito_view') # Redirige a la vista principal de depósito
+    form_class = InsumoForm  # Usar formulario personalizado
 
     def form_valid(self, form):
         messages.success(
@@ -154,19 +165,9 @@ class InsumoCreateView(CreateView):
 
 class InsumoUpdateView(UpdateView):
     model = Insumo
-    template_name = "deposito/insumo_editar.html"  # Asegúrate que sea el nombre correcto de tu plantilla
-    fields = [
-        "descripcion",
-        "categoria",
-        "fabricante",
-        "stock",
-        "imagen",
-    ]  # Lista los campos que quieres que sean editables
-    # O usa un formulario personalizado:
-    # form_class = InsumoForm
-    context_object_name = (
-        "insumo"  # Nombre del objeto en la plantilla (puedes usar 'object' también)
-    )
+    template_name = "deposito/insumo_editar.html"
+    form_class = InsumoForm  # Usar formulario personalizado
+    context_object_name = "insumo"
 
     def get_success_url(self):
         # Redirigir al detalle de la categoría del insumo editado, o a donde prefieras

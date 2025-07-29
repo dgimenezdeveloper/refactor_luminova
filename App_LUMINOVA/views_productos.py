@@ -52,6 +52,7 @@ from .forms import (
     ProveedorForm,
     ReporteProduccionForm,
     RolForm,
+    ProductoTerminadoForm,
 )
 
 # Local Application Imports (Models)
@@ -91,8 +92,22 @@ logger = logging.getLogger(__name__)
 # Funciones para el CRUD de Productos Terminados
 class ProductoTerminadosListView(ListView):
     model = ProductoTerminado
-    template_name = "deposito/productoterminados_list.html"  # Para una vista de todos los PT si es necesaria
+    template_name = "deposito/productoterminados_list.html"
     context_object_name = "productos_terminados"
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        deposito_id = self.request.GET.get("deposito")
+        if deposito_id:
+            queryset = queryset.filter(deposito_id=deposito_id)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from .models import Deposito
+        context["depositos"] = Deposito.objects.all()
+        context["deposito_seleccionado"] = self.request.GET.get("deposito", "")
+        return context
 
 
 class ProductoTerminadoDetailView(DetailView):
@@ -104,14 +119,13 @@ class ProductoTerminadoDetailView(DetailView):
 class ProductoTerminadoCreateView(CreateView):
     model = ProductoTerminado
     template_name = "deposito/productoterminado_crear.html"
-    fields = "__all__"
-    success_url = reverse_lazy("App_LUMINOVA:deposito_view")
+    form_class = ProductoTerminadoForm
 
 
 class ProductoTerminadoUpdateView(UpdateView):
     model = ProductoTerminado
     template_name = "deposito/productoterminado_editar.html"
-    fields = "__all__"
+    form_class = ProductoTerminadoForm
     context_object_name = "producto_terminado"
 
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")

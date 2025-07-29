@@ -413,6 +413,31 @@ class FacturaForm(forms.ModelForm):
         ] = "form-control-plaintext text-muted"
 
 
+class ProductoTerminadoForm(forms.ModelForm):
+    class Meta:
+        model = ProductoTerminado
+        fields = [
+            "descripcion", "categoria", "precio_unitario", "stock", "modelo",
+            "potencia", "acabado", "color_luz", "material", "deposito", "imagen"
+        ]
+        widgets = {
+            "descripcion": forms.TextInput(attrs={"class": "form-control"}),
+            "categoria": forms.Select(attrs={"class": "form-select"}),
+            "precio_unitario": forms.NumberInput(attrs={"class": "form-control"}),
+            "stock": forms.NumberInput(attrs={"class": "form-control"}),
+            "modelo": forms.TextInput(attrs={"class": "form-control"}),
+            "potencia": forms.NumberInput(attrs={"class": "form-control"}),
+            "acabado": forms.TextInput(attrs={"class": "form-control"}),
+            "color_luz": forms.TextInput(attrs={"class": "form-control"}),
+            "material": forms.TextInput(attrs={"class": "form-control"}),
+            "deposito": forms.Select(attrs={"class": "form-select"}),
+            "imagen": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+        labels = {
+            "deposito": "Depósito",
+        }
+
+
 class OrdenCompraForm(forms.ModelForm):
     class Meta:
         model = Orden
@@ -683,3 +708,20 @@ class ReporteProduccionForm(forms.ModelForm):
             self.fields["sector_reporta"].initial = (
                 self.orden_produccion.sector_asignado_op
             )
+
+
+class InsumoForm(forms.ModelForm):
+    class Meta:
+        model = Insumo
+        fields = ["descripcion", "categoria", "fabricante", "stock", "deposito", "imagen"]
+        widgets = {
+            "descripcion": forms.TextInput(attrs={"class": "form-control"}),
+            "categoria": forms.Select(attrs={"class": "form-select"}),
+            "fabricante": forms.Select(attrs={"class": "form-select"}),
+            "stock": forms.NumberInput(attrs={"class": "form-control"}),
+            "deposito": forms.Select(attrs={"class": "form-select"}),
+            "imagen": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+        labels = {
+            "deposito": "Depósito",
+        }

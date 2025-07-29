@@ -37,19 +37,29 @@
 
 {% block content %}
 
-    <ul>
-        
-        {% for insumo in insumos %}
-            <li>{{insumo}}</li>
-            <div>
-                <form action="{% url 'App_LUMINOVA:insumo_delete' insumo.id %}" method="post" >{% csrf_token %}
-                    <button type="submit">Eliminar</button>
-                </form>
-                <button>
-                    <a href="{% url 'App_LUMINOVA:insumo_edit' insumo.id %}">Editar</a>
-                </button>
-            </div>
-        {% endfor %}
+    <form method="get" class="mb-3">
+        <label for="deposito">Depósito:</label>
+        <select name="deposito" id="deposito" class="form-select" style="width: auto; display: inline-block;" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for dep in depositos %}
+                <option value="{{ dep.id }}" {% if dep.id|stringformat:"s" == deposito_seleccionado %}selected{% endif %}>{{ dep.nombre }}</option>
+            {% endfor %}
+        </select>
+    </form>
 
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Descripción</th>
+                <th>Fabricante</th>
+                <th>Stock</th>
+                <th>Depósito</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for insumo in insumos %}
+            <tr>
     </ul>
 {% endblock %}
