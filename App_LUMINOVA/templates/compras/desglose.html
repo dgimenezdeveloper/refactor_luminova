@@ -1,0 +1,90 @@
+{% extends 'padre.html' %}
+{% load static %}
+{% load django_bootstrap5 %}
+
+{% block title %}{{ titulo_seccion|default:"Gestionar Compra por Stock Bajo" }}{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'compras/compras_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ titulo_seccion }}</h1>
+</div>
+
+<div class="alert alert-info small">
+    <i class="bi bi-info-circle-fill"></i>
+    Esta sección muestra todos los insumos cuyo stock está por debajo del umbral de <strong>{{ umbral_stock_bajo }}</strong> unidades y que no tienen una Orden de Compra (OC) activa. Desde aquí puede iniciar el proceso de compra para reabastecerlos.
+</div>
+
+{% if insumos_criticos_list_con_estado %}
+<div class="table-responsive mt-3">
+    <table class="table table-hover table-sm align-middle">
+        <thead class="color-thead">
+            <tr>
+                <th style="width: 5%;">ID</th>
+                <th>Insumo</th>
+                <th>Categoría</th>
+                <th class="text-center">Stock Actual</th>
+                <th class="text-center">Estado de Compra</th>
+                <th class="text-center">Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item_data in insumos_criticos_list_con_estado %} 
+            <tr>
+                <td>{{ item_data.insumo.id }}</td>
+                <td>
+                    {% if item_data.insumo.imagen %}
+                        <img src="{{ item_data.insumo.imagen.url }}" alt="{{ item_data.insumo.descripcion }}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 3px; margin-right: 8px;">
+                    {% endif %}
+                    {{ item_data.insumo.descripcion|truncatechars:40 }}
+                </td>
+                <td>{{ item_data.insumo.categoria.nombre|default_if_none:"N/A" }}</td>
+                <td class="text-center fw-bold text-danger">{{ item_data.insumo.stock }}</td>
+                
+                {# --- INICIO DE LA CORRECCIÓN --- #}
+                <td class="text-center">
+                    {% if item_data.oc_pendiente %}
+                        <a href="{% url 'App_LUMINOVA:compras_detalle_oc' item_data.oc_pendiente.id %}" class="badge bg-info text-dark text-decoration-none" title="Ver OC {{ item_data.oc_pendiente.numero_orden }}">
+                            OC: {{ item_data.oc_pendiente.numero_orden }} ({{ item_data.oc_pendiente.get_estado_display }})
+                        </a>
+                    {% else %}
+                        <span class="badge bg-warning text-dark">Requiere Compra</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if not item_data.oc_pendiente %}
+                        <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' item_data.insumo.id %}" 
+                           class="btn btn-sm btn-primary" 
+                           title="Iniciar compra para {{ item_data.insumo.descripcion }}">
+                            <i class="bi bi-cart-plus-fill"></i> Iniciar Compra
+                        </a>
+                    {% else %}
+                        <a href="{% url 'App_LUMINOVA:compras_detalle_oc' item_data.oc_pendiente.id %}" class="btn btn-sm btn-outline-secondary" title="Ver OC existente">
+                            <i class="bi bi-eye-fill"></i> Ver OC
+                        </a>
+                    {% endif %}
+                </td>
+                {# --- FIN DE LA CORRECCIÓN --- #}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-success mt-3" role="alert">
+    <i class="bi bi-check-circle-fill"></i> ¡Excelente! No hay insumos críticos que requieran gestión de compra inmediata.
+</div>
+{% endif %}
+
+<div class="mt-4">
+    <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left-circle"></i> Volver a Depósito
+    </a>
+    <a href="{% url 'App_LUMINOVA:compras_lista_oc' %}" class="btn btn-outline-info ms-2">
+        <i class="bi bi-list-ul"></i> Ver Todas las Órdenes de Compra
+    </a>
+</div>
+{% endblock %}

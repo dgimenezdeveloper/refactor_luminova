@@ -1,0 +1,57 @@
+{% extends 'padre.html' %}
+{% load static %}
+
+{% block title %}Seguimiento de Compras - Luminova{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'compras/compras_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Seguimiento de Órdenes de Compra</h1>
+</div>
+
+<div class="table-responsive mt-3">
+    <table class="table table-hover table-sm align-middle">
+        <thead class="color-thead" >
+          <tr>
+            <th class="align-middle" style="background-color: #014BAC;">N° OC</th>
+            <th class="align-middle" style="background-color: #014BAC;">Estado de OC</th>
+            <th class="align-middle" style="background-color: #014BAC;">Proveedor</th>
+            <th class="align-middle" style="background-color: #014BAC;">Fecha Estimada de Entrega</th>
+            <th class="align-middle" style="background-color: #014BAC;">N° Tracking</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for oc in ordenes_en_seguimiento %}
+            <tr>
+              <td class="align-middle">
+                  <a href="{% url 'App_LUMINOVA:compras_detalle_oc' oc.id %}">{{ oc.numero_orden }}</a>
+              </td>
+              <td class="align-middle">
+                  <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">
+                      {{ oc.get_estado_display }}
+                  </span>
+              </td>
+              <td class="align-middle">{{ oc.proveedor.nombre }}</td>
+              <td class="align-middle">{{ oc.fecha_estimada_entrega|date:"d/m/Y"|default:"No especificada" }}</td>
+              <td>
+                {% if oc.numero_tracking %}
+                  <a href="{% url 'App_LUMINOVA:compras_tracking_pedido' oc.id %}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-truck me-1"></i> {{ oc.numero_tracking }}
+                  </a>
+                {% else %}
+                  N/A
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="text-center fst-italic text-muted py-3">No hay órdenes en seguimiento en este momento.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+</div>
+{% endblock %}

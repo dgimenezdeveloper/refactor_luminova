@@ -1,0 +1,83 @@
+{% extends 'padre.html' %}
+{% load static %}
+{% load django_bootstrap5 %}
+
+{% block title %}{{ titulo_seccion|default:"Detalle Orden de Compra" }}{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'compras/compras_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">{{ titulo_seccion }}</h1>
+        <div>
+            {% if oc.estado == 'BORRADOR' %}
+            <a href="{% url 'App_LUMINOVA:compras_editar_oc' oc.id %}" class="btn btn-outline-primary btn-sm me-2">
+                <i class="bi bi-pencil-square"></i> Editar OC
+            </a>
+            {% endif %}
+            <a href="{% url 'App_LUMINOVA:compras_lista_oc' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left-circle"></i> Volver al Listado
+            </a>
+        </div>
+    </div>
+
+    {# --- INICIO DE LA CORRECCIÓN --- #}
+    {# La vista ahora es solo informativa, sin formularios de acción #}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-file-earmark-text-fill me-2"></i>Información de la Orden de Compra
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-4">N° OC:</dt>
+                <dd class="col-sm-8">{{ oc.numero_orden }}</dd>
+
+                <dt class="col-sm-4">Fecha Creación:</dt>
+                <dd class="col-sm-8">{{ oc.fecha_creacion|date:"d/m/Y H:i" }}</dd>
+
+                <dt class="col-sm-4">Proveedor:</dt>
+                <dd class="col-sm-8">{{ oc.proveedor.nombre|default_if_none:"No asignado" }}</dd>
+
+                <dt class="col-sm-4">Estado:</dt>
+                <dd class="col-sm-8">
+                    <span class="badge fs-6
+                        {% if oc.estado == 'BORRADOR' %}bg-secondary
+                        {% elif oc.estado == 'APROBADA' %}bg-info text-dark
+                        {% elif oc.estado == 'ENVIADA_PROVEEDOR' %}bg-primary
+                        {% elif oc.estado == 'EN_TRANSITO' %}bg-success-subtle text-success-emphasis border border-success-subtle
+                        {% elif oc.estado == 'RECIBIDA_PARCIAL' or oc.estado == 'RECIBIDA_TOTAL' or oc.estado == 'COMPLETADA' %}bg-success
+                        {% elif oc.estado == 'CANCELADA' %}bg-dark
+                        {% else %}bg-light text-dark{% endif %}">
+                        {{ oc.get_estado_display }}
+                    </span>
+                </dd>
+
+                <dt class="col-sm-4">Insumo Principal:</dt>
+                <dd class="col-sm-8">{{ oc.insumo_principal.descripcion|default_if_none:"N/A" }}</dd>
+
+                <dt class="col-sm-4">Cantidad Pedida:</dt>
+                <dd class="col-sm-8">{{ oc.cantidad_principal|default_if_none:"N/A" }}</dd>
+
+                <dt class="col-sm-4">Precio Unit. Compra:</dt>
+                <dd class="col-sm-8">${{ oc.precio_unitario_compra|floatformat:2|default:"N/A" }}</dd>
+
+                <dt class="col-sm-4">Total Orden Compra:</dt>
+                <dd class="col-sm-8 fw-bold">${{ oc.total_orden_compra|floatformat:2|default:"N/A" }}</dd>
+
+                <dt class="col-sm-4">Fecha Estimada Entrega:</dt>
+                <dd class="col-sm-8">{{ oc.fecha_estimada_entrega|date:"d/m/Y"|default_if_none:"No especificada" }}</dd>
+
+                <dt class="col-sm-4">N° Tracking:</dt>
+                <dd class="col-sm-8 fw-bold text-success">{{ oc.numero_tracking|default_if_none:"Aún no disponible" }}</dd>
+
+                <dt class="col-sm-4">Notas:</dt>
+                <dd class="col-sm-8">{{ oc.notas|default_if_none:"-"|linebreaksbr }}</dd>
+            </dl>
+        </div>
+    </div>
+    {# --- FIN DE LA CORRECCIÓN --- #}
+</div>
+{% endblock %}
