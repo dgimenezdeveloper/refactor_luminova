@@ -542,3 +542,30 @@ class Deposito(models.Model):
 
     def __str__(self):
         return self.nombre
+
+class StockInsumo(models.Model):
+    insumo = models.ForeignKey('Insumo', on_delete=models.CASCADE)
+    deposito = models.ForeignKey('Deposito', on_delete=models.CASCADE)
+    cantidad = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ('insumo', 'deposito')
+
+class StockProductoTerminado(models.Model):
+    producto = models.ForeignKey('ProductoTerminado', on_delete=models.CASCADE)
+    deposito = models.ForeignKey('Deposito', on_delete=models.CASCADE)
+    cantidad = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ('producto', 'deposito')
+
+class MovimientoStock(models.Model):
+    insumo = models.ForeignKey('Insumo', on_delete=models.CASCADE, null=True, blank=True)
+    producto = models.ForeignKey('ProductoTerminado', on_delete=models.CASCADE, null=True, blank=True)
+    deposito_origen = models.ForeignKey('Deposito', on_delete=models.CASCADE, related_name='movimientos_salida', null=True, blank=True)
+    deposito_destino = models.ForeignKey('Deposito', on_delete=models.CASCADE, related_name='movimientos_entrada', null=True, blank=True)
+    cantidad = models.IntegerField()
+    tipo = models.CharField(max_length=20, choices=[('entrada', 'Entrada'), ('salida', 'Salida'), ('transferencia', 'Transferencia')])
+    fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    motivo = models.CharField(max_length=255, blank=True)

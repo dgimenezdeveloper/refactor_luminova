@@ -24,6 +24,9 @@ from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAs
     RolDescripcion,
     SectorAsignado,
     Deposito,
+    StockInsumo,
+    StockProductoTerminado,
+    MovimientoStock,
 )
 
 
@@ -322,3 +325,22 @@ class LoteProductoTerminadoAdmin(admin.ModelAdmin):
 class DepositoAdmin(admin.ModelAdmin):
     list_display = ("nombre", "ubicacion", "descripcion")
     search_fields = ("nombre", "ubicacion")
+
+
+@admin.register(StockInsumo)
+class StockInsumoAdmin(admin.ModelAdmin):
+    list_display = ("insumo", "deposito", "cantidad")
+    search_fields = ("insumo__descripcion", "deposito__nombre")
+
+
+@admin.register(StockProductoTerminado)
+class StockProductoTerminadoAdmin(admin.ModelAdmin):
+    list_display = ("producto", "deposito", "cantidad")
+    search_fields = ("producto__descripcion", "deposito__nombre")
+
+
+@admin.register(MovimientoStock)
+class MovimientoStockAdmin(admin.ModelAdmin):
+    list_display = ("insumo", "producto", "deposito_origen", "deposito_destino", "cantidad", "tipo", "fecha", "usuario")
+    list_filter = ("tipo", "fecha", "deposito_origen", "deposito_destino")
+    search_fields = ("insumo__descripcion", "producto__descripcion", "usuario__username")
