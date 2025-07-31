@@ -708,11 +708,34 @@ def transferencia_insumo_view(request):
             categoria_origen = insumo.categoria
             categoria_destino = CategoriaInsumo.objects.filter(nombre=categoria_origen.nombre, deposito=deposito_destino).first()
             if not categoria_destino:
-                # Solo copiar los campos que existen en el modelo
-                categoria_destino = CategoriaInsumo.objects.create(
-                    nombre=categoria_origen.nombre,
-                    deposito=deposito_destino
-                )
+                # Clonar imagen de la categoría si existe
+                from django.core.files.base import ContentFile
+                from django.core.files.storage import default_storage
+                import os
+                categoria_fields = {
+                    'nombre': categoria_origen.nombre,
+                    'deposito': deposito_destino,
+                }
+                if getattr(categoria_origen, 'imagen', None):
+                    try:
+                        original_cat_img = categoria_origen.imagen
+                        if original_cat_img and hasattr(original_cat_img, 'name') and original_cat_img.name:
+                            original_cat_img.open('rb')
+                            cat_img_content = original_cat_img.read()
+                            original_cat_img.close()
+                            base, ext = os.path.splitext(os.path.basename(original_cat_img.name))
+                            new_cat_img_name = f"categorias_insumos/clone_{categoria_origen.id}_{deposito_destino.id}{ext}"
+                            # Creamos la categoría sin imagen primero
+                            categoria_fields['imagen'] = None
+                            categoria_destino = CategoriaInsumo.objects.create(**categoria_fields)
+                            # Guardamos la imagen usando el método save()
+                            categoria_destino.imagen.save(new_cat_img_name, ContentFile(cat_img_content), save=True)
+                        else:
+                            categoria_destino = CategoriaInsumo.objects.create(**categoria_fields)
+                    except Exception as e:
+                        categoria_destino = CategoriaInsumo.objects.create(**categoria_fields)
+                else:
+                    categoria_destino = CategoriaInsumo.objects.create(**categoria_fields)
 
             # 2. Clonar insumo si no existe en el depósito destino
             insumo_destino = Insumo.objects.filter(descripcion=insumo.descripcion, deposito=deposito_destino).first()
