@@ -550,12 +550,13 @@ def deposito_view(request):
     # Insumos con stock bajo SOLO de este depósito
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
-    # Sincronizar StockInsumo con el valor de stock de Insumo para todos los insumos del depósito
+    # Refuerza la sincronización: SIEMPRE actualiza StockInsumo con el valor actual de stock de Insumo
     from .models import StockInsumo
     insumos_del_deposito = Insumo.objects.filter(deposito=deposito)
     for insumo in insumos_del_deposito:
         stock_obj, created = StockInsumo.objects.get_or_create(insumo=insumo, deposito=deposito, defaults={"cantidad": insumo.stock})
-        if not created and stock_obj.cantidad != insumo.stock:
+        # Siempre sincroniza, aunque el valor sea igual (por si hay triggers externos)
+        if stock_obj.cantidad != insumo.stock:
             stock_obj.cantidad = insumo.stock
             stock_obj.save()
 
