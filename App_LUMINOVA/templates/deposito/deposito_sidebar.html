@@ -37,18 +37,8 @@
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_insumo_create %}active{% endif %}" href="{{ url_insumo_create }}">
-                    <i class="bi bi-plus-square me-2"></i> <span class="ms-2">Agregar Insumo</span>
-                </a>
-            </li>
-            <li class="nav-item mt-2">
                 <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_cat_i_create %}active{% endif %}" href="{{ url_cat_i_create }}">
                     <i class="bi bi-bookmark-plus me-2"></i> <span class="ms-2">Agregar Cat. Insumo</span>
-                </a>
-            </li>
-            <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_pt_create %}active{% endif %}" href="{{ url_pt_create }}">
-                    <i class="bi bi-plus-square-fill me-2"></i> <span class="ms-2">Agregar Prod. Term.</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
@@ -59,6 +49,12 @@
             <li class="nav-item mt-2">
                 <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_transferencia_insumo %}active{% endif %}" href="{{ url_transferencia_insumo }}">
                     <i class="bi bi-arrow-left-right me-2"></i> <span class="ms-2">Transferir Insumo entre Depósitos</span>
+                </a>
+            </li>
+            {% url 'App_LUMINOVA:historial_transferencias' as url_historial_transferencias %}
+            <li class="nav-item mt-2">
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_historial_transferencias %}active{% endif %}" href="{{ url_historial_transferencias }}">
+                    <i class="bi bi-clock-history me-2"></i> <span class="ms-2">Historial de Transferencias</span>
                 </a>
             </li>
         </ul>

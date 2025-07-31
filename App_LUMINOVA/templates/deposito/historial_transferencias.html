@@ -1,0 +1,202 @@
+{% extends 'padre.html' %}
+
+{% block sidebar_content %}
+    {% include 'deposito/sidebar_include.html' %}
+{% endblock %}
+
+{% block content %}
+<style>
+  .historial-card {
+    background: #eaf2ff;
+    border-radius: 16px;
+    border: 2px solid #b3d1ff;
+    padding: 1.2rem 1.5rem 1rem 1.5rem;
+    margin-bottom: 1.2rem;
+    margin-top: 1.2rem;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    max-width: 98vw;
+    overflow-x: visible;
+  }
+  .historial-title {
+    color: #003a7b;
+    font-weight: bold;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    letter-spacing: -0.5px;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+  }
+  .historial-form label {
+    color: #003a7b;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.1rem;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+  }
+  .historial-form .form-select, .historial-form .form-control {
+    border-radius: 6px;
+    border: 1px solid #b3d1ff;
+    font-size: 1rem;
+    min-width: 100px;
+    background: #fff;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    height: 2.1rem;
+    padding: 0.1rem 0.5rem;
+  }
+  .historial-form .btn-primary {
+    background: #003a7b;
+    border: none;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 0.3rem 1rem;
+    font-size: 1rem;
+    box-shadow: none;
+    transition: background 0.2s;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+  }
+  .historial-form .btn-primary:hover {
+    background: #00285a;
+  }
+  .historial-table {
+    border-radius: 10px;
+    margin-top: 0.1rem;
+    margin-bottom: 0;
+    background: #fff;
+    box-shadow: none;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .historial-table th {
+    background: #0050b2;
+    color: #fff;
+    font-weight: bold;
+    border-bottom: 2px solid #b3d1ff;
+    font-size: 1rem;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    padding: 0.4rem 0.3rem;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .historial-table td {
+    border-bottom: 1px solid #e0eaff;
+    font-size: 1rem;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    padding: 0.3rem 0.3rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .historial-table tr:last-child td {
+    border-bottom: none;
+  }
+  .historial-table .text-muted {
+    color: #b0b8c9 !important;
+  }
+  /* Ajustar anchos de columnas para evitar overflow */
+  .historial-table th:nth-child(1), .historial-table td:nth-child(1) { width: 110px; }
+  .historial-table th:nth-child(2), .historial-table td:nth-child(2) { width: 260px; }
+  .historial-table th:nth-child(3), .historial-table td:nth-child(3) { width: 80px; text-align: right; }
+  .historial-table th:nth-child(4), .historial-table td:nth-child(4) { width: 150px; }
+  .historial-table th:nth-child(5), .historial-table td:nth-child(5) { width: 150px; }
+  .historial-table th:nth-child(6), .historial-table td:nth-child(6) { width: 90px; }
+  .historial-table th:nth-child(7), .historial-table td:nth-child(7) { width: 170px; }
+  @media (max-width: 1200px) {
+    .historial-table th, .historial-table td { font-size: 0.95rem; }
+    .historial-table th:nth-child(2), .historial-table td:nth-child(2) { width: 180px; }
+    .historial-table th:nth-child(4), .historial-table td:nth-child(4),
+    .historial-table th:nth-child(5), .historial-table td:nth-child(5) { width: 100px; }
+    .historial-table th:nth-child(7), .historial-table td:nth-child(7) { width: 120px; }
+  }
+  @media (max-width: 991px) {
+    .historial-card { padding: 0.7rem 0.2rem; }
+    .historial-title { font-size: 1.1rem; }
+    .historial-table th, .historial-table td { font-size: 0.93rem; }
+  }
+</style>
+<div class="historial-card">
+    <h2 class="historial-title">Historial de Transferencias</h2>
+    <form method="get" class="mb-2 historial-form">
+      <div class="row g-2 align-items-end flex-wrap">
+        <div class="col-6 col-md-2">
+          <label>Depósito Origen</label>
+          <select name="deposito_origen" class="form-select">
+            <option value="">Todos</option>
+            {% for d in depositos %}
+              <option value="{{ d.id }}" {% if filtros.deposito_origen_id == d.id|stringformat:'s' %}selected{% endif %}>{{ d.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label>Depósito Destino</label>
+          <select name="deposito_destino" class="form-select">
+            <option value="">Todos</option>
+            {% for d in depositos %}
+              <option value="{{ d.id }}" {% if filtros.deposito_destino_id == d.id|stringformat:'s' %}selected{% endif %}>{{ d.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label>Usuario</label>
+          <select name="usuario" class="form-select">
+            <option value="">Todos</option>
+            {% for u in usuarios %}
+              <option value="{{ u.id }}" {% if filtros.usuario_id == u.id|stringformat:'s' %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label>Insumo</label>
+          <select name="insumo" class="form-select">
+            <option value="">Todos</option>
+            {% for i in insumos %}
+              <option value="{{ i.id }}" {% if filtros.insumo_id == i.id|stringformat:'s' %}selected{% endif %}>{{ i.descripcion }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label>Desde</label>
+          <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" class="form-control">
+        </div>
+        <div class="col-6 col-md-2">
+          <label>Hasta</label>
+          <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" class="form-control">
+        </div>
+        <div class="col-12 col-md-1 d-grid mt-2 mt-md-0">
+          <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+        </div>
+      </div>
+    </form>
+    <div class="table-responsive historial-table">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Insumo</th>
+                    <th>Cantidad</th>
+                    <th>Depósito Origen</th>
+                    <th>Depósito Destino</th>
+                    <th>Usuario</th>
+                    <th>Motivo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transferencias %}
+                <tr>
+                    <td>{{ t.fecha|date:'d/m/Y H:i' }}</td>
+                    <td>{{ t.insumo.descripcion }}</td>
+                    <td>{{ t.cantidad }}</td>
+                    <td>{{ t.deposito_origen.nombre }}</td>
+                    <td>{{ t.deposito_destino.nombre }}</td>
+                    <td>{{ t.usuario.username }}</td>
+                    <td>{{ t.motivo }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">No hay transferencias registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
