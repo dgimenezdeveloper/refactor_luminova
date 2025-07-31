@@ -1,3 +1,4 @@
+{% url 'App_LUMINOVA:transferencia_insumo' as url_transferencia_insumo %}
 {% load static %}
 
 {% url 'App_LUMINOVA:deposito_view' as url_deposito_principal %}
@@ -17,6 +18,11 @@
         </h6>
         <hr class="text-white">
         <ul class="nav flex-column">
+            <li class="nav-item mt-2">
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_transferencia_insumo %}active{% endif %}" href="{{ url_transferencia_insumo }}">
+                    <i class="bi bi-arrow-left-right me-2"></i> <span class="ms-2">Transferir Insumo entre Depósitos</span>
+                </a>
+            </li>
             <li class="nav-item">
                 <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_deposito_recepcion %}active{% endif %}" href="{{ url_deposito_recepcion }}">
                     <i class="bi bi-truck me-2"></i> <span class="ms-2">Recepción de Pedidos</span>

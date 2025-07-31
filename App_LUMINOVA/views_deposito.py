@@ -1,3 +1,42 @@
+from django.db import transaction
+from django.contrib.auth.decorators import login_required, user_passes_test
+from .forms import TransferenciaInsumoForm
+# --- TRANSFERENCIA DE INSUMOS ENTRE DEPÓSITOS ---
+@login_required
+@transaction.atomic
+def transferencia_insumo_view(request):
+    if request.method == "POST":
+        form = TransferenciaInsumoForm(request.POST)
+        if form.is_valid():
+            insumo = form.cleaned_data["insumo"]
+            deposito_origen = form.cleaned_data["deposito_origen"]
+            deposito_destino = form.cleaned_data["deposito_destino"]
+            cantidad = form.cleaned_data["cantidad"]
+            motivo = form.cleaned_data["motivo"]
+            from .models import StockInsumo, MovimientoStock
+            # Descontar stock del origen
+            stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
+            stock_origen.cantidad -= cantidad
+            stock_origen.save()
+            # Sumar stock al destino (crear si no existe)
+            stock_destino, created = StockInsumo.objects.get_or_create(insumo=insumo, deposito=deposito_destino, defaults={"cantidad": 0})
+            stock_destino.cantidad += cantidad
+            stock_destino.save()
+            # Registrar movimiento
+            MovimientoStock.objects.create(
+                insumo=insumo,
+                deposito_origen=deposito_origen,
+                deposito_destino=deposito_destino,
+                cantidad=cantidad,
+                tipo="transferencia",
+                usuario=request.user,
+                motivo=motivo or "Transferencia entre depósitos"
+            )
+            messages.success(request, "Transferencia realizada correctamente.")
+            return redirect("App_LUMINOVA:deposito_view")
+    else:
+        form = TransferenciaInsumoForm()
+    return render(request, "deposito/transferencia_insumo.html", {"form": form})
 import logging
 from datetime import timedelta
 

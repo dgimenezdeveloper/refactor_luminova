@@ -1,3 +1,4 @@
+from .models import Deposito, Insumo
 import logging
 from datetime import timedelta, timezone
 
@@ -24,6 +25,30 @@ from .models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Formulario para transferir insumos entre depósitos
+class TransferenciaInsumoForm(forms.Form):
+    insumo = forms.ModelChoiceField(queryset=Insumo.objects.all(), label="Insumo")
+    deposito_origen = forms.ModelChoiceField(queryset=Deposito.objects.all(), label="Depósito origen")
+    deposito_destino = forms.ModelChoiceField(queryset=Deposito.objects.all(), label="Depósito destino")
+    cantidad = forms.IntegerField(min_value=1, label="Cantidad a transferir")
+    motivo = forms.CharField(max_length=255, required=False, label="Motivo (opcional)")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        insumo = cleaned_data.get("insumo")
+        deposito_origen = cleaned_data.get("deposito_origen")
+        cantidad = cleaned_data.get("cantidad")
+        if insumo and deposito_origen and cantidad:
+            from .models import StockInsumo
+            try:
+                stock = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
+            except StockInsumo.DoesNotExist:
+                raise forms.ValidationError("No hay stock de este insumo en el depósito de origen.")
+            if stock.cantidad < cantidad:
+                raise forms.ValidationError("Stock insuficiente en el depósito de origen.")
+        return cleaned_data
+
 
 
 class RolForm(forms.Form):

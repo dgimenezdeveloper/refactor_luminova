@@ -1,5 +1,7 @@
 from django.urls import path
 
+from ..views_deposito import transferencia_insumo_view
+
 from App_LUMINOVA.views_insumos import InsumosListView
 from App_LUMINOVA.views_productos import ProductoTerminadosListView
 from ..views import (
@@ -38,6 +40,7 @@ from ..views_deposito import seleccionar_deposito_view, deposito_dashboard_view
 
 # Rutas de Ventas
 urlpatterns = [
+    path('deposito/transferencia-insumo/', transferencia_insumo_view, name='transferencia_insumo'),
     path("deposito/", deposito_view, name="deposito_view"),
     path(
         "deposito/solicitudes-insumos/",
