@@ -494,9 +494,13 @@ def deposito_view(request):
 
     # Insumos con stock bajo SOLO de este depósito
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
-    insumos_con_stock_bajo = Insumo.objects.filter(
-        stock__lt=UMBRAL_STOCK_BAJO_INSUMOS, deposito=deposito
-    )
+
+    # Obtener insumos con stock bajo según StockInsumo
+    from .models import StockInsumo
+    stock_insumos_bajo = StockInsumo.objects.filter(
+        deposito=deposito, cantidad__lt=UMBRAL_STOCK_BAJO_INSUMOS
+    ).select_related('insumo')
+    insumos_con_stock_bajo = [si.insumo for si in stock_insumos_bajo]
 
     # Estados que consideramos como "pedido en firme"
     ESTADOS_OC_EN_PROCESO = [
@@ -509,7 +513,8 @@ def deposito_view(request):
     insumos_a_gestionar = []
     insumos_en_pedido = []
 
-    for insumo in insumos_con_stock_bajo:
+    for stock_insumo in stock_insumos_bajo:
+        insumo = stock_insumo.insumo
         oc_en_proceso = (
             Orden.objects.filter(
                 insumo_principal=insumo, estado__in=ESTADOS_OC_EN_PROCESO
@@ -518,9 +523,9 @@ def deposito_view(request):
             .first()
         )
         if oc_en_proceso:
-            insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso})
+            insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso, "stock_real": stock_insumo.cantidad})
         else:
-            insumos_a_gestionar.append({"insumo": insumo})
+            insumos_a_gestionar.append({"insumo": insumo, "stock_real": stock_insumo.cantidad})
 
     context = {
         "deposito": deposito,
