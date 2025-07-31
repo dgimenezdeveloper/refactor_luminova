@@ -52,6 +52,7 @@ from .forms import (
     ProveedorForm,
     ReporteProduccionForm,
     RolForm,
+    TransferenciaInsumoForm,  # Nueva importación para la transferencia de insumos
 )
 
 # Local Application Imports (Models)
@@ -677,4 +678,107 @@ def deposito_enviar_lote_pt_view(request, lote_id):
         f"Lote de {cantidad_a_enviar} x '{producto_terminado.descripcion}' enviado exitosamente.",
     )
     return redirect("App_LUMINOVA:deposito_view")
+
+
+@login_required
+@transaction.atomic
+def transferencia_insumo_view(request):
+    if request.method == "POST":
+        form = TransferenciaInsumoForm(request.POST)
+        if form.is_valid():
+            insumo = form.cleaned_data["insumo"]
+            deposito_origen = form.cleaned_data["deposito_origen"]
+            deposito_destino = form.cleaned_data["deposito_destino"]
+            cantidad = form.cleaned_data["cantidad"]
+            motivo = form.cleaned_data["motivo"]
+            from .models import StockInsumo, MovimientoStock, CategoriaInsumo, Insumo
+
+            # Descontar stock del origen
+            stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
+            if stock_origen.cantidad < cantidad:
+                messages.error(request, "Stock insuficiente en el depósito de origen.")
+                return redirect("App_LUMINOVA:deposito_view")
+            stock_origen.cantidad -= cantidad
+            stock_origen.save()
+            insumo.stock = stock_origen.cantidad
+            insumo.save(update_fields=["stock"])
+
+            # --- CLONAR CATEGORÍA E INSUMO EN DEPÓSITO DESTINO SI NO EXISTEN ---
+            # 1. Clonar categoría si no existe en el depósito destino
+            categoria_origen = insumo.categoria
+            categoria_destino = CategoriaInsumo.objects.filter(nombre=categoria_origen.nombre, deposito=deposito_destino).first()
+            if not categoria_destino:
+                # Solo copiar los campos que existen en el modelo
+                categoria_destino = CategoriaInsumo.objects.create(
+                    nombre=categoria_origen.nombre,
+                    deposito=deposito_destino
+                )
+
+            # 2. Clonar insumo si no existe en el depósito destino
+            insumo_destino = Insumo.objects.filter(descripcion=insumo.descripcion, deposito=deposito_destino).first()
+            if not insumo_destino:
+                # Copiar todos los campos relevantes si existen
+                from django.apps import apps
+                from django.core.files.base import ContentFile
+                from django.core.files.storage import default_storage
+                import os
+                InsumoModel = apps.get_model('App_LUMINOVA', 'Insumo')
+                insumo_fields = {
+                    'descripcion': insumo.descripcion,
+                    'categoria': categoria_destino,
+                    'fabricante': getattr(insumo, 'fabricante', None),
+                    'stock': 0,  # Se actualizará abajo
+                    'deposito': deposito_destino,
+                    'cantidad_en_pedido': getattr(insumo, 'cantidad_en_pedido', 0),
+                    'modelo': getattr(insumo, 'modelo', None),
+                    'unidad_medida': getattr(insumo, 'unidad_medida', None),
+                    'precio_unitario': getattr(insumo, 'precio_unitario', None),
+                    'codigo': getattr(insumo, 'codigo', None),
+                }
+                # Clonar imagen físicamente si existe
+                if getattr(insumo, 'imagen', None):
+                    try:
+                        original_image = insumo.imagen
+                        if original_image and hasattr(original_image, 'name') and original_image.name:
+                            original_image.open('rb')
+                            image_content = original_image.read()
+                            original_image.close()
+                            # Generar nuevo nombre de archivo
+                            base, ext = os.path.splitext(os.path.basename(original_image.name))
+                            new_image_name = f"insumos/clone_{insumo.id}_{deposito_destino.id}{ext}"
+                            saved_path = default_storage.save(new_image_name, ContentFile(image_content))
+                            insumo_fields['imagen'] = saved_path
+                    except Exception as e:
+                        # Si falla la copia, dejar imagen en None
+                        insumo_fields['imagen'] = None
+                # Filtrar solo los campos válidos para el modelo
+                valid_fields = {f.name for f in InsumoModel._meta.get_fields()}
+                insumo_fields = {k: v for k, v in insumo_fields.items() if k in valid_fields}
+                insumo_destino = Insumo.objects.create(**insumo_fields)
+
+            # Sumar stock al destino (usando insumo_destino)
+            stock_destino, created = StockInsumo.objects.get_or_create(
+                insumo=insumo_destino, deposito=deposito_destino, defaults={"cantidad": 0}
+            )
+            stock_destino.cantidad += cantidad
+            stock_destino.save()
+            # Sincronizar campo stock del Insumo destino
+            insumo_destino.stock = stock_destino.cantidad
+            insumo_destino.save(update_fields=["stock"])
+
+            # Registrar movimiento
+            MovimientoStock.objects.create(
+                insumo=insumo_destino,
+                deposito_origen=deposito_origen,
+                deposito_destino=deposito_destino,
+                cantidad=cantidad,
+                tipo="transferencia",
+                usuario=request.user,
+                motivo=motivo or "Transferencia entre depósitos"
+            )
+            messages.success(request, "Transferencia realizada correctamente.")
+            return redirect("App_LUMINOVA:deposito_view")
+    else:
+        form = TransferenciaInsumoForm()
+    return render(request, "deposito/transferencia_insumo.html", {"form": form})
 

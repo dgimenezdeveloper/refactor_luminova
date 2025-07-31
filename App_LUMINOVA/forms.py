@@ -21,6 +21,7 @@ from .models import (
     Proveedor,
     Reportes,
     SectorAsignado,
+    Deposito,
 )
 
 logger = logging.getLogger(__name__)
@@ -725,3 +726,17 @@ class InsumoForm(forms.ModelForm):
         labels = {
             "deposito": "Depósito",
         }
+
+
+class TransferenciaInsumoForm(forms.Form):
+    insumo = forms.ModelChoiceField(queryset=Insumo.objects.all(), label="Insumo a transferir")
+    deposito_origen = forms.ModelChoiceField(queryset=Deposito.objects.all(), label="Depósito Origen")
+    deposito_destino = forms.ModelChoiceField(queryset=Deposito.objects.all(), label="Depósito Destino")
+    cantidad = forms.IntegerField(min_value=1, label="Cantidad a transferir")
+    motivo = forms.CharField(max_length=255, required=False, label="Motivo (opcional)")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('deposito_origen') == cleaned_data.get('deposito_destino'):
+            raise forms.ValidationError("El depósito origen y destino deben ser diferentes.")
+        return cleaned_data

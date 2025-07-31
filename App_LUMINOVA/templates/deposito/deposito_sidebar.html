@@ -7,6 +7,7 @@
 {% url 'App_LUMINOVA:categoria_pt_create' as url_cat_pt_create %}
 {% url 'App_LUMINOVA:deposito_solicitudes_insumos' as url_deposito_solicitudes %}
 {% url 'App_LUMINOVA:deposito_recepcion_pedidos' as url_deposito_recepcion %}
+{% url 'App_LUMINOVA:transferencia_insumo' as url_transferencia_insumo %}
 
 
 
@@ -53,6 +54,11 @@
             <li class="nav-item mt-2">
                 <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_cat_pt_create %}active{% endif %}" href="{{ url_cat_pt_create }}">
                     <i class="bi bi-bookmark-plus-fill me-2"></i> <span class="ms-2">Agregar Cat. Prod. Term.</span>
+                </a>
+            </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_transferencia_insumo %}active{% endif %}" href="{{ url_transferencia_insumo }}">
+                    <i class="bi bi-arrow-left-right me-2"></i> <span class="ms-2">Transferir Insumo entre Depósitos</span>
                 </a>
             </li>
         </ul>

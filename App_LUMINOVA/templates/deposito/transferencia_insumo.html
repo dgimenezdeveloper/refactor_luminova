@@ -1,0 +1,14 @@
+{% extends 'padre.html' %}
+{% load django_bootstrap5 %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Transferir Insumo entre Depósitos</h2>
+    <form method="post">
+        {% csrf_token %}
+        {% bootstrap_form form %}
+        <button type="submit" class="btn btn-primary">Transferir</button>
+        <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

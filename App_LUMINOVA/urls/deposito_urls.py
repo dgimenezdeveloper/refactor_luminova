@@ -34,7 +34,7 @@ from ..views import (
     ProductoTerminadoUpdateView,
     ProductoTerminadoDeleteView,
 )
-from ..views_deposito import seleccionar_deposito_view, deposito_dashboard_view
+from ..views_deposito import seleccionar_deposito_view, deposito_dashboard_view, transferencia_insumo_view
 
 # Rutas de Ventas
 urlpatterns = [
@@ -190,4 +190,5 @@ urlpatterns = [
         ProductoTerminadosListView.as_view(),
         name="productos_terminados_list",
     ),
+    path("deposito/transferir-insumo/", transferencia_insumo_view, name="transferencia_insumo"),
 ]
