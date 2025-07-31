@@ -122,6 +122,13 @@ class ProductoTerminadoCreateView(CreateView):
     template_name = "deposito/productoterminado_crear.html"
     form_class = ProductoTerminadoForm
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            kwargs["deposito"] = deposito_id
+        return kwargs
+
 
 class ProductoTerminadoUpdateView(UpdateView):
     model = ProductoTerminado

@@ -439,6 +439,12 @@ class FacturaForm(forms.ModelForm):
 
 
 class ProductoTerminadoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        deposito = kwargs.pop('deposito', None)
+        super().__init__(*args, **kwargs)
+        if deposito:
+            self.fields['categoria'].queryset = CategoriaProductoTerminado.objects.filter(deposito=deposito)
+
     class Meta:
         model = ProductoTerminado
         fields = [
@@ -736,6 +742,11 @@ class ReporteProduccionForm(forms.ModelForm):
 
 
 class InsumoForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        deposito = kwargs.pop('deposito', None)
+        super().__init__(*args, **kwargs)
+        if deposito:
+            self.fields['categoria'].queryset = CategoriaInsumo.objects.filter(deposito=deposito)
     class Meta:
         model = Insumo
         fields = ["descripcion", "categoria", "fabricante", "stock", "deposito", "imagen"]

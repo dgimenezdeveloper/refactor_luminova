@@ -9,7 +9,7 @@ from django.utils import timezone  # Importar timezone
 # --- CATEGORÍAS Y ENTIDADES BASE ---
 class CategoriaProductoTerminado(models.Model):
     nombre = models.CharField(
-        max_length=100, unique=True, verbose_name="Nombre Categoría PT"
+        max_length=100, verbose_name="Nombre Categoría PT"
     )  # Aumentado max_length
     imagen = models.ImageField(upload_to="categorias_productos/", null=True, blank=True)
     deposito = models.ForeignKey(
@@ -23,6 +23,7 @@ class CategoriaProductoTerminado(models.Model):
     class Meta:
         verbose_name = "Categoría de Producto Terminado"
         verbose_name_plural = "Categorías de Productos Terminados"
+        unique_together = ("nombre", "deposito")
 
     def __str__(self):
         return self.nombre
@@ -58,7 +59,7 @@ class ProductoTerminado(models.Model):
 
 class CategoriaInsumo(models.Model):
     nombre = models.CharField(
-        max_length=100, unique=True, verbose_name="Nombre Categoría Insumo"
+        max_length=100, verbose_name="Nombre Categoría Insumo"
     )
     imagen = models.ImageField(upload_to="categorias_insumos/", null=True, blank=True)
     deposito = models.ForeignKey(
@@ -72,6 +73,7 @@ class CategoriaInsumo(models.Model):
     class Meta:
         verbose_name = "Categoría de Insumo"
         verbose_name_plural = "Categorías de Insumos"
+        unique_together = ("nombre", "deposito")
 
     def __str__(self):
         return self.nombre

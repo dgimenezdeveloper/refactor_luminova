@@ -121,6 +121,13 @@ class InsumoCreateView(CreateView):
     template_name = "deposito/insumo_crear.html"
     form_class = InsumoForm  # Usar formulario personalizado
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            kwargs["deposito"] = deposito_id
+        return kwargs
+
     def form_valid(self, form):
         messages.success(
             self.request, f"Insumo '{form.instance.descripcion}' creado exitosamente."
@@ -183,10 +190,32 @@ class InsumoUpdateView(UpdateView):
         return reverse_lazy("App_LUMINOVA:deposito_view")  # Fallback
 
     def form_valid(self, form):
-        logger.info(
-            f"InsumoUpdateView: Formulario válido para insumo ID {self.object.id}. Guardando cambios."
+        # Siempre forzar el depósito del insumo original si no viene en el form (no editable por usuario)
+        if not form.instance.deposito:
+            # Tomar el depósito del objeto original (self.get_object())
+            insumo_original = self.get_object()
+            if insumo_original.deposito:
+                form.instance.deposito = insumo_original.deposito
+            else:
+                messages.error(
+                    self.request,
+                    "Error: El insumo no tiene un depósito asignado. No se puede sincronizar el stock. Por favor, asigne un depósito antes de guardar."
+                )
+                logger.error(f"InsumoUpdateView: El insumo (form.instance) no tiene depósito asignado ni en el original. Abortando guardado de StockInsumo.")
+                return self.form_invalid(form)
+        response = super().form_valid(form)
+        # Sincronizar StockInsumo con el valor de stock del insumo editado
+        from .models import StockInsumo
+        stock, created = StockInsumo.objects.get_or_create(
+            insumo=self.object, deposito=form.instance.deposito, defaults={"cantidad": self.object.stock}
         )
-        return super().form_valid(form)
+        if not created:
+            stock.cantidad = self.object.stock
+            stock.save()
+        logger.info(
+            f"InsumoUpdateView: Formulario válido para insumo ID {self.object.id}. Stock sincronizado en StockInsumo."
+        )
+        return response
 
     def form_invalid(self, form):
         logger.warning(

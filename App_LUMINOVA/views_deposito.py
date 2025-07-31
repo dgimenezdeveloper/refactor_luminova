@@ -13,18 +13,73 @@ def transferencia_insumo_view(request):
             deposito_destino = form.cleaned_data["deposito_destino"]
             cantidad = form.cleaned_data["cantidad"]
             motivo = form.cleaned_data["motivo"]
-            from .models import StockInsumo, MovimientoStock
-            # Descontar stock del origen
+            from .models import StockInsumo, MovimientoStock, CategoriaInsumo
+
+            # Buscar o crear la categoría en el destino
+            categoria_destino = CategoriaInsumo.objects.filter(nombre=insumo.categoria.nombre, deposito=deposito_destino).first()
+            if not categoria_destino:
+                categoria_destino = CategoriaInsumo.objects.create(
+                    nombre=insumo.categoria.nombre,
+                    imagen=insumo.categoria.imagen,
+                    deposito=deposito_destino
+                )
+
+            # Buscar o crear el insumo en el destino
+            insumo_destino = Insumo.objects.filter(
+                descripcion=insumo.descripcion,
+                fabricante=insumo.fabricante,
+                categoria=categoria_destino,
+                deposito=deposito_destino
+            ).first()
+            if not insumo_destino:
+                insumo_destino = Insumo.objects.create(
+                    descripcion=insumo.descripcion,
+                    categoria=categoria_destino,
+                    fabricante=insumo.fabricante,
+                    imagen=insumo.imagen,
+                    deposito=deposito_destino
+                )
+
+
+            import logging
+            logger = logging.getLogger(__name__)
+            # Descontar stock del origen (StockInsumo)
             stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
+            logger.info(f"[TRANSFERENCIA] Stock origen antes: {stock_origen.cantidad}")
+            if stock_origen.cantidad < cantidad:
+                messages.error(request, "Stock insuficiente en el depósito de origen.")
+                logger.warning(f"[TRANSFERENCIA] Stock insuficiente en origen: {stock_origen.cantidad} < {cantidad}")
+                return redirect("App_LUMINOVA:deposito_view")
             stock_origen.cantidad -= cantidad
             stock_origen.save()
-            # Sumar stock al destino (crear si no existe)
-            stock_destino, created = StockInsumo.objects.get_or_create(insumo=insumo, deposito=deposito_destino, defaults={"cantidad": 0})
+            logger.info(f"[TRANSFERENCIA] Stock origen después: {stock_origen.cantidad}")
+            # Sincronizar campo stock del Insumo origen si existe
+            if hasattr(insumo, 'stock'):
+                insumo.stock = stock_origen.cantidad
+                insumo.save(update_fields=["stock"])
+                logger.info(f"[TRANSFERENCIA] Insumo origen stock actualizado a {insumo.stock}")
+            else:
+                logger.warning(f"[TRANSFERENCIA] El modelo Insumo no tiene campo 'stock'.")
+
+            # Sumar stock al destino (StockInsumo)
+            stock_destino, created = StockInsumo.objects.get_or_create(
+                insumo=insumo_destino, deposito=deposito_destino, defaults={"cantidad": 0}
+            )
+            logger.info(f"[TRANSFERENCIA] Stock destino antes: {stock_destino.cantidad}")
             stock_destino.cantidad += cantidad
             stock_destino.save()
-            # Registrar movimiento
+            logger.info(f"[TRANSFERENCIA] Stock destino después: {stock_destino.cantidad}")
+            # Sincronizar campo stock del Insumo destino si existe
+            if hasattr(insumo_destino, 'stock'):
+                insumo_destino.stock = stock_destino.cantidad
+                insumo_destino.save(update_fields=["stock"])
+                logger.info(f"[TRANSFERENCIA] Insumo destino stock actualizado a {insumo_destino.stock}")
+            else:
+                logger.warning(f"[TRANSFERENCIA] El modelo Insumo no tiene campo 'stock'.")
+
+            # Registrar movimiento (opcional: puedes registrar dos movimientos si quieres trazabilidad por insumo)
             MovimientoStock.objects.create(
-                insumo=insumo,
+                insumo=insumo_destino,  # El insumo en el destino
                 deposito_origen=deposito_origen,
                 deposito_destino=deposito_destino,
                 cantidad=cantidad,
@@ -495,8 +550,16 @@ def deposito_view(request):
     # Insumos con stock bajo SOLO de este depósito
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
-    # Obtener insumos con stock bajo según StockInsumo
+    # Sincronizar StockInsumo con el valor de stock de Insumo para todos los insumos del depósito
     from .models import StockInsumo
+    insumos_del_deposito = Insumo.objects.filter(deposito=deposito)
+    for insumo in insumos_del_deposito:
+        stock_obj, created = StockInsumo.objects.get_or_create(insumo=insumo, deposito=deposito, defaults={"cantidad": insumo.stock})
+        if not created and stock_obj.cantidad != insumo.stock:
+            stock_obj.cantidad = insumo.stock
+            stock_obj.save()
+
+    # Obtener insumos con stock bajo según StockInsumo
     stock_insumos_bajo = StockInsumo.objects.filter(
         deposito=deposito, cantidad__lt=UMBRAL_STOCK_BAJO_INSUMOS
     ).select_related('insumo')

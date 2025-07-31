@@ -115,6 +115,12 @@ class Categoria_ICreateView(CreateView):
     fields = ("nombre", "imagen")
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
 
+    def form_valid(self, form):
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            form.instance.deposito_id = deposito_id
+        return super().form_valid(form)
+
 
 class Categoria_IUpdateView(UpdateView):
     model = CategoriaInsumo
@@ -192,6 +198,12 @@ class Categoria_PTCreateView(CreateView):
     template_name = "deposito/categoria_producto_terminado_crear.html"
     fields = ("nombre", "imagen")
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
+
+    def form_valid(self, form):
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            form.instance.deposito_id = deposito_id
+        return super().form_valid(form)
 
 
 class Categoria_PTUpdateView(UpdateView):
