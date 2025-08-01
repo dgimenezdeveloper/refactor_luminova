@@ -19,44 +19,54 @@
         <hr class="text-white">
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_deposito_recepcion %}active{% endif %}" href="{{ url_deposito_recepcion }}">
-                    <i class="bi bi-truck me-2"></i> <span class="ms-2">Recepción de Pedidos</span>
-                    {# --- INICIO DE LA MODIFICACIÓN --- #}
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_deposito_recepcion %}active{% endif %}" href="{{ url_deposito_recepcion }}">
+                    <i class="bi bi-box-seam-fill fs-5 me-2"></i> <span class="ms-2">Recepción de Pedidos</span>
                     {% if ocs_en_transito_count_sidebar > 0 %}
                         <span class="badge bg-success ms-auto">{{ ocs_en_transito_count_sidebar }}</span>
                     {% endif %}
-                    {# --- FIN DE LA MODIFICACIÓN --- #}
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_deposito_solicitudes %}active{% endif %}" href="{{ url_deposito_solicitudes }}">
-                    <i class="bi bi-card-list me-2"></i> <span class="ms-2">Solicitudes de Insumos</span>
-                     {% if solicitudes_insumos_count_sidebar > 0 %}
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_deposito_solicitudes %}active{% endif %}" href="{{ url_deposito_solicitudes }}">
+                    <i class="bi bi-clipboard-data-fill fs-5 me-2"></i> <span class="ms-2">Solicitudes de Insumos</span>
+                    {% if solicitudes_insumos_count_sidebar > 0 %}
                         <span class="badge bg-danger ms-auto">{{ solicitudes_insumos_count_sidebar }}</span>
                     {% endif %}
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_cat_i_create %}active{% endif %}" href="{{ url_cat_i_create }}">
-                    <i class="bi bi-bookmark-plus me-2"></i> <span class="ms-2">Agregar Cat. Insumo</span>
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_cat_i_create %}active{% endif %}" href="{{ url_cat_i_create }}">
+                    <i class="bi bi-tags-fill fs-5 me-2"></i> <span class="ms-2">Agregar Cat. Insumo</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_cat_pt_create %}active{% endif %}" href="{{ url_cat_pt_create }}">
-                    <i class="bi bi-bookmark-plus-fill me-2"></i> <span class="ms-2">Agregar Cat. Prod. Term.</span>
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_cat_pt_create %}active{% endif %}" href="{{ url_cat_pt_create }}">
+                    <i class="bi bi-bookmarks-fill fs-5 me-2"></i> <span class="ms-2">Agregar Cat. Prod. Term.</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_transferencia_insumo %}active{% endif %}" href="{{ url_transferencia_insumo }}">
-                    <i class="bi bi-arrow-left-right me-2"></i> <span class="ms-2">Transferir Insumo entre Depósitos</span>
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_transferencia_insumo %}active{% endif %}" href="{{ url_transferencia_insumo }}">
+                    <i class="bi bi-arrow-repeat fs-5 me-2"></i> <span class="ms-2">Transferir Insumo entre Depósitos</span>
                 </a>
             </li>
             {% url 'App_LUMINOVA:historial_transferencias' as url_historial_transferencias %}
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_historial_transferencias %}active{% endif %}" href="{{ url_historial_transferencias }}">
-                    <i class="bi bi-clock-history me-2"></i> <span class="ms-2">Historial de Transferencias</span>
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_historial_transferencias %}active{% endif %}" href="{{ url_historial_transferencias }}">
+                    <i class="bi bi-journal-text fs-5 me-2"></i> <span class="ms-2">Historial de Transferencias</span>
                 </a>
             </li>
+<style>
+    .sidebar-link i {
+        transition: color 0.2s, transform 0.2s;
+    }
+    .sidebar-link:hover i {
+        color: #ffd700 !important;
+        transform: scale(1.15);
+    }
+    .sidebar-link.active i {
+        color: #00e6e6 !important;
+    }
+</style>
         </ul>
     </div>
 </nav>

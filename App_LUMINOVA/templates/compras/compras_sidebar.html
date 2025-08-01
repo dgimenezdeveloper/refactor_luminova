@@ -14,20 +14,32 @@
         <hr class="text-white">
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_compras_lista_oc %}active{% endif %}" href="{{ url_compras_lista_oc }}">
-                    <i class="bi bi-list-ul me-2"></i> <span class="ms-2">Listado de OC</span>
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_compras_lista_oc %}active{% endif %}" href="{{ url_compras_lista_oc }}">
+                    <i class="bi bi-list-ul fs-5 me-2"></i> <span class="ms-2">Listado de OC</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_compras_desglose %}active{% endif %}" href="{{ url_compras_desglose }}">
-                    <i class="bi bi-box-seam-fill"></i> <span class="ms-2">Desglose de Componentes</span>
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_compras_desglose %}active{% endif %}" href="{{ url_compras_desglose }}">
+                    <i class="bi bi-box-seam-fill fs-5 me-2"></i> <span class="ms-2">Desglose de Componentes</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_compras_seguimiento %}active{% endif %}" href="{{ url_compras_seguimiento }}">
-                    <i class="bi bi-truck me-2"></i> <span class="ms-2">Seguimiento de Compras</span>
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_compras_seguimiento %}active{% endif %}" href="{{ url_compras_seguimiento }}">
+                    <i class="bi bi-truck fs-5 me-2"></i> <span class="ms-2">Seguimiento de Compras</span>
                 </a>
             </li>
+<style>
+    .sidebar-link i {
+        transition: color 0.2s, transform 0.2s;
+    }
+    .sidebar-link:hover i {
+        color: #ffd700 !important;
+        transform: scale(1.15);
+    }
+    .sidebar-link.active i {
+        color: #00e6e6 !important;
+    }
+</style>
             </ul>
     </div>
 </nav>

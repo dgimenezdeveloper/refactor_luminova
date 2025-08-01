@@ -15,25 +15,37 @@
         <hr class="text-white">
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_ventas_lista_ov %}active{% endif %}" href="{{ url_ventas_lista_ov }}">
-                    <i class="bi bi-card-list me-2"></i> <span class="ms-2">Listado Órdenes Venta</span>
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_ventas_lista_ov %}active{% endif %}" href="{{ url_ventas_lista_ov }}">
+                    <i class="bi bi-card-list fs-5 me-2"></i> <span class="ms-2">Listado Órdenes Venta</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_ventas_crear_ov %}active{% endif %}" href="{{ url_ventas_crear_ov }}">
-                    <i class="bi bi-plus-square me-2"></i> <span class="ms-2">Nueva Orden Venta</span>
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_ventas_crear_ov %}active{% endif %}" href="{{ url_ventas_crear_ov }}">
+                    <i class="bi bi-plus-square-fill fs-5 me-2"></i> <span class="ms-2">Nueva Orden Venta</span>
                 </a>
             </li>
              <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_lista_clientes %}active{% endif %}" href="{{ url_lista_clientes }}">
-                    <i class="bi bi-people-fill me-2"></i> <span class="ms-2">Gestión de Clientes</span>
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_lista_clientes %}active{% endif %}" href="{{ url_lista_clientes }}">
+                    <i class="bi bi-person-lines-fill fs-5 me-2"></i> <span class="ms-2">Gestión de Clientes</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_produccion_lista_op %}active{% endif %}" href="{{ url_produccion_lista_op }}">
-                    <i class="bi bi-gear-fill me-2"></i> <span class="ms-2">Ver Órdenes Producción</span>
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center {% if request.path == url_produccion_lista_op %}active{% endif %}" href="{{ url_produccion_lista_op }}">
+                    <i class="bi bi-gear-wide-connected fs-5 me-2"></i> <span class="ms-2">Ver Órdenes Producción</span>
                 </a>
             </li>
+<style>
+    .sidebar-link i {
+        transition: color 0.2s, transform 0.2s;
+    }
+    .sidebar-link:hover i {
+        color: #ffd700 !important;
+        transform: scale(1.15);
+    }
+    .sidebar-link.active i {
+        color: #00e6e6 !important;
+    }
+</style>
         </ul>
     </div>
 </nav>

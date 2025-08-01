@@ -13,26 +13,38 @@
         <hr class="text-white">
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center 
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center 
                    {% if request.resolver_match.url_name == 'produccion_lista_op' or request.resolver_match.url_name == 'produccion_detalle_op' %}active{% endif %}" 
                    aria-current="page" href="{{ url_produccion_lista_op }}">
-                    <i class="bi bi-card-list"></i> <span class="ms-2">Listado OPs</span>
+                    <i class="bi bi-card-list fs-5 me-2"></i> <span class="ms-2">Listado OPs</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center 
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center 
                    {% if request.resolver_match.url_name == 'planificacion_produccion' %}active{% endif %}" 
                    href="{{ url_planificacion }}">
-                    <i class="bi bi-calendar-week"></i> <span class="ms-2">Planificación</span>
+                    <i class="bi bi-calendar-week fs-5 me-2"></i> <span class="ms-2">Planificación</span>
                 </a>
             </li>
             <li class="nav-item mt-2">
-                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center 
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center 
                    {% if request.resolver_match.url_name == 'reportes_produccion' %}active{% endif %}" 
                    href="{{ url_reportes }}">
-                    <i class="bi bi-flag-fill"></i> <span class="ms-2">Reportes</span>
+                    <i class="bi bi-flag-fill fs-5 me-2"></i> <span class="ms-2">Reportes</span>
                 </a>
             </li>
+<style>
+    .sidebar-link i {
+        transition: color 0.2s, transform 0.2s;
+    }
+    .sidebar-link:hover i {
+        color: #ffd700 !important;
+        transform: scale(1.15);
+    }
+    .sidebar-link.active i {
+        color: #00e6e6 !important;
+    }
+</style>
         </ul>
     </div>
 </nav>

@@ -7,25 +7,37 @@
             <hr class="text-white">
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link {% if '/dashboard/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" aria-current="page" href="{% url 'App_LUMINOVA:dashboard' %}" style="border-radius: 25px;">
-                        <i class="bi bi-speedometer2 me-2"></i> <span class="ms-2">Dashboard</span>
+                    <a class="nav-link sidebar-link {% if '/dashboard/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" aria-current="page" href="{% url 'App_LUMINOVA:dashboard' %}" style="border-radius: 25px;">
+                        <i class="bi bi-speedometer2 fs-5 me-2"></i> <span class="ms-2">Dashboard</span>
                     </a>
                 </li>
                 <li class="nav-item mt-2">
-                    <a class="nav-link {% if '/usuarios/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:lista_usuarios' %}" style="border-radius: 25px; padding-top: 0.75rem; padding-bottom: 0.75rem;">
-                        <i class="bi bi-people-fill me-2"></i> <span class="ms-2">Usuarios</span>
+                    <a class="nav-link sidebar-link {% if '/usuarios/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:lista_usuarios' %}" style="border-radius: 25px; padding-top: 0.75rem; padding-bottom: 0.75rem;">
+                        <i class="bi bi-people-fill fs-5 me-2"></i> <span class="ms-2">Usuarios</span>
                     </a>
                 </li>
                 <li class="nav-item mt-2">
-                    <a class="nav-link {% if '/roles-permisos/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:roles-permisos' %}" style="border-radius: 25px;">
-                        <i class="bi bi-key-fill me-2"></i> <span class="ms-2">Roles y Permisos</span>
+                    <a class="nav-link sidebar-link {% if '/roles-permisos/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:roles-permisos' %}" style="border-radius: 25px;">
+                        <i class="bi bi-person-gear fs-5 me-2"></i> <span class="ms-2">Roles y Permisos</span>
                     </a>
                 </li>
                 <li class="nav-item mt-2">
-                    <a class="nav-link {% if '/auditoria/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:auditoria' %}" style="border-radius: 25px;">
-                        <i class="bi bi-clock-history me-2"></i> <span class="ms-2">Auditoría de Accesos</span>
+                    <a class="nav-link sidebar-link {% if '/auditoria/' in request.path %}active{% endif %} text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:auditoria' %}" style="border-radius: 25px;">
+                        <i class="bi bi-journal-text fs-5 me-2"></i> <span class="ms-2">Auditoría de Accesos</span>
                     </a>
                 </li>
+<style>
+    .sidebar-link i {
+        transition: color 0.2s, transform 0.2s;
+    }
+    .sidebar-link:hover i {
+        color: #ffd700 !important;
+        transform: scale(1.15);
+    }
+    .sidebar-link.active i {
+        color: #00e6e6 !important;
+    }
+</style>
             </ul>
         </div>
     </nav>
