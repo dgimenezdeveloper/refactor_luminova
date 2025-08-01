@@ -735,6 +735,89 @@ class TransferenciaInsumoForm(forms.Form):
     cantidad = forms.IntegerField(min_value=1, label="Cantidad a transferir")
     motivo = forms.CharField(max_length=255, required=False, label="Motivo (opcional)")
 
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar depósitos según permisos del usuario
+        if user and not user.is_superuser:
+            # Si el usuario no es superusuario, filtrar depósitos según su rol
+            depositos_permitidos = self._get_depositos_permitidos(user)
+            self.fields['deposito_origen'].queryset = depositos_permitidos
+            self.fields['deposito_destino'].queryset = depositos_permitidos
+
+    def _get_depositos_permitidos(self, user):
+        """Obtiene los depósitos a los que el usuario tiene acceso"""
+        from .models import UsuarioDeposito, Deposito
+        
+        # Superusuarios y administradores pueden acceder a todos los depósitos
+        if user.is_superuser or user.groups.filter(name='administrador').exists():
+            return Deposito.objects.all()
+        
+        # Buscar depósitos específicamente asignados al usuario
+        depositos_asignados = UsuarioDeposito.objects.filter(
+            usuario=user, 
+            puede_transferir=True
+        ).values_list('deposito', flat=True)
+        
+        if depositos_asignados:
+            return Deposito.objects.filter(id__in=depositos_asignados)
+        
+        # Si no hay asignaciones específicas y tiene rol 'deposito', todos los depósitos
+        if user.groups.filter(name='Depósito').exists():
+            return Deposito.objects.all()
+        
+        # Por defecto, ningún depósito
+        return Deposito.objects.none()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('deposito_origen') == cleaned_data.get('deposito_destino'):
+            raise forms.ValidationError("El depósito origen y destino deben ser diferentes.")
+        return cleaned_data
+
+
+class TransferenciaProductoForm(forms.Form):
+    producto = forms.ModelChoiceField(queryset=ProductoTerminado.objects.all(), label="Producto a transferir")
+    deposito_origen = forms.ModelChoiceField(queryset=Deposito.objects.all(), label="Depósito Origen")
+    deposito_destino = forms.ModelChoiceField(queryset=Deposito.objects.all(), label="Depósito Destino")
+    cantidad = forms.IntegerField(min_value=1, label="Cantidad a transferir")
+    motivo = forms.CharField(max_length=255, required=False, label="Motivo (opcional)")
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar depósitos según permisos del usuario
+        if user and not user.is_superuser:
+            depositos_permitidos = self._get_depositos_permitidos(user)
+            self.fields['deposito_origen'].queryset = depositos_permitidos
+            self.fields['deposito_destino'].queryset = depositos_permitidos
+
+    def _get_depositos_permitidos(self, user):
+        """Obtiene los depósitos a los que el usuario tiene acceso"""
+        from .models import UsuarioDeposito, Deposito
+        
+        # Superusuarios y administradores pueden acceder a todos los depósitos
+        if user.is_superuser or user.groups.filter(name='administrador').exists():
+            return Deposito.objects.all()
+        
+        # Buscar depósitos específicamente asignados al usuario
+        depositos_asignados = UsuarioDeposito.objects.filter(
+            usuario=user, 
+            puede_transferir=True
+        ).values_list('deposito', flat=True)
+        
+        if depositos_asignados:
+            return Deposito.objects.filter(id__in=depositos_asignados)
+        
+        # Si no hay asignaciones específicas y tiene rol 'deposito', todos los depósitos
+        if user.groups.filter(name='Depósito').exists():
+            return Deposito.objects.all()
+        
+        # Por defecto, ningún depósito
+        return Deposito.objects.none()
+
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data.get('deposito_origen') == cleaned_data.get('deposito_destino'):

@@ -145,11 +145,28 @@
           </select>
         </div>
         <div class="col-6 col-md-2">
+          <label>Tipo de Item</label>
+          <select name="tipo_item" class="form-select">
+            <option value="">Todos</option>
+            <option value="insumo" {% if filtros.tipo_item == 'insumo' %}selected{% endif %}>Insumos</option>
+            <option value="producto" {% if filtros.tipo_item == 'producto' %}selected{% endif %}>Productos</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
           <label>Insumo</label>
           <select name="insumo" class="form-select">
             <option value="">Todos</option>
             {% for i in insumos %}
               <option value="{{ i.id }}" {% if filtros.insumo_id == i.id|stringformat:'s' %}selected{% endif %}>{{ i.descripcion }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label>Producto</label>
+          <select name="producto" class="form-select">
+            <option value="">Todos</option>
+            {% for p in productos %}
+              <option value="{{ p.id }}" {% if filtros.producto_id == p.id|stringformat:'s' %}selected{% endif %}>{{ p.descripcion }}</option>
             {% endfor %}
           </select>
         </div>
@@ -171,7 +188,8 @@
             <thead>
                 <tr>
                     <th>Fecha</th>
-                    <th>Insumo</th>
+                    <th>Item</th>
+                    <th>Tipo</th>
                     <th>Cantidad</th>
                     <th>Depósito Origen</th>
                     <th>Depósito Destino</th>
@@ -183,7 +201,24 @@
                 {% for t in transferencias %}
                 <tr>
                     <td>{{ t.fecha|date:'d/m/Y H:i' }}</td>
-                    <td>{{ t.insumo.descripcion }}</td>
+                    <td>
+                        {% if t.insumo %}
+                            {{ t.insumo.descripcion }}
+                        {% elif t.producto %}
+                            {{ t.producto.descripcion }}
+                        {% else %}
+                            <span class="text-muted">Sin especificar</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if t.insumo %}
+                            <span class="badge bg-info">Insumo</span>
+                        {% elif t.producto %}
+                            <span class="badge bg-success">Producto</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Desconocido</span>
+                        {% endif %}
+                    </td>
                     <td>{{ t.cantidad }}</td>
                     <td>{{ t.deposito_origen.nombre }}</td>
                     <td>{{ t.deposito_destino.nombre }}</td>
@@ -192,7 +227,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted">No hay transferencias registradas.</td>
+                    <td colspan="8" class="text-center text-muted">No hay transferencias registradas.</td>
                 </tr>
                 {% endfor %}
             </tbody>

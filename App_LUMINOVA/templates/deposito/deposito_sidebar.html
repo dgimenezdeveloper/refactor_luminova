@@ -8,9 +8,9 @@
 {% url 'App_LUMINOVA:deposito_solicitudes_insumos' as url_deposito_solicitudes %}
 {% url 'App_LUMINOVA:deposito_recepcion_pedidos' as url_deposito_recepcion %}
 {% url 'App_LUMINOVA:transferencia_insumo' as url_transferencia_insumo %}
+{% url 'App_LUMINOVA:transferencia_producto' as url_transferencia_producto %}
 
-
-
+{% if puede_ver_deposito_sidebar %}
 <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end vh-100" style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
     <div class="position-sticky pt-4">
         <h6 class="sidebar-heading d-flex justify-content-center align-items-center px-3 mt-4 mb-1 text-white fw-bold">
@@ -49,6 +49,11 @@
                     <i class="bi bi-arrow-repeat fs-5 me-2"></i> <span class="ms-2">Transferir Insumo entre Depósitos</span>
                 </a>
             </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_transferencia_producto %}active{% endif %}" href="{{ url_transferencia_producto }}">
+                    <i class="bi bi-arrow-left-right fs-5 me-2"></i> <span class="ms-2">Transferir Producto entre Depósitos</span>
+                </a>
+            </li>
             {% url 'App_LUMINOVA:historial_transferencias' as url_historial_transferencias %}
             <li class="nav-item mt-2">
                 <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center sidebar-link {% if request.path == url_historial_transferencias %}active{% endif %}" href="{{ url_historial_transferencias }}">
@@ -70,3 +75,4 @@
         </ul>
     </div>
 </nav>
+{% endif %}

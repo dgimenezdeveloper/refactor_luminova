@@ -67,6 +67,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "App_LUMINOVA.context_processors.notificaciones_context",
+                "App_LUMINOVA.context_processors.puede_ver_deposito_sidebar",
             ],
         },
     },

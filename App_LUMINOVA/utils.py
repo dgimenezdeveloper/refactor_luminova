@@ -8,7 +8,13 @@ def es_admin_o_rol(user, roles_permitidos=None):
         return True
     if roles_permitidos is None:
         roles_permitidos = []
-    # Agregamos 'administrador' a los roles permitidos por defecto
-    if 'administrador' not in roles_permitidos:
-        roles_permitidos.append('administrador')
-    return user.groups.filter(name__in=[rol.lower() for rol in roles_permitidos]).exists()
+    # Normalizar nombres de roles
+    roles_normalizados = []
+    for rol in roles_permitidos:
+        if rol.lower() == "deposito":
+            roles_normalizados.append("Depósito")
+        else:
+            roles_normalizados.append(rol)
+    if "administrador" not in roles_normalizados:
+        roles_normalizados.append("administrador")
+    return user.groups.filter(name__in=roles_normalizados).exists()

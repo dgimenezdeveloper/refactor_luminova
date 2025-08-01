@@ -1,0 +1,102 @@
+{% extends 'padre.html' %}
+{% load static %}
+{% block title %}Transferir Producto entre Depósitos{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-0">
+                <div class="card-body p-4">
+                    <h2 class="mb-2 fw-bold text-primary"><i class="bi bi-arrow-left-right me-2"></i>Transferir Producto entre Depósitos</h2>
+                    <p class="text-muted mb-4">Complete los datos para realizar una transferencia segura y registrada.</p>
+                    <form method="post" id="form-transferencia-producto" autocomplete="off">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="id_producto" class="form-label fw-semibold">Producto a transferir</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-box"></i></span>
+                                    <select name="producto" id="id_producto" class="form-select">{% for opt in form.producto.field.queryset %}<option value="{{ opt.pk }}" {% if form.producto.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_deposito_origen" class="form-label fw-semibold">Depósito Origen</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-house-door"></i></span>
+                                    <select name="deposito_origen" id="id_deposito_origen" class="form-select">{% for opt in form.deposito_origen.field.queryset %}<option value="{{ opt.pk }}" {% if form.deposito_origen.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_deposito_destino" class="form-label fw-semibold">Depósito Destino</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-house-add"></i></span>
+                                    <select name="deposito_destino" id="id_deposito_destino" class="form-select">{% for opt in form.deposito_destino.field.queryset %}<option value="{{ opt.pk }}" {% if form.deposito_destino.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_cantidad" class="form-label fw-semibold">Cantidad a transferir</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-123"></i></span>
+                                    <input type="number" name="cantidad" id="id_cantidad" class="form-control" value="{{ form.cantidad.value|default_if_none:'' }}" min="1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_motivo" class="form-label fw-semibold">Motivo (opcional)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-chat-left-text"></i></span>
+                                    <input type="text" name="motivo" id="id_motivo" class="form-control" value="{{ form.motivo.value|default_if_none:'' }}" maxlength="255">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mostrar errores del formulario -->
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger mt-3">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary flex-fill">
+                                <i class="bi bi-arrow-right-circle-fill me-2"></i>Realizar Transferencia
+                            </button>
+                            <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('form-transferencia-producto');
+    const origenSelect = document.getElementById('id_deposito_origen');
+    const destinoSelect = document.getElementById('id_deposito_destino');
+    
+    function validarDepositos() {
+        if (origenSelect.value && destinoSelect.value && origenSelect.value === destinoSelect.value) {
+            destinoSelect.setCustomValidity('El depósito origen y destino deben ser diferentes');
+        } else {
+            destinoSelect.setCustomValidity('');
+        }
+    }
+    
+    origenSelect.addEventListener('change', validarDepositos);
+    destinoSelect.addEventListener('change', validarDepositos);
+    
+    form.addEventListener('submit', function(e) {
+        validarDepositos();
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}

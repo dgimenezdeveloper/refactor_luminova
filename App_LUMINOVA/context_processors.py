@@ -1,5 +1,5 @@
 # TP_LUMINOVA-main/App_LUMINOVA/context_processors.py
-from .models import Insumo, Orden, OrdenProduccion, Reportes
+from .models import Insumo, Orden, OrdenProduccion, Reportes, UsuarioDeposito
 
 
 def notificaciones_context(request):
@@ -85,3 +85,14 @@ def notificaciones_context(request):
         "ocs_en_transito_count_sidebar": ocs_en_transito_count_sidebar,
         "solicitudes_insumos_count_sidebar": solicitudes_insumos_count_sidebar,
     }
+
+def puede_ver_deposito_sidebar(request):
+    user = getattr(request, 'user', None)
+    if not user or not user.is_authenticated:
+        return {'puede_ver_deposito_sidebar': False}
+    if user.is_superuser:
+        return {'puede_ver_deposito_sidebar': True}
+    tiene_depositos = UsuarioDeposito.objects.filter(usuario=user).exists()
+    if user.groups.filter(name='Depósito').exists() and tiene_depositos:
+        return {'puede_ver_deposito_sidebar': True}
+    return {'puede_ver_deposito_sidebar': False}

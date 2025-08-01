@@ -34,7 +34,16 @@ from ..views import (
     ProductoTerminadoUpdateView,
     ProductoTerminadoDeleteView,
 )
-from ..views_deposito import seleccionar_deposito_view, deposito_dashboard_view, transferencia_insumo_view
+from ..views_deposito import (
+    seleccionar_deposito_view, 
+    deposito_dashboard_view, 
+    transferencia_insumo_view,
+    transferencia_producto_view,
+    entrada_stock_insumo,
+    salida_stock_insumo,
+    entrada_stock_producto,
+    salida_stock_producto
+)
 from App_LUMINOVA.views_transferencias import historial_transferencias_view
 
 # Rutas de Ventas
@@ -192,5 +201,10 @@ urlpatterns = [
         name="productos_terminados_list",
     ),
     path("deposito/transferir-insumo/", transferencia_insumo_view, name="transferencia_insumo"),
+    path("deposito/transferir-producto/", transferencia_producto_view, name="transferencia_producto"),
+    path("deposito/entrada-insumo/<int:insumo_id>/<int:deposito_id>/", entrada_stock_insumo, name="entrada_stock_insumo"),
+    path("deposito/salida-insumo/<int:insumo_id>/<int:deposito_id>/", salida_stock_insumo, name="salida_stock_insumo"),
+    path("deposito/entrada-producto/<int:producto_id>/<int:deposito_id>/", entrada_stock_producto, name="entrada_stock_producto"),
+    path("deposito/salida-producto/<int:producto_id>/<int:deposito_id>/", salida_stock_producto, name="salida_stock_producto"),
     path("deposito/historial-transferencias/", historial_transferencias_view, name="historial_transferencias"),
 ]
