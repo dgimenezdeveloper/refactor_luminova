@@ -133,6 +133,7 @@ def compras_desglose_view(request):
     # Si ya está 'APROBADA' o más allá, el equipo de compras ya hizo su parte principal.
 
     # 1. Obtenemos los IDs de insumos que ya tienen una OC "en firme" (es decir, post-borrador)
+    # con cantidad suficiente para cubrir el déficit
     ESTADOS_OC_POST_BORRADOR = [
         "APROBADA",
         "ENVIADA_PROVEEDOR",
@@ -141,28 +142,83 @@ def compras_desglose_view(request):
         "RECIBIDA_TOTAL",
         "COMPLETADA",
     ]
-    insumos_ya_gestionados_ids = (
-        Orden.objects.filter(
+    
+    # Obtener insumos con OC aprobadas y verificar si la cantidad es suficiente
+    from django.db.models import Sum
+    insumos_con_oc_suficiente = []
+    
+    for insumo in Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS):
+        # Calcular total en órdenes de compra activas para este insumo y su depósito
+        from django.db.models import Q
+        total_en_ocs = Orden.objects.filter(
             tipo="compra",
             estado__in=ESTADOS_OC_POST_BORRADOR,
-            insumo_principal__isnull=False,
-        )
-        .values_list("insumo_principal_id", flat=True)
-        .distinct()
-    )
+            insumo_principal=insumo
+        ).filter(
+            Q(deposito=insumo.deposito) | Q(deposito__isnull=True)
+        ).aggregate(total=Sum('cantidad_principal'))['total'] or 0
+        # Si el stock actual + lo que viene en OCs >= umbral, no necesita más gestión
+        if (insumo.stock + total_en_ocs) >= UMBRAL_STOCK_BAJO_INSUMOS:
+            insumos_con_oc_suficiente.append(insumo.id)
+    
+    insumos_ya_gestionados_ids = insumos_con_oc_suficiente
 
     logger.info(
-        f"IDs de insumos que ya tienen OC post-borrador: {list(insumos_ya_gestionados_ids)}"
+        f"IDs de insumos que ya tienen OC post-borrador con cantidad suficiente: {list(insumos_ya_gestionados_ids)}"
     )
+
+    # Debug detallado para verificar cada insumo
+    all_insumos_bajo_stock = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    logger.info(f"=== DEBUG DESGLOSE DE COMPRAS ===")
+    logger.info(f"Umbral de stock bajo: {UMBRAL_STOCK_BAJO_INSUMOS}")
+    logger.info(f"Total de insumos con stock bajo: {all_insumos_bajo_stock.count()}")
+    
+    for insumo in all_insumos_bajo_stock:
+        ocs_activas = Orden.objects.filter(
+            tipo="compra",
+            estado__in=ESTADOS_OC_POST_BORRADOR,
+            insumo_principal=insumo
+        )
+        total_en_ocs = ocs_activas.aggregate(total=Sum('cantidad_principal'))['total'] or 0
+        stock_final = insumo.stock + total_en_ocs
+        necesita_compra = stock_final < UMBRAL_STOCK_BAJO_INSUMOS
+        
+        logger.info(f"  Insumo '{insumo.descripcion}' (ID: {insumo.id}):")
+        logger.info(f"    Stock actual: {insumo.stock}")
+        logger.info(f"    En OCs activas: {total_en_ocs}")
+        logger.info(f"    Stock proyectado: {stock_final}")
+        logger.info(f"    Necesita compra: {necesita_compra}")
+        logger.info(f"    OCs activas: {ocs_activas.count()}")
+        
+        for oc in ocs_activas:
+            logger.info(f"      - OC #{oc.id}: Estado={oc.estado}, Cantidad={oc.cantidad_principal}")
 
     # 2. Buscamos insumos críticos, EXCLUYENDO los que ya están gestionados.
     #    La lista resultante solo contendrá insumos sin OC o con OC en 'BORRADOR'.
-    insumos_criticos_para_gestionar = (
+    # Agrupar insumos por depósito
+    from collections import defaultdict
+    insumos_criticos = (
         Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
         .exclude(id__in=insumos_ya_gestionados_ids)
-        .select_related("categoria")
-        .order_by("categoria__nombre", "stock", "descripcion")
+        .select_related("categoria", "deposito")
+        .order_by("deposito__nombre", "categoria__nombre", "stock", "descripcion")
     )
+    insumos_por_deposito = defaultdict(list)
+    for insumo in insumos_criticos:
+        tiene_oc_borrador = Orden.objects.filter(
+            tipo="compra",
+            estado="BORRADOR",
+            insumo_principal=insumo,
+            deposito=insumo.deposito
+        ).exists()
+        insumo.tiene_oc_borrador = tiene_oc_borrador
+        insumos_por_deposito[insumo.deposito.nombre if insumo.deposito else "Sin depósito"].append(insumo)
+    context = {
+        "insumos_por_deposito": dict(insumos_por_deposito),
+        "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
+        "titulo_seccion": "Gestionar Compra por Stock Bajo",
+    }
+    return render(request, "compras/compras_desglose.html", context)
 
     logger.info(
         f"Insumos críticos que requieren acción de Compras: {insumos_criticos_para_gestionar.count()}"
@@ -363,21 +419,43 @@ def compras_crear_oc_view(request, insumo_id=None, proveedor_id=None):
                     except (ValueError, TypeError): pass
 
     if request.method == 'POST':
+        logger.info(f"=== DEBUG CREAR OC ===")
+        logger.info(f"POST data: {dict(request.POST)}")
+        logger.info(f"insumo_id: {insumo_id}")
+        logger.info(f"proveedor_id: {proveedor_id}")
+        
         form = OrdenCompraForm(request.POST, **form_kwargs)
         if form.is_valid():
             orden_compra = form.save(commit=False)
             orden_compra.tipo = 'compra'
             orden_compra.estado = 'BORRADOR'
-            
+            # Asignar depósito correctamente
+            deposito_id = None
+            if orden_compra.insumo_principal and orden_compra.insumo_principal.deposito:
+                deposito_id = orden_compra.insumo_principal.deposito.id
+            else:
+                deposito_id = request.session.get('deposito_seleccionado')
+            if deposito_id:
+                from App_LUMINOVA.models import Deposito
+                orden_compra.deposito = Deposito.objects.get(id=deposito_id)
+            logger.info(f"Orden antes de guardar:")
+            logger.info(f"  - insumo_principal: {orden_compra.insumo_principal}")
+            logger.info(f"  - proveedor: {orden_compra.proveedor}")
+            logger.info(f"  - cantidad_principal: {orden_compra.cantidad_principal}")
+            logger.info(f"  - deposito: {getattr(orden_compra.deposito, 'nombre', None)}")
             # --- Aquí asignamos el número de orden usando el servicio ---
             orden_compra.numero_orden = generar_siguiente_numero_documento(Orden, 'OC', 'numero_orden')
-            
             orden_compra.save()
-            
+            logger.info(f"Orden después de guardar:")
+            logger.info(f"  - ID: {orden_compra.id}")
+            logger.info(f"  - numero_orden: {orden_compra.numero_orden}")
+            logger.info(f"  - insumo_principal: {orden_compra.insumo_principal}")
+            logger.info(f"  - deposito: {getattr(orden_compra.deposito, 'nombre', None)}")
             messages.success(request, f"Orden de Compra '{orden_compra.numero_orden}' creada en Borrador.")
             return redirect('App_LUMINOVA:compras_lista_oc')
         else:
             messages.error(request, "Por favor, corrija los errores del formulario.")
+            logger.error(f"Errores del formulario: {form.errors}")
     else: # GET
         form = OrdenCompraForm(initial=initial_data, **form_kwargs)
 

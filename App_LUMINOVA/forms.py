@@ -523,14 +523,20 @@ class OrdenCompraForm(forms.ModelForm):
                 pk=self.insumo_fijo.pk
             )
             self.fields["insumo_principal"].initial = self.insumo_fijo
-            self.fields["insumo_principal"].widget.attrs["disabled"] = True
+            # Hacer que parezca readonly pero mantener funcionalidad
+            self.fields["insumo_principal"].widget.attrs["class"] = "form-select mb-3 bg-light"
+            self.fields["insumo_principal"].widget.attrs["onclick"] = "return false;"
+            self.fields["insumo_principal"].widget.attrs["onkeydown"] = "return false;"
             self.fields["insumo_principal"].empty_label = None
         elif instance and instance.insumo_principal and instance.estado != "BORRADOR":
             self.fields["insumo_principal"].queryset = Insumo.objects.filter(
                 pk=instance.insumo_principal.pk
             )
             self.fields["insumo_principal"].initial = instance.insumo_principal
-            self.fields["insumo_principal"].widget.attrs["disabled"] = True
+            # Hacer que parezca readonly pero mantener funcionalidad
+            self.fields["insumo_principal"].widget.attrs["class"] = "form-select mb-3 bg-light"
+            self.fields["insumo_principal"].widget.attrs["onclick"] = "return false;"
+            self.fields["insumo_principal"].widget.attrs["onkeydown"] = "return false;"
             self.fields["insumo_principal"].empty_label = None
         else:
             self.fields["insumo_principal"].queryset = Insumo.objects.all().order_by(
@@ -564,16 +570,41 @@ class OrdenCompraForm(forms.ModelForm):
                 except (Insumo.DoesNotExist, ValueError, TypeError):
                     pass
 
-        # Si determinamos un insumo, filtramos los proveedores
+        # Si determinamos un insumo, filtramos los proveedores SOLO con oferta
+        proveedor_preseleccionado = self.initial.get("proveedor")
+        proveedor_post = None
+        
+        # En caso de POST, también considerar el proveedor enviado en el formulario
+        if "proveedor" in self.data:
+            try:
+                proveedor_post = int(self.data.get("proveedor"))
+            except (ValueError, TypeError):
+                pass
+        
+        proveedor_ids = []
         if insumo_for_filter:
-            proveedor_ids = (
+            proveedor_ids = list(
                 OfertaProveedor.objects.filter(insumo=insumo_for_filter)
                 .values_list("proveedor_id", flat=True)
                 .distinct()
             )
-            self.fields["proveedor"].queryset = Proveedor.objects.filter(
-                id__in=proveedor_ids
-            ).order_by("nombre")
+        
+        # Incluir proveedor preseleccionado o enviado en POST
+        proveedores_a_incluir = []
+        if proveedor_preseleccionado:
+            if isinstance(proveedor_preseleccionado, int):
+                proveedores_a_incluir.append(proveedor_preseleccionado)
+            elif hasattr(proveedor_preseleccionado, "pk"):
+                proveedores_a_incluir.append(proveedor_preseleccionado.pk)
+        if proveedor_post:
+            proveedores_a_incluir.append(proveedor_post)
+            
+        # Agregar todos los proveedores relevantes al queryset
+        proveedor_ids.extend(proveedores_a_incluir)
+        
+        self.fields["proveedor"].queryset = Proveedor.objects.filter(
+            id__in=set(proveedor_ids)
+        ).order_by("nombre")
 
         # --- Configuración de Precio y Fecha ---
         self.fields["precio_unitario_compra"].widget.attrs["readonly"] = True

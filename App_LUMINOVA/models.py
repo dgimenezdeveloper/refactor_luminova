@@ -448,6 +448,16 @@ class Orden(models.Model):
         verbose_name="Precio Unit. Compra (de la oferta)",
     )
 
+    deposito = models.ForeignKey(
+        'Deposito',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='ordenes_de_compra',
+        verbose_name='Depósito que solicita',
+        help_text='Depósito que origina la solicitud de compra',
+    )
+
     total_orden_compra = models.DecimalField(
         max_digits=12, decimal_places=2, default=0.00
     )
