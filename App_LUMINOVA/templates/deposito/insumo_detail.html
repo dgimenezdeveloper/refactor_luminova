@@ -48,7 +48,7 @@
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
-        <h1 class="h2">Categoría Insumo: {{ categoria_I.nombre }}</h1>
+        <h1 class="h2 fw-bold text-primary">Categoría Insumo: {{ categoria_I.nombre }}</h1>
         <div class="btn-toolbar mb-2 mb-md-0">
             <a href="{% url 'App_LUMINOVA:insumo_create' %}?categoria={{ categoria_I.id }}" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-plus-circle"></i> Agregar Insumo a esta Categoría

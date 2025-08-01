@@ -11,7 +11,7 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">{{ titulo_seccion|default:"Detalle Orden de Venta:" }} <span class="text-primary">{{ ov.numero_ov }}</span></h1>
+        <h1 class="h2 fw-bold text-primary">{{ titulo_seccion|default:"Detalle Orden de Venta:" }} <span class="text-primary">{{ ov.numero_ov }}</span></h1>
         <div>
             {% if ov.estado == 'PENDIENTE' or ov.estado == 'CONFIRMADA' %}
                  <a href="{% url 'App_LUMINOVA:ventas_editar_ov' ov.id %}" class="btn btn-outline-primary btn-sm me-2">

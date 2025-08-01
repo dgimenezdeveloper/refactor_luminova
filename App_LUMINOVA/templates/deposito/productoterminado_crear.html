@@ -47,7 +47,7 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="color-thead" style="height: 45px;">Agregar Nuevo Producto Terminado</h2>
+    <h2 class="color-thead fw-bold text-primary" style="height: 45px;">Agregar Nuevo Producto Terminado</h2>
     <form method="post" enctype="multipart/form-data"> {# La action se infiere de la URL actual para CreateView #}
         {% csrf_token %}
 

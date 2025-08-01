@@ -51,7 +51,7 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="color-thead" style="height: 45px;">Editar Categoría de Producto Terminado: "{{ categoria.nombre }}"</h2>
+    <h2 class="color-thead fw-bold text-primary" style="height: 45px;">Editar Categoría de Producto Terminado: "{{ categoria.nombre }}"</h2>
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="mb-3">
