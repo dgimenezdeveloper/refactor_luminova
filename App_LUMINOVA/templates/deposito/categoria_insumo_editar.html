@@ -11,25 +11,39 @@
             <hr class="text-white">
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:insumo_create' %}?categoria={{ categoria.id }}"> {# Para preseleccionar categoría si es posible #}
+                    <a class="sidebar-link nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:insumo_create' %}?categoria={{ categoria.id }}"> {# Para preseleccionar categoría si es posible #}
                         <i class="bi bi-plus-square me-2"></i> <span class="ms-2">Agregar Insumo</span>
                     </a>
                 </li>
                 <li class="nav-item mt-2">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center active" href="{% url 'App_LUMINOVA:categoria_i_edit' categoria.pk %}">
+                    <a class="sidebar-link nav-link text-white fw-bold custom-active-button d-flex align-items-center active" href="{% url 'App_LUMINOVA:categoria_i_edit' categoria.pk %}">
                         <i class="bi bi-pencil-fill me-2"></i> <span class="ms-2">Editar Categoría</span>
                     </a>
                 </li>
                  <li class="nav-item mt-2">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:categoria_i_delete' categoria.pk %}">
+                    <a class="sidebar-link nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:categoria_i_delete' categoria.pk %}">
                         <i class="bi bi-trash-fill me-2"></i> <span class="ms-2">Eliminar Categoría</span>
                     </a>
                 </li>
                  <li class="nav-item mt-2">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:deposito_view' %}">
+                    <a class="sidebar-link nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:deposito_view' %}">
                         <i class="bi bi-arrow-left-circle-fill me-2"></i> <span class="ms-2">Volver a Depósito</span>
                     </a>
                 </li>
+                <style>
+                    .sidebar-link i {
+                        transition: color 0.2s, transform 0.2s;
+                    }
+
+                    .sidebar-link:hover i {
+                        color: #ffd700 !important;
+                        transform: scale(1.15);
+                    }
+
+                    .sidebar-link.active i {
+                        color: #00e6e6 !important;
+                    }
+                </style>
             </ul>
         </div>
     </nav>
@@ -37,7 +51,7 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="color-thead" style="height: 45px;">Editar Categoría de Insumo: "{{ categoria.nombre }}"</h2>
+    <h2 class="color-thead fw-bold text-primary" style="height: 45px;">Editar Categoría de Insumo: "{{ categoria.nombre }}"</h2>
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
 

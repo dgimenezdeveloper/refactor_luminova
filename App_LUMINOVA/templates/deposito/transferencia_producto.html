@@ -1,6 +1,6 @@
 {% extends 'padre.html' %}
 {% load static %}
-{% block title %}Transferir Insumo entre Depósitos{% endblock %}
+{% block title %}Transferir Producto entre Depósitos{% endblock %}
 
 {% block content %}
 <div class="container mt-5">
@@ -8,16 +8,16 @@
         <div class="col-md-8">
             <div class="card shadow border-0">
                 <div class="card-body p-4">
-                    <h2 class="mb-2 fw-bold text-primary"><i class="bi bi-arrow-left-right me-2"></i>Transferir Insumo entre Depósitos</h2>
+                    <h2 class="mb-2 fw-bold text-primary"><i class="bi bi-arrow-left-right me-2"></i>Transferir Producto entre Depósitos</h2>
                     <p class="text-muted mb-4">Complete los datos para realizar una transferencia segura y registrada.</p>
-                    <form method="post" id="form-transferencia-insumo" autocomplete="off">
+                    <form method="post" id="form-transferencia-producto" autocomplete="off">
                         {% csrf_token %}
                         <div class="row g-3">
                             <div class="col-md-12">
-                                <label for="id_insumo" class="form-label fw-semibold">Insumo a transferir</label>
+                                <label for="id_producto" class="form-label fw-semibold">Producto a transferir</label>
                                 <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-box-seam"></i></span>
-                                    <select name="insumo" id="id_insumo" class="form-select">{% for opt in form.insumo.field.queryset %}<option value="{{ opt.pk }}" {% if form.insumo.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                    <span class="input-group-text"><i class="bi bi-box"></i></span>
+                                    <select name="producto" id="id_producto" class="form-select">{% for opt in form.producto.field.queryset %}<option value="{{ opt.pk }}" {% if form.producto.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -49,33 +49,20 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="stock-info" class="mb-2 mt-2 text-info"></div>
-                        {% if form.errors %}
+
+                        <!-- Mostrar errores del formulario -->
+                        {% if form.non_field_errors %}
                             <div class="alert alert-danger mt-3">
-                                {% for field in form %}
-                                    {% for error in field.errors %}
-                                        <div>{{ error }}</div>
-                                    {% endfor %}
-                                {% endfor %}
-                                {% for error in form.non_field_errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+                                {{ form.non_field_errors }}
                             </div>
                         {% endif %}
-                        {% if messages %}
-                            <div class="mt-2">
-                                {% for message in messages %}
-                                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                        <div class="d-flex justify-content-between align-items-center mt-4">
-                            <div>
-                                <button type="submit" class="btn btn-primary px-4">Transferir</button>
-                                <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-secondary ms-2">Cancelar</a>
-                            </div>
-                            <a href="{% url 'App_LUMINOVA:historial_transferencias' %}" class="btn btn-outline-primary">
-                                <i class="bi bi-clock-history me-1"></i> Ver historial de transferencias
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary flex-fill">
+                                <i class="bi bi-arrow-right-circle-fill me-2"></i>Realizar Transferencia
+                            </button>
+                            <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Cancelar
                             </a>
                         </div>
                     </form>
@@ -84,8 +71,32 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts_extra %}
-<script src="{% static 'js/transferencia_insumo.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('form-transferencia-producto');
+    const origenSelect = document.getElementById('id_deposito_origen');
+    const destinoSelect = document.getElementById('id_deposito_destino');
+    
+    function validarDepositos() {
+        if (origenSelect.value && destinoSelect.value && origenSelect.value === destinoSelect.value) {
+            destinoSelect.setCustomValidity('El depósito origen y destino deben ser diferentes');
+        } else {
+            destinoSelect.setCustomValidity('');
+        }
+    }
+    
+    origenSelect.addEventListener('change', validarDepositos);
+    destinoSelect.addEventListener('change', validarDepositos);
+    
+    form.addEventListener('submit', function(e) {
+        validarDepositos();
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
 {% endblock %}

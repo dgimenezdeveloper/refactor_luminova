@@ -545,6 +545,24 @@ class Deposito(models.Model):
     def __str__(self):
         return self.nombre
 
+
+class UsuarioDeposito(models.Model):
+    """Modelo para gestionar permisos de usuarios por depósito"""
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='depositos_asignados')
+    deposito = models.ForeignKey(Deposito, on_delete=models.CASCADE, related_name='usuarios_asignados')
+    puede_transferir = models.BooleanField(default=True, help_text="Puede realizar transferencias desde/hacia este depósito")
+    puede_entradas = models.BooleanField(default=True, help_text="Puede registrar entradas de stock")
+    puede_salidas = models.BooleanField(default=True, help_text="Puede registrar salidas de stock")
+    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('usuario', 'deposito')
+        verbose_name = "Asignación Usuario-Depósito"
+        verbose_name_plural = "Asignaciones Usuario-Depósito"
+
+    def __str__(self):
+        return f"{self.usuario.username} - {self.deposito.nombre}"
+
 class StockInsumo(models.Model):
     insumo = models.ForeignKey('Insumo', on_delete=models.CASCADE)
     deposito = models.ForeignKey('Deposito', on_delete=models.CASCADE)

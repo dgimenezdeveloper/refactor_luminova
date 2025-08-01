@@ -70,8 +70,10 @@ def crear_usuario(request):
             return redirect("App_LUMINOVA:lista_usuarios")
 
         try:
-            # La creación del usuario y la asignación de grupo ocurren dentro de una transacción
-            # para asegurar que todo se complete correctamente o no se haga nada.
+            # Normalizar el nombre del rol para evitar errores de grupo inexistente
+            rol_name_normalizado = rol_name
+            if rol_name_normalizado.lower() == "deposito":
+                rol_name_normalizado = "Depósito"
 
             user = User.objects.create_user(
                 username=username, email=email, password=password
@@ -80,17 +82,32 @@ def crear_usuario(request):
 
             # Asignar el rol (grupo)
             try:
-                group = Group.objects.get(name=rol_name)
+                group = Group.objects.get(name=rol_name_normalizado)
                 user.groups.add(group)
             except Group.DoesNotExist:
                 # Si el grupo no existe, la transacción hará rollback y el usuario no se creará.
                 messages.error(
                     request,
-                    f"El rol '{rol_name}' no existe. No se pudo crear el usuario.",
+                    f"El rol '{rol_name_normalizado}' no existe. No se pudo crear el usuario.",
                 )
                 raise Exception("Rol no existente")  # Forzar rollback de la transacción
 
             user.save()
+
+            # Si el rol es Depósito, asignar automáticamente el primer depósito disponible
+            if rol_name_normalizado == "Depósito":
+                from .models import Deposito, UsuarioDeposito
+                deposito = Deposito.objects.first()
+                if deposito:
+                    UsuarioDeposito.objects.get_or_create(
+                        usuario=user,
+                        deposito=deposito,
+                        defaults={
+                            "puede_transferir": True,
+                            "puede_entradas": True,
+                            "puede_salidas": True,
+                        }
+                    )
 
             # --- Marcar al usuario para que cambie su contraseña en el primer login ---
             PasswordChangeRequired.objects.create(user=user)
@@ -169,11 +186,14 @@ def editar_usuario(request, id):
         rol_name = request.POST.get("rol")
         usuario.groups.clear()
         if rol_name:
+            rol_name_normalizado = rol_name
+            if rol_name_normalizado.lower() == "deposito":
+                rol_name_normalizado = "Depósito"
             try:
-                group = Group.objects.get(name=rol_name)
+                group = Group.objects.get(name=rol_name_normalizado)
                 usuario.groups.add(group)
             except Group.DoesNotExist:
-                messages.error(request, f"El rol '{rol_name}' no existe.")
+                messages.error(request, f"El rol '{rol_name_normalizado}' no existe.")
 
         # Actualizar estado
         estado_str = request.POST.get("estado")

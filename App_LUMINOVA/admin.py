@@ -24,6 +24,7 @@ from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAs
     RolDescripcion,
     SectorAsignado,
     Deposito,
+    UsuarioDeposito,
     StockInsumo,
     StockProductoTerminado,
     MovimientoStock,
@@ -325,6 +326,26 @@ class LoteProductoTerminadoAdmin(admin.ModelAdmin):
 class DepositoAdmin(admin.ModelAdmin):
     list_display = ("nombre", "ubicacion", "descripcion")
     search_fields = ("nombre", "ubicacion")
+
+
+@admin.register(UsuarioDeposito)
+class UsuarioDepositoAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "deposito", "puede_transferir", "puede_entradas", "puede_salidas", "fecha_asignacion")
+    list_filter = ("puede_transferir", "puede_entradas", "puede_salidas", "deposito")
+    search_fields = ("usuario__username", "deposito__nombre")
+    autocomplete_fields = ["usuario", "deposito"]
+    fieldsets = (
+        (None, {
+            'fields': ('usuario', 'deposito')
+        }),
+        ('Permisos', {
+            'fields': ('puede_transferir', 'puede_entradas', 'puede_salidas'),
+            'description': 'Configure los permisos específicos del usuario para este depósito.'
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('usuario', 'deposito')
 
 
 @admin.register(StockInsumo)

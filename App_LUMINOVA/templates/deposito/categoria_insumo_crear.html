@@ -3,46 +3,55 @@
 {% block title %}Crear Nueva Categoría de Insumo{% endblock %}
 
 {% block sidebar_content %}
-    <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end full-height" style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
-        <div class="position-sticky pt-4">
-            <h6 class="sidebar-heading d-flex justify-content-center align-items-center px-3 mt-4 mb-1 text-white fw-bold">
-                <a href="{% url 'App_LUMINOVA:deposito_view' %}"><span style="color: white;">Depósito</span></a>
-            </h6>
-            <hr class="text-white">
-            <ul class="nav flex-column">
-                <li class="nav-item">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:insumo_create' %}">
-                        <i class="bi bi-plus-square me-2"></i> <span class="ms-2">Agregar Insumo</span>
-                    </a>
-                </li>
-                <li class="nav-item mt-2">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center active" href="{% url 'App_LUMINOVA:categoria_i_create' %}">
-                        <i class="bi bi-bookmark-plus me-2"></i> <span class="ms-2">Agregar Categoría Insumo</span>
-                    </a>
-                </li>
-                <li class="nav-item mt-2">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:producto_terminado_create' %}">
-                        <i class="bi bi-plus-square-fill me-2"></i> <span class="ms-2">Agregar Producto Terminado</span>
-                    </a>
-                </li>
-                <li class="nav-item mt-2">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:categoria_pt_create' %}">
-                        <i class="bi bi-bookmark-plus-fill me-2"></i> <span class="ms-2">Agregar Categoría Prod. Term.</span>
-                    </a>
-                </li>
-                 <li class="nav-item mt-2">
-                    <a class="nav-link text-white fw-bold custom-active-button d-flex align-items-center" href="{% url 'App_LUMINOVA:deposito_view' %}">
-                        <i class="bi bi-arrow-left-circle-fill me-2"></i> <span class="ms-2">Volver a Depósito</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </nav>
+<nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end full-height"
+    style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
+    <div class="position-sticky pt-4">
+        <h6 class="sidebar-heading d-flex justify-content-center align-items-center px-3 mt-4 mb-1 text-white fw-bold">
+            <a href="{% url 'App_LUMINOVA:deposito_view' %}"><span style="color: white;">Depósito</span></a>
+        </h6>
+        <hr class="text-white">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="sidebar-link nav-link text-white fw-bold custom-active-button d-flex align-items-center"
+                    href="{% url 'App_LUMINOVA:insumo_create' %}">
+                    <i class="bi bi-plus-square me-2"></i> <span class="ms-2">Agregar Insumo</span>
+                </a>
+            </li>
+            <li class="nav-item mt-2">
+                <a class="sidebar-link nav-link text-white fw-bold custom-active-button d-flex align-items-center active"
+                    href="{% url 'App_LUMINOVA:categoria_i_create' %}">
+                    <i class="bi bi-bookmark-plus me-2"></i> <span class="ms-2">Agregar Categoría Insumo</span>
+                </a>
+            </li>
+            
+            <li class="nav-item mt-2">
+                <a class="sidebar-link nav-link text-white fw-bold custom-active-button d-flex align-items-center"
+                    href="{% url 'App_LUMINOVA:deposito_view' %}">
+                    <i class="bi bi-arrow-left-circle-fill me-2"></i> <span class="ms-2">Volver a Depósito</span>
+                </a>
+            </li>
+            <style>
+                .sidebar-link i {
+                    transition: color 0.2s, transform 0.2s;
+                }
+
+                .sidebar-link:hover i {
+                    color: #ffd700 !important;
+                    transform: scale(1.15);
+                }
+
+                .sidebar-link.active i {
+                    color: #00e6e6 !important;
+                }
+            </style>
+        </ul>
+    </div>
+</nav>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="color-thead" style="height: 45px;">Crear Nueva Categoría de Insumo</h2>
+    <h2 class="color-thead fw-bold text-primary" style="height: 45px;">Crear Nueva Categoría de Insumo</h2>
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <div class="mb-3">
@@ -56,7 +65,7 @@
             {{ form.imagen }}
             {% if form.imagen.errors %}<div class="invalid-feedback d-block">{{ form.imagen.errors }}</div>{% endif %}
             {% if form.imagen.help_text %}
-                <small class="form-text text-muted">{{ form.imagen.help_text }}</small>
+            <small class="form-text text-muted">{{ form.imagen.help_text }}</small>
             {% endif %}
         </div>
         <div class="mt-3">
@@ -67,7 +76,7 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         var form = document.querySelector('form');
         if (form) {
             var elements = form.elements;
