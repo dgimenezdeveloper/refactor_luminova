@@ -35,6 +35,7 @@ from ..views import (
     ProductoTerminadoDeleteView,
 )
 from ..views_deposito import seleccionar_deposito_view, deposito_dashboard_view, transferencia_insumo_view
+from App_LUMINOVA.views_transferencias import historial_transferencias_view
 
 # Rutas de Ventas
 urlpatterns = [
@@ -191,4 +192,5 @@ urlpatterns = [
         name="productos_terminados_list",
     ),
     path("deposito/transferir-insumo/", transferencia_insumo_view, name="transferencia_insumo"),
+    path("deposito/historial-transferencias/", historial_transferencias_view, name="historial_transferencias"),
 ]

@@ -1,14 +1,91 @@
 {% extends 'padre.html' %}
-{% load django_bootstrap5 %}
+{% load static %}
+{% block title %}Transferir Insumo entre Depósitos{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2>Transferir Insumo entre Depósitos</h2>
-    <form method="post">
-        {% csrf_token %}
-        {% bootstrap_form form %}
-        <button type="submit" class="btn btn-primary">Transferir</button>
-        <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-secondary">Cancelar</a>
-    </form>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-0">
+                <div class="card-body p-4">
+                    <h2 class="mb-2 fw-bold text-primary"><i class="bi bi-arrow-left-right me-2"></i>Transferir Insumo entre Depósitos</h2>
+                    <p class="text-muted mb-4">Complete los datos para realizar una transferencia segura y registrada.</p>
+                    <form method="post" id="form-transferencia-insumo" autocomplete="off">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="id_insumo" class="form-label fw-semibold">Insumo a transferir</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-box-seam"></i></span>
+                                    <select name="insumo" id="id_insumo" class="form-select">{% for opt in form.insumo.field.queryset %}<option value="{{ opt.pk }}" {% if form.insumo.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_deposito_origen" class="form-label fw-semibold">Depósito Origen</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-house-door"></i></span>
+                                    <select name="deposito_origen" id="id_deposito_origen" class="form-select">{% for opt in form.deposito_origen.field.queryset %}<option value="{{ opt.pk }}" {% if form.deposito_origen.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_deposito_destino" class="form-label fw-semibold">Depósito Destino</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-house-add"></i></span>
+                                    <select name="deposito_destino" id="id_deposito_destino" class="form-select">{% for opt in form.deposito_destino.field.queryset %}<option value="{{ opt.pk }}" {% if form.deposito_destino.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_cantidad" class="form-label fw-semibold">Cantidad a transferir</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-123"></i></span>
+                                    <input type="number" name="cantidad" id="id_cantidad" class="form-control" value="{{ form.cantidad.value|default_if_none:'' }}" min="1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_motivo" class="form-label fw-semibold">Motivo (opcional)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-chat-left-text"></i></span>
+                                    <input type="text" name="motivo" id="id_motivo" class="form-control" value="{{ form.motivo.value|default_if_none:'' }}" maxlength="255">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="stock-info" class="mb-2 mt-2 text-info"></div>
+                        {% if form.errors %}
+                            <div class="alert alert-danger mt-3">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% if messages %}
+                            <div class="mt-2">
+                                {% for message in messages %}
+                                    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <div>
+                                <button type="submit" class="btn btn-primary px-4">Transferir</button>
+                                <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-secondary ms-2">Cancelar</a>
+                            </div>
+                            <a href="{% url 'App_LUMINOVA:historial_transferencias' %}" class="btn btn-outline-primary">
+                                <i class="bi bi-clock-history me-1"></i> Ver historial de transferencias
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script src="{% static 'js/transferencia_insumo.js' %}"></script>
 {% endblock %}

@@ -1,5 +1,5 @@
 from django.urls import path, include
-from . import admin_urls, ventas_urls, compras_urls, produccion_urls, deposito_urls, base_urls, control_calidad_urls, transferencias_urls
+from . import admin_urls, ventas_urls, compras_urls, produccion_urls, deposito_urls, base_urls, control_calidad_urls
 
 app_name = 'App_LUMINOVA'
 
@@ -12,6 +12,6 @@ urlpatterns = [
     path('produccion/', include(produccion_urls)),
     path('deposito/', include(deposito_urls)),
     path('control_calidad/', include(control_calidad_urls)),
-    path('transferencias/', include(transferencias_urls)),
+    
     path('', include(base_urls)),
 ]
