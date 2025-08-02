@@ -34,6 +34,9 @@ from ..views import (
     ProductoTerminadoUpdateView,
     ProductoTerminadoDeleteView,
 )
+from App_LUMINOVA.views_compras import (
+    ajax_notificaciones_no_leidas,
+)
 from ..views_deposito import (
     seleccionar_deposito_view, 
     deposito_dashboard_view, 
@@ -82,6 +85,7 @@ urlpatterns = [
     ),
     path('deposito/seleccionar/', seleccionar_deposito_view, name='seleccionar_deposito'),
     path('deposito/dashboard/', deposito_dashboard_view, name='deposito_dashboard'),
+    path('ajax/notificaciones-no-leidas/', ajax_notificaciones_no_leidas, name='ajax_notificaciones_no_leidas'),
     # CRUDs para Fabricantes, Proveedores (Class-Based Views)
     path(
         "ventas/proveedores/proveedor/",

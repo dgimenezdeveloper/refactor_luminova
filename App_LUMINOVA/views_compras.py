@@ -1,3 +1,31 @@
+from django.views.decorators.http import require_GET
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+from App_LUMINOVA.models import NotificacionSistema
+
+# --- VISTA AJAX: Notificaciones no leídas para el usuario/grupo ---
+@login_required
+@require_GET
+def ajax_notificaciones_no_leidas(request):
+    user = request.user
+    # Notificaciones para el grupo del usuario (ej: Compras)
+    grupos = user.groups.values_list('name', flat=True)
+    notificaciones = NotificacionSistema.objects.filter(
+        leida=False,
+        destinatario_grupo__in=grupos
+    ).order_by('-fecha_creacion')[:10]
+    data = [
+        {
+            'id': n.id,
+            'titulo': n.titulo,
+            'mensaje': n.mensaje,
+            'tipo': n.tipo,
+            'fecha': n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+            'prioridad': n.prioridad,
+        }
+        for n in notificaciones
+    ]
+    return JsonResponse({'notificaciones': data})
 import logging
 from datetime import timedelta
 
@@ -137,9 +165,14 @@ def compras_desglose_view(request):
     logger.info("--- compras_desglose_view: INICIO ---")
 
     # Obtener notificaciones de stock bajo del depósito
-    notificaciones_stock_bajo = NotificationService.obtener_notificaciones_usuario(
+    notificaciones_usuario = NotificationService.obtener_notificaciones_usuario(
         request.user, solo_no_leidas=True
-    ).filter(tipo='stock_bajo')
+    )
+    # Puede ser queryset o lista
+    if hasattr(notificaciones_usuario, 'filter'):
+        notificaciones_stock_bajo = notificaciones_usuario.filter(tipo='stock_bajo')
+    else:
+        notificaciones_stock_bajo = [n for n in notificaciones_usuario if getattr(n, 'tipo', None) == 'stock_bajo']
 
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
@@ -186,7 +219,10 @@ def compras_desglose_view(request):
     all_insumos_bajo_stock = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
     logger.info(f"=== DEBUG DESGLOSE DE COMPRAS ===")
     logger.info(f"Umbral de stock bajo: {UMBRAL_STOCK_BAJO_INSUMOS}")
-    logger.info(f"Total de insumos con stock bajo: {all_insumos_bajo_stock.count()}")
+    if hasattr(all_insumos_bajo_stock, 'count'):
+        logger.info(f"Total de insumos con stock bajo: {all_insumos_bajo_stock.count()}")
+    else:
+        logger.info(f"Total de insumos con stock bajo: {len(all_insumos_bajo_stock)}")
     
     for insumo in all_insumos_bajo_stock:
         ocs_activas = Orden.objects.filter(
@@ -236,7 +272,13 @@ def compras_desglose_view(request):
         "titulo_seccion": "Gestionar Compra por Stock Bajo",
     }
     
-    logger.info(f"Notificaciones de stock bajo: {notificaciones_stock_bajo.count()}")
+    if hasattr(notificaciones_stock_bajo, 'count'):
+        try:
+            logger.info(f"Notificaciones de stock bajo: {notificaciones_stock_bajo.count()}")
+        except TypeError:
+            logger.info(f"Notificaciones de stock bajo: {len(list(notificaciones_stock_bajo))}")
+    else:
+        logger.info(f"Notificaciones de stock bajo: {len(notificaciones_stock_bajo)}")
     return render(request, "compras/compras_desglose.html", context)
 
 
