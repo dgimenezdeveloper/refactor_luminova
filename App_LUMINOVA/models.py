@@ -100,6 +100,7 @@ class Fabricante(models.Model):
 
 
 class Insumo(models.Model):
+    notificado_a_compras = models.BooleanField(default=False, help_text="¿Ya fue notificado a compras por stock bajo?")
     descripcion = models.CharField(max_length=255)
     categoria = models.ForeignKey(
         CategoriaInsumo, on_delete=models.PROTECT, related_name="insumos"

@@ -1,4 +1,5 @@
 from django.urls import path
+from ..views import ajax_marcar_notificacion_leida
 from ..views import (
     compras_lista_oc_view,
     compras_crear_oc_view,
@@ -66,5 +67,10 @@ urlpatterns = [
         "ajax/get-proveedores-for-insumo/",
         ajax_get_proveedores_for_insumo,
         name="ajax_get_proveedores_for_insumo",
+    ),
+    path(
+        "ajax/marcar-notificacion-leida/",
+        ajax_marcar_notificacion_leida,
+        name="ajax_marcar_notificacion_leida",
     ),
 ]

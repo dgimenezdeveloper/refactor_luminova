@@ -1,5 +1,67 @@
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
+
+# --- AJAX: Marcar notificación como leída ---
+from django.views.decorators.csrf import csrf_exempt
+@csrf_exempt
+@login_required
+@require_POST
+def ajax_marcar_notificacion_leida(request):
+    import json
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        data = json.loads(request.body)
+        notif_id = data.get('id')
+        notif = NotificacionSistema.objects.get(id=notif_id)
+        # Solo marcar como leída si el insumo ya no es crítico
+        # Buscar el insumo relacionado (asumiendo que el mensaje tiene el id del insumo)
+        insumo_id = getattr(notif, 'objeto_id', None)
+        logger.info(f"[AJAX] Intentando marcar notificación {notif_id} como leída. insumo_id={insumo_id}")
+        if insumo_id:
+            from App_LUMINOVA.models import Insumo, Orden
+            UMBRAL_STOCK_BAJO_INSUMOS = 15000
+            try:
+                insumo = Insumo.objects.get(id=insumo_id)
+                stock_actual = insumo.stock
+                from django.db.models import Q, Sum
+                ESTADOS_OC_POST_BORRADOR = [
+                    "APROBADA",
+                    "ENVIADA_PROVEEDOR",
+                    "EN_TRANSITO",
+                    "RECIBIDA_PARCIAL",
+                    "RECIBIDA_TOTAL",
+                    "COMPLETADA",
+                ]
+                total_en_ocs = Orden.objects.filter(
+                    tipo="compra",
+                    estado__in=ESTADOS_OC_POST_BORRADOR,
+                    insumo_principal=insumo
+                ).filter(
+                    Q(deposito=insumo.deposito) | Q(deposito__isnull=True)
+                ).aggregate(total=Sum('cantidad_principal'))['total'] or 0
+                logger.info(f"[AJAX] Insumo {insumo_id}: stock_actual={stock_actual}, total_en_ocs={total_en_ocs}, umbral={UMBRAL_STOCK_BAJO_INSUMOS}")
+                if (stock_actual + total_en_ocs) >= UMBRAL_STOCK_BAJO_INSUMOS:
+                    notif.marcar_como_leida(request.user)
+                    logger.info(f"[AJAX] Notificación {notif_id} marcada como leída (insumo ya no crítico)")
+                    return JsonResponse({'success': True, 'marcada': True})
+                else:
+                    logger.info(f"[AJAX] Notificación {notif_id} NO marcada como leída (insumo sigue crítico)")
+                    return JsonResponse({'success': True, 'marcada': False, 'error': 'El insumo sigue siendo crítico'})
+            except Insumo.DoesNotExist:
+                logger.warning(f"[AJAX] Insumo {insumo_id} no existe. No se marca como leída.")
+                return JsonResponse({'success': False, 'error': 'El insumo relacionado no existe.'}, status=400)
+            except Exception as e:
+                logger.error(f"[AJAX] Error al procesar insumo {insumo_id}: {e}")
+                return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        else:
+            # Si no hay insumo relacionado, NO marcar como leída (por seguridad)
+            logger.info(f"[AJAX] Notificación {notif_id} sin insumo relacionado. No se marca como leída.")
+            return JsonResponse({'success': True, 'marcada': False, 'error': 'No hay insumo relacionado.'})
+    except Exception as e:
+        logger.error(f"[AJAX] Error general: {e}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+from django.views.decorators.http import require_GET
 from django.utils.decorators import method_decorator
 from App_LUMINOVA.models import NotificacionSistema
 
@@ -8,23 +70,102 @@ from App_LUMINOVA.models import NotificacionSistema
 @require_GET
 def ajax_notificaciones_no_leidas(request):
     user = request.user
-    # Notificaciones para el grupo del usuario (ej: Compras)
     grupos = user.groups.values_list('name', flat=True)
+    # Antes de obtener las notificaciones, marcar como leídas todas las de insumos con OC post-borrador
+    from App_LUMINOVA.models import Insumo, Orden
+    from django.db.models import Q, Sum
+    UMBRAL_STOCK_BAJO_INSUMOS = 15000
+    ESTADOS_OC_POST_BORRADOR = [
+        "APROBADA",
+        "ENVIADA_PROVEEDOR",
+        "EN_TRANSITO",
+        "RECIBIDA_PARCIAL",
+        "RECIBIDA_TOTAL",
+        "COMPLETADA",
+    ]
+    # Buscar todos los insumos con OC post-borrador
+    insumos_con_oc_post_borrador = set(
+        Orden.objects.filter(
+            tipo="compra",
+            estado__in=ESTADOS_OC_POST_BORRADOR
+        ).values_list('insumo_principal', flat=True)
+    )
+    # Marcar como leídas todas las notificaciones de stock bajo de esos insumos
+    if insumos_con_oc_post_borrador:
+        NotificacionSistema.objects.filter(
+            leida=False,
+            tipo='stock_bajo',
+            objeto_id__in=insumos_con_oc_post_borrador,
+            destinatario_grupo__in=grupos
+        ).update(leida=True)
+
+    # Ahora sí, obtener solo las no leídas (ya filtradas)
     notificaciones = NotificacionSistema.objects.filter(
         leida=False,
         destinatario_grupo__in=grupos
-    ).order_by('-fecha_creacion')[:10]
-    data = [
-        {
-            'id': n.id,
-            'titulo': n.titulo,
-            'mensaje': n.mensaje,
-            'tipo': n.tipo,
-            'fecha': n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
-            'prioridad': n.prioridad,
-        }
-        for n in notificaciones
+    ).order_by('-fecha_creacion')[:20]
+
+    # Solo mostrar notificaciones de insumos que realmente siguen críticos
+    data = []
+    from App_LUMINOVA.models import Insumo, Orden
+    from django.db.models import Q, Sum
+    UMBRAL_STOCK_BAJO_INSUMOS = 15000
+    ESTADOS_OC_POST_BORRADOR = [
+        "APROBADA",
+        "ENVIADA_PROVEEDOR",
+        "EN_TRANSITO",
+        "RECIBIDA_PARCIAL",
+        "RECIBIDA_TOTAL",
+        "COMPLETADA",
     ]
+    # Para evitar duplicados, llevamos registro de insumos ya notificados
+    insumos_notificados = set()
+    for n in notificaciones:
+        insumo_id = getattr(n, 'objeto_id', None)
+        if n.tipo == 'stock_bajo' and insumo_id:
+            try:
+                insumo = Insumo.objects.get(id=insumo_id)
+                # Si existe al menos una OC en estado post-borrador para este insumo y depósito, marcar todas las notificaciones como leídas
+                existe_oc_post_borrador = Orden.objects.filter(
+                    tipo="compra",
+                    estado__in=ESTADOS_OC_POST_BORRADOR,
+                    insumo_principal=insumo
+                ).filter(
+                    Q(deposito=insumo.deposito) | Q(deposito__isnull=True)
+                ).exists()
+                if existe_oc_post_borrador:
+                    # Marcar todas las notificaciones de stock bajo de este insumo como leídas para este usuario
+                    NotificacionSistema.objects.filter(
+                        leida=False,
+                        tipo='stock_bajo',
+                        objeto_id=insumo_id,
+                        destinatario_grupo__in=grupos
+                    ).update(leida=True)
+                    continue  # No mostrar ninguna notificación de este insumo
+                # Evitar duplicados: solo mostrar una notificación por insumo
+                if insumo_id in insumos_notificados:
+                    continue
+                insumos_notificados.add(insumo_id)
+                data.append({
+                    'id': n.id,
+                    'titulo': n.titulo,
+                    'mensaje': n.mensaje,
+                    'tipo': n.tipo,
+                    'fecha': n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                    'prioridad': n.prioridad,
+                })
+            except Insumo.DoesNotExist:
+                continue
+        else:
+            # Para otros tipos de notificación, mostrar normalmente
+            data.append({
+                'id': n.id,
+                'titulo': n.titulo,
+                'mensaje': n.mensaje,
+                'tipo': n.tipo,
+                'fecha': n.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                'prioridad': n.prioridad,
+            })
     return JsonResponse({'notificaciones': data})
 import logging
 from datetime import timedelta

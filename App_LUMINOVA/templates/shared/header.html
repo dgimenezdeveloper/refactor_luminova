@@ -116,13 +116,35 @@ function cargarMensajesNavbar() {
                 data.notificaciones.forEach(n => {
                     const li = document.createElement('li');
                     li.className = 'mensaje-item';
+                    // Determinar URL destino según tipo de notificación
+                    let url = '#';
+                    if (n.tipo === 'stock_bajo' && n.prioridad === 'critica') {
+                        // Ir a seleccionar proveedor para insumo
+                        url = `/compras/orden/seleccionar-proveedor/insumo/${n.id}/`;
+                    } else if (n.tipo === 'stock_bajo') {
+                        // Ir al desglose de compras
+                        url = `/compras/compras/desglose/`;
+                    }
                     li.innerHTML = `
-                        <span class='mensaje-titulo'>${n.titulo}</span><br>
-                        <span class='mensaje-fecha'>${n.fecha}</span><br>
-                        <span class='mensaje-texto'>${n.mensaje}</span>
+                        <a href="${url}" class="text-decoration-none text-dark mensaje-link" data-notif-id="${n.id}">
+                            <span class='mensaje-titulo'>${n.titulo}</span><br>
+                            <span class='mensaje-fecha'>${n.fecha}</span><br>
+                            <span class='mensaje-texto'>${n.mensaje}</span>
+                        </a>
                     `;
                     lista.appendChild(li);
                 });
+// Marcar como leída al hacer click en el mensaje
+document.addEventListener('click', function(e) {
+    const link = e.target.closest('.mensaje-link');
+    if (link && link.dataset.notifId) {
+        // Simplemente redirigir si el enlace tiene href válido
+        if (link.href && link.href !== '#') {
+            window.location.href = link.href;
+            e.preventDefault();
+        }
+    }
+});
                 contador.textContent = data.notificaciones.length;
                 contador.style.display = 'inline-block';
             }

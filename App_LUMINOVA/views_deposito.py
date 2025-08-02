@@ -88,6 +88,12 @@ def notificar_stock_bajo_view(request, insumo_id):
         if not deposito:
             return JsonResponse({"success": False, "error": "No se pudo determinar el depósito"})
         
+        # Si ya fue notificado, no volver a notificar
+        if insumo.notificado_a_compras:
+            return JsonResponse({
+                "success": False,
+                "error": "Este insumo ya fue notificado a Compras."
+            })
         # Crear la notificación usando el servicio
         notificacion = NotificationService.notificar_stock_bajo(
             insumo=insumo,
@@ -95,7 +101,9 @@ def notificar_stock_bajo_view(request, insumo_id):
             usuario_remitente=request.user,
             umbral_critico=15000  # O el umbral que uses
         )
-        
+        # Marcar insumo como notificado
+        insumo.notificado_a_compras = True
+        insumo.save(update_fields=["notificado_a_compras"])
         return JsonResponse({
             "success": True, 
             "message": f"Notificación enviada a Compras sobre {insumo.descripcion}",
@@ -1045,6 +1053,10 @@ def deposito_view(request):
         if oc_en_proceso:
             insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso, "stock_real": insumo.stock})
             logger.info(f"[DEBUG] Insumo EN PEDIDO: {insumo.descripcion}")
+        elif insumo.notificado_a_compras:
+            # Si ya fue notificado, mostrarlo como notificado (no permitir botón de notificar)
+            insumos_a_gestionar.append(insumo)
+            logger.info(f"[DEBUG] Insumo YA NOTIFICADO: {insumo.descripcion}")
         else:
             insumos_a_gestionar.append(insumo)
             logger.info(f"[DEBUG] Insumo A GESTIONAR: {insumo.descripcion}")

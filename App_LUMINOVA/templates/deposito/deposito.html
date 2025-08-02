@@ -191,13 +191,19 @@
                     <td class="text-white" colspan="2">{{ insumo.descripcion|truncatechars:25 }}</td>
                     <td class="text-white text-center fw-bold text-danger">{{ insumo.stock }}</td>
                     <td class="text-white text-center">
-                        <button class="btn btn-warning btn-sm btn-notificar-stock" 
-                                data-insumo-id="{{ insumo.id }}"
-                                data-insumo-descripcion="{{ insumo.descripcion|escapejs }}"
-                                title="Notificar a Compras sobre stock bajo de {{ insumo.descripcion|escape }}" 
-                                id="btn-notificar-{{ insumo.id }}">
-                            <i class="bi bi-bell-fill"></i> Notificar
-                        </button>
+                        {% if insumo.notificado_a_compras %}
+                            <button class="btn btn-success btn-sm" disabled title="Ya notificado a Compras">
+                                <i class="bi bi-check-circle-fill"></i> Notificado
+                            </button>
+                        {% else %}
+                            <button class="btn btn-warning btn-sm btn-notificar-stock" 
+                                    data-insumo-id="{{ insumo.id }}"
+                                    data-insumo-descripcion="{{ insumo.descripcion|escapejs }}"
+                                    title="Notificar a Compras sobre stock bajo de {{ insumo.descripcion|escape }}" 
+                                    id="btn-notificar-{{ insumo.id }}">
+                                <i class="bi bi-bell-fill"></i> Notificar
+                            </button>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
