@@ -1,0 +1,141 @@
+<!-- Modal para crear depósito -->
+<div class="modal fade" id="modalCrearDeposito" tabindex="-1" aria-labelledby="modalCrearDepositoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalCrearDepositoLabel">Crear nuevo depósito</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <form action="{% url 'crear_deposito_ajax' %}" method="post" id="formCrearDeposito">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_nombre" class="form-label">Nombre</label>
+            <input type="text" class="form-control" id="id_nombre" name="nombre" required>
+          </div>
+          <div class="mb-3">
+            <label for="id_ubicacion" class="form-label">Ubicación</label>
+            <input type="text" class="form-control" id="id_ubicacion" name="ubicacion">
+          </div>
+          <div class="mb-3">
+            <label for="id_descripcion" class="form-label">Descripción</label>
+            <textarea class="form-control" id="id_descripcion" name="descripcion" rows="2"></textarea>
+          </div>
+          <div id="deposito-form-error" class="text-danger mb-2" style="display:none;"></div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary" onclick="submitFormulario()">Crear</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function submitFormulario() {
+    const form = document.getElementById('formCrearDeposito');
+    const errorDiv = document.getElementById('deposito-form-error');
+    const submitBtn = form.querySelector('.btn-primary');
+    
+    // Validación básica
+    const nombre = document.getElementById('id_nombre').value.trim();
+    if (!nombre) {
+        errorDiv.textContent = 'El nombre es requerido';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    // Mostrar estado de carga
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creando...';
+    errorDiv.style.display = 'none';
+    
+    // Crear FormData desde el formulario
+    const formData = new FormData(form);
+    
+    console.log('=== ENVIANDO FORMULARIO ===');
+    console.log('Nombre:', formData.get('nombre'));
+    console.log('Ubicación:', formData.get('ubicacion'));
+    console.log('Descripción:', formData.get('descripcion'));
+    console.log('CSRF:', formData.get('csrfmiddlewaretoken'));
+    console.log('URL:', form.action);
+    
+    // Enviar con fetch
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.text().then(text => {
+            console.log('Response text:', text);
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error('Respuesta no es JSON válido: ' + text);
+            }
+        });
+    })
+    .then(data => {
+        console.log('Datos parseados:', data);
+        
+        if (data.success) {
+            console.log('¡ÉXITO! Depósito creado con ID:', data.id);
+            
+            // Cerrar modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalCrearDeposito'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Agregar al select si existe
+            const select = document.querySelector('select[name="deposito_id"]');
+            if (select) {
+                const option = new Option(data.nombre, data.id);
+                select.add(option);
+                select.value = data.id;
+                console.log('Depósito agregado al select y seleccionado');
+            }
+            
+            // Mostrar mensaje de éxito
+            alert('Depósito creado exitosamente: ' + data.nombre);
+            
+        } else {
+            console.error('Error del servidor:', data);
+            let mensaje = 'Error al crear depósito';
+            if (data.errors) {
+                mensaje = Object.values(data.errors).flat().join(', ');
+            } else if (data.error) {
+                mensaje = data.error;
+            }
+            errorDiv.textContent = mensaje;
+            errorDiv.style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error en fetch:', error);
+        errorDiv.textContent = 'Error de conexión: ' + error.message;
+        errorDiv.style.display = 'block';
+    })
+    .finally(() => {
+        // Restaurar botón
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Crear';
+    });
+}
+
+// Limpiar formulario al abrir modal
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modalCrearDeposito');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function() {
+            document.getElementById('formCrearDeposito').reset();
+            document.getElementById('deposito-form-error').style.display = 'none';
+        });
+    }
+});
+</script>

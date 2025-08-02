@@ -4,6 +4,7 @@ from datetime import timedelta, timezone
 from django import apps, forms
 from django.contrib.auth.models import Group, Permission
 from django.db.models import Q
+from django.utils import timezone
 
 from .models import (
     CategoriaInsumo,
@@ -255,12 +256,8 @@ class OrdenProduccionUpdateForm(forms.ModelForm):
         widgets = {
             "estado_op": forms.Select(attrs={"class": "form-select"}),
             "sector_asignado_op": forms.Select(attrs={"class": "form-select"}),
-            "fecha_inicio_planificada": forms.DateInput(
-                attrs={"class": "form-control", "type": "date"}
-            ),
-            "fecha_fin_planificada": forms.DateInput(
-                attrs={"class": "form-control", "type": "date"}
-            ),
+            "fecha_inicio_planificada": forms.DateInput(attrs={"type": "date"}),
+            "fecha_fin_planificada": forms.DateInput(attrs={"type": "date"}),
             "notas": forms.Textarea(
                 attrs={
                     "class": "form-control",
@@ -889,3 +886,14 @@ class TransferenciaProductoForm(forms.Form):
         if cleaned_data.get('deposito_origen') == cleaned_data.get('deposito_destino'):
             raise forms.ValidationError("El depósito origen y destino deben ser diferentes.")
         return cleaned_data
+
+
+class DepositoForm(forms.ModelForm):
+    class Meta:
+        model = Deposito
+        fields = ['nombre', 'ubicacion', 'descripcion']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'ubicacion': forms.TextInput(attrs={'class': 'form-control'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
