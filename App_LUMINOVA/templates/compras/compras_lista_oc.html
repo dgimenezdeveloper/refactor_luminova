@@ -26,6 +26,7 @@
                 <th>Fecha Creación</th>
                 <th>Proveedor</th>
                 <th>Insumo Principal</th>
+                <th>Depósito</th>
                 <th class="text-center">Cantidad</th>
                 <th class="text-end">Total ($)</th>
                 <th class="text-center">Estado</th>
@@ -42,6 +43,7 @@
                 <td>{{ oc.fecha_creacion|date:"d/m/Y H:i" }}</td>
                 <td>{{ oc.proveedor.nombre|default_if_none:"N/A" }}</td>
                 <td>{{ oc.insumo_principal.descripcion|default_if_none:"N/A"|truncatechars:30 }}</td>
+                <td>{{ oc.deposito.nombre|default_if_none:"N/A" }}</td>
                 <td class="text-center">{{ oc.cantidad_principal|default_if_none:"-" }}</td>
                 <td class="text-end">{{ oc.total_orden_compra|floatformat:2|default:"0.00" }}</td>
                 <td class="text-center">

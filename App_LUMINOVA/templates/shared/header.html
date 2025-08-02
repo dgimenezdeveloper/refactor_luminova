@@ -25,14 +25,12 @@
                 <div class="navbar-nav ms-auto d-flex flex-row align-items-center">
                     {% if user.is_authenticated %}
                         
-                        <div class="nav-item dropdown">
-                            <a class="nav-link px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones">
-                                <!-- Se cambia a text-primary -->
-                                <i class="bi bi-bell-fill fs-5 position-relative text-primary"> 
-                                    {% if total_notificaciones > 0 %}
-                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6em;">{{ total_notificaciones }}</span>
-                                    {% endif %}
-                                </i>
+                        <div class="nav-item dropdown me-3">
+                            <a class="nav-link px-2 position-relative d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notificaciones">
+                                <i class="bi bi-bell-fill fs-5 text-primary"></i>
+                                {% if total_notificaciones > 0 %}
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow-sm" style="font-size: 0.65em; min-width:18px; border:2px solid #fff;">{{ total_notificaciones }}</span>
+                                {% endif %}
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="width: 300px;">
                                 <li class="dropdown-header">Acciones Urgentes</li>
@@ -60,10 +58,114 @@
                             </ul>
                         </div>
                         
-                        <div class="nav-item">
-                            <!-- Se cambia a text-primary -->
-                             <a class="nav-link px-2" href="#" title="Mensajes"><i class="bi bi-envelope-fill fs-5 text-primary"></i></a>
+                        <style>
+                        /* Badge de mensajes igual que notificaciones, con borde blanco y sombra */
+                        #contador-mensajes {
+                            font-size: 0.65em;
+                            min-width: 18px;
+                            border: 2px solid #fff;
+                            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+                            z-index: 2;
+                            display: none;
+                        }
+                        .dropdown-menu-mensajes {
+                            width: 370px;
+                            max-width: 95vw;
+                            max-height: 400px;
+                            overflow-y: auto;
+                            padding: 0;
+                        }
+                        .mensaje-item {
+                            white-space: normal;
+                            word-break: break-word;
+                            padding: 10px 16px;
+                            border-bottom: 1px solid #f0f0f0;
+                            font-size: 0.97em;
+                        }
+                        .mensaje-item:last-child { border-bottom: none; }
+                        .mensaje-titulo { font-weight: bold; font-size: 1em; }
+                        .mensaje-fecha { color: #888; font-size: 0.85em; }
+                        .mensaje-texto { color: #333; font-size: 0.97em; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                        </style>
+                        <div class="nav-item dropdown ms-2" id="dropdown-mensajes">
+                            <a class="nav-link px-2 position-relative d-flex align-items-center" href="#" id="mensajesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Mensajes">
+                                <i class="bi bi-envelope-fill fs-5 text-primary"></i>
+                                <span id="contador-mensajes" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow-sm" style="font-size: 0.65em; min-width:18px; border:2px solid #fff; display:none;">0</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-mensajes shadow-lg" aria-labelledby="mensajesDropdown">
+                                <li class="dropdown-header">Mensajes del Sistema</li>
+                                <li><hr class="dropdown-divider"></li>
+                                <div id="mensajes-lista">
+                                    <li class="dropdown-item text-center text-muted small py-3">Cargando mensajes...</li>
+                                </div>
+                            </ul>
                         </div>
+{% block extra_js %}
+<script>
+function cargarMensajesNavbar() {
+    fetch("{% url 'App_LUMINOVA:ajax_notificaciones_no_leidas' %}")
+        .then(response => response.json())
+        .then(data => {
+            const lista = document.getElementById('mensajes-lista');
+            const contador = document.getElementById('contador-mensajes');
+            lista.innerHTML = '';
+            if (data.notificaciones.length === 0) {
+                lista.innerHTML = '<li class="dropdown-item text-center text-muted small py-3">No hay mensajes nuevos.</li>';
+                contador.style.display = 'none';
+            } else {
+                data.notificaciones.forEach(n => {
+                    const li = document.createElement('li');
+                    li.className = 'mensaje-item';
+                    // Determinar URL destino según tipo de notificación
+                    let url = '#';
+                    if (n.tipo === 'stock_bajo' && n.prioridad === 'critica') {
+                        // Ir a seleccionar proveedor para insumo
+                        url = `/compras/orden/seleccionar-proveedor/insumo/${n.id}/`;
+                    } else if (n.tipo === 'stock_bajo') {
+                        // Ir al desglose de compras
+                        url = `/compras/compras/desglose/`;
+                    }
+                    li.innerHTML = `
+                        <a href="${url}" class="text-decoration-none text-dark mensaje-link" data-notif-id="${n.id}">
+                            <span class='mensaje-titulo'>${n.titulo}</span><br>
+                            <span class='mensaje-fecha'>${n.fecha}</span><br>
+                            <span class='mensaje-texto'>${n.mensaje}</span>
+                        </a>
+                    `;
+                    lista.appendChild(li);
+                });
+// Marcar como leída al hacer click en el mensaje
+document.addEventListener('click', function(e) {
+    const link = e.target.closest('.mensaje-link');
+    if (link && link.dataset.notifId) {
+        // Simplemente redirigir si el enlace tiene href válido
+        if (link.href && link.href !== '#') {
+            window.location.href = link.href;
+            e.preventDefault();
+        }
+    }
+});
+                contador.textContent = data.notificaciones.length;
+                contador.style.display = 'inline-block';
+            }
+        })
+        .catch(() => {
+            const lista = document.getElementById('mensajes-lista');
+            lista.innerHTML = '<li class="dropdown-item text-center text-danger small py-3">Error al cargar mensajes.</li>';
+        });
+}
+
+// Cargar mensajes al abrir el dropdown
+document.addEventListener('DOMContentLoaded', function() {
+    const dropdown = document.getElementById('mensajesDropdown');
+    if (dropdown) {
+        dropdown.addEventListener('show.bs.dropdown', cargarMensajesNavbar);
+    }
+    // También cargar al inicio para mostrar el contador
+    cargarMensajesNavbar();
+});
+</script>
+{% endblock %}
                         
                         <div class="vr mx-3 d-none d-lg-block"></div>
 

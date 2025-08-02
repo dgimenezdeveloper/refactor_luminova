@@ -1,6 +1,7 @@
 {% extends 'padre.html' %}
 {% load static %}
 {% load django_bootstrap5 %}
+{% csrf_token %}
 
 {% block title %}Depósito - Luminova{% endblock %}
 
@@ -185,14 +186,24 @@
                     <th class="text-white text-center" style="background-color: #014BAC; width: 25%;" >Stock</th>
                     <th class="text-white text-center" style="background-color: #014BAC; width: 15%; color: white;">Acción</th>
                 </tr>
-                {% for item in insumos_a_gestionar_list %}
+                {% for insumo in insumos_a_gestionar_list %}
                 <tr class="{% if forloop.counter|divisibleby:2 %}table-row-even{% else %}table-row-odd{% endif %}">
-                    <td class="text-white" colspan="2">{{ item.insumo.descripcion|truncatechars:25 }}</td>
-                    <td class="text-white text-center fw-bold text-danger">{{ item.insumo.stock }}</td>
+                    <td class="text-white" colspan="2">{{ insumo.descripcion|truncatechars:25 }}</td>
+                    <td class="text-white text-center fw-bold text-danger">{{ insumo.stock }}</td>
                     <td class="text-white text-center">
-                        <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' item.insumo.id %}" class="btn btn-success btn-sm" title="Seleccionar proveedor para comprar {{ item.insumo.descripcion }}">
-                            <i class="bi bi-cart-plus-fill"></i>
-                        </a>
+                        {% if insumo.notificado_a_compras %}
+                            <button class="btn btn-success btn-sm" disabled title="Ya notificado a Compras">
+                                <i class="bi bi-check-circle-fill"></i> Notificado
+                            </button>
+                        {% else %}
+                            <button class="btn btn-warning btn-sm btn-notificar-stock" 
+                                    data-insumo-id="{{ insumo.id }}"
+                                    data-insumo-descripcion="{{ insumo.descripcion|escapejs }}"
+                                    title="Notificar a Compras sobre stock bajo de {{ insumo.descripcion|escape }}" 
+                                    id="btn-notificar-{{ insumo.id }}">
+                                <i class="bi bi-bell-fill"></i> Notificar
+                            </button>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}
@@ -264,29 +275,29 @@
         mostrarInsumos();
 
         // Lógica para el modal de confirmación
-        const confirmarEnvioModal = document.getElementById('confirmarEnvioModal');
+        var confirmarEnvioModal = document.getElementById('confirmarEnvioModal');
         if (confirmarEnvioModal) {
             confirmarEnvioModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget; // Botón que activó el modal
-                const loteInfo = button.getAttribute('data-lote-info');
-                const loteId = button.getAttribute('data-lote-id');
+                var button = event.relatedTarget; // Botón que activó el modal
+                var loteInfo = button.getAttribute('data-lote-info');
+                var loteId = button.getAttribute('data-lote-id');
 
                 // Actualizar el contenido del modal
-                const modalBodyInfo = confirmarEnvioModal.querySelector('#modal-lote-info');
+                var modalBodyInfo = confirmarEnvioModal.querySelector('#modal-lote-info');
                 modalBodyInfo.textContent = loteInfo;
 
                 // Guardar el ID del lote en el botón de confirmación del modal
-                const btnConfirmar = confirmarEnvioModal.querySelector('#btn-confirmar-envio-modal');
+                var btnConfirmar = confirmarEnvioModal.querySelector('#btn-confirmar-envio-modal');
                 btnConfirmar.setAttribute('data-lote-id-to-send', loteId);
             });
         }
 
-        const btnConfirmar = document.getElementById('btn-confirmar-envio-modal');
+        var btnConfirmar = document.getElementById('btn-confirmar-envio-modal');
         if (btnConfirmar) {
             btnConfirmar.addEventListener('click', function() {
-                const loteIdToSend = this.getAttribute('data-lote-id-to-send');
+                var loteIdToSend = this.getAttribute('data-lote-id-to-send');
                 if (loteIdToSend) {
-                    const form = document.getElementById(`form-enviar-lote-${loteIdToSend}`);
+                    var form = document.getElementById('form-enviar-lote-' + loteIdToSend);
                     if (form) {
                         form.submit();
                     } else {
@@ -439,6 +450,116 @@
     </div>
 </div>
 
+<script>
+function notificarStockBajo(insumoId, insumoDescripcion) {
+    var boton = document.getElementById('btn-notificar-' + insumoId);
+    var originalContent = boton.innerHTML;
+    
+    // Deshabilitar el botón y mostrar loading
+    boton.disabled = true;
+    boton.innerHTML = '<i class="bi bi-spinner"></i> Enviando...';
+    
+    // Obtener el token CSRF desde el DOM o meta tag
+    var csrfToken = '';
+    var csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfInput) {
+        csrfToken = csrfInput.value;
+    } else {
+        var metaCsrf = document.querySelector('meta[name="csrf-token"]');
+        if (metaCsrf) {
+            csrfToken = metaCsrf.getAttribute('content');
+        }
+    }
+    
+    fetch("{% url 'App_LUMINOVA:notificar_stock_bajo' 0 %}".replace('0', insumoId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({})
+    })
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(data) {
+        if (data.success) {
+            // Cambiar el botón a estado "notificado"
+            boton.innerHTML = '<i class="bi bi-check-circle-fill"></i> Notificado';
+            boton.className = 'btn btn-success btn-sm';
+            boton.title = 'Notificación enviada para ' + insumoDescripcion;
+            
+            // Mostrar mensaje de éxito
+            showNotification('success', data.message);
+            
+            // Opcional: deshabilitar permanentemente
+            setTimeout(function() {
+                boton.disabled = true;
+            }, 1000);
+        } else {
+            // Restaurar botón en caso de error
+            boton.disabled = false;
+            boton.innerHTML = originalContent;
+            showNotification('error', data.error || 'Error al enviar notificación');
+        }
+    })
+    .catch(function(error) {
+        // Restaurar botón en caso de error
+        boton.disabled = false;
+        boton.innerHTML = originalContent;
+        showNotification('error', 'Error de conexión');
+        console.error('Error:', error);
+    });
+}
 
+function showNotification(type, message) {
+    // Crear elemento de notificación
+    var notification = document.createElement('div');
+    notification.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger') + ' alert-dismissible fade show position-fixed';
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    
+    // Agregar al body
+    document.body.appendChild(notification);
+    
+    // Auto-remover después de 5 segundos
+    setTimeout(function() {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Agregar token CSRF al DOM cuando cargue la página
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar si ya existe un input CSRF
+    if (!document.querySelector('[name=csrfmiddlewaretoken]')) {
+        // Crear el input con el token CSRF
+        var csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = '{{ csrf_token }}';
+        document.body.appendChild(csrfInput);
+    }
+    
+    // Alternativamente, agregar como meta tag
+    if (!document.querySelector('meta[name="csrf-token"]')) {
+        var metaCsrf = document.createElement('meta');
+        metaCsrf.name = 'csrf-token';
+        metaCsrf.content = '{{ csrf_token }}';
+        document.head.appendChild(metaCsrf);
+    }
+    
+    // Agregar event listeners para los botones de notificación
+    var botonesNotificar = document.querySelectorAll('.btn-notificar-stock');
+    botonesNotificar.forEach(function(boton) {
+        boton.addEventListener('click', function() {
+            var insumoId = this.getAttribute('data-insumo-id');
+            var insumoDescripcion = this.getAttribute('data-insumo-descripcion');
+            notificarStockBajo(insumoId, insumoDescripcion);
+        });
+    });
+});
+</script>
 
 {% endblock %}

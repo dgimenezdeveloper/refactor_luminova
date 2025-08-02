@@ -43,6 +43,11 @@
         <h2 class="color-thead fw-bold text-primary" style="height: 45px;">Editar Insumo</h2>
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
+            
+            {# Campo depósito oculto para preservar la asignación #}
+            {% if form.deposito %}
+                {{ form.deposito.as_hidden }}
+            {% endif %}
 
             <div class="row">
                 <div class="col-md-6 mb-3">
@@ -67,24 +72,6 @@
                     {% if form.fabricante.errors %}<div class="invalid-feedback d-block">{{ form.fabricante.errors }}</div>{% endif %}
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label for="{{ form.proveedor.id_for_label }}" class="form-label">{{ form.proveedor.label }}</label>
-                    {{ form.proveedor }}
-                    {% if form.proveedor.errors %}<div class="invalid-feedback d-block">{{ form.proveedor.errors }}</div>{% endif %}
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label for="{{ form.precio_unitario.id_for_label }}" class="form-label">{{ form.precio_unitario.label }}</label>
-                    {{ form.precio_unitario }}
-                    {% if form.precio_unitario.errors %}<div class="invalid-feedback d-block">{{ form.precio_unitario.errors }}</div>{% endif %}
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label for="{{ form.tiempo_entrega.id_for_label }}" class="form-label">{{ form.tiempo_entrega.label }}</label>
-                    {{ form.tiempo_entrega }}
-                    {% if form.tiempo_entrega.errors %}<div class="invalid-feedback d-block">{{ form.tiempo_entrega.errors }}</div>{% endif %}
-                </div>
-                <div class="col-md-4 mb-3">
                     <label for="{{ form.stock.id_for_label }}" class="form-label">{{ form.stock.label }}</label>
                     {{ form.stock }}
                     {% if form.stock.errors %}<div class="invalid-feedback d-block">{{ form.stock.errors }}</div>{% endif %}
@@ -96,6 +83,14 @@
                 {{ form.imagen }}
                 {% if form.imagen.errors %}<div class="invalid-feedback d-block">{{ form.imagen.errors }}</div>{% endif %}
             </div>
+            
+            {# Mostrar información del depósito actual (solo lectura) #}
+            {% if insumo.deposito %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                <strong>Depósito asignado:</strong> {{ insumo.deposito.nombre }}
+            </div>
+            {% endif %}
 
             <div class="mt-3">
                 <button type="submit" class="btn btn-primary">Guardar Insumo</button>

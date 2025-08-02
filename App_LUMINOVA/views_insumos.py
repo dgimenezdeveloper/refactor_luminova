@@ -53,6 +53,7 @@ from .forms import (
     ReporteProduccionForm,
     RolForm,
     InsumoForm,
+    InsumoCreateForm,
 )
 
 # Local Application Imports (Models)
@@ -119,7 +120,7 @@ class InsumoDetailView(DetailView):
 class InsumoCreateView(CreateView):
     model = Insumo
     template_name = "deposito/insumo_crear.html"
-    form_class = InsumoForm  # Usar formulario personalizado
+    form_class = InsumoCreateForm  # Usar formulario específico para creación
 
     def form_valid(self, form):
         messages.success(
@@ -166,27 +167,35 @@ class InsumoCreateView(CreateView):
 class InsumoUpdateView(UpdateView):
     model = Insumo
     template_name = "deposito/insumo_editar.html"
-    form_class = InsumoForm  # Usar formulario personalizado
+    form_class = InsumoForm  # Usar formulario para edición (sin campo depósito)
     context_object_name = "insumo"
 
-    def get_success_url(self):
-        # Redirigir al detalle de la categoría del insumo editado, o a donde prefieras
+    def form_valid(self, form):
+        # PRESERVAR SIEMPRE el depósito original - NO CAMBIAR NUNCA
+        original_deposito = self.object.deposito
+        response = super().form_valid(form)
+        
+        # Asegurar que el depósito no cambió
+        if self.object.deposito != original_deposito:
+            self.object.deposito = original_deposito
+            self.object.save(update_fields=['deposito'])
+        
         messages.success(
             self.request,
             f"Insumo '{self.object.descripcion}' actualizado exitosamente.",
         )
+        logger.info(
+            f"InsumoUpdateView: Insumo {self.object.id} actualizado. Depósito preservado: {self.object.deposito}"
+        )
+        return response
+
+    def get_success_url(self):
         if hasattr(self.object, "categoria") and self.object.categoria:
             return reverse_lazy(
                 "App_LUMINOVA:categoria_i_detail",
                 kwargs={"pk": self.object.categoria.pk},
             )
         return reverse_lazy("App_LUMINOVA:deposito_view")  # Fallback
-
-    def form_valid(self, form):
-        logger.info(
-            f"InsumoUpdateView: Formulario válido para insumo ID {self.object.id}. Guardando cambios."
-        )
-        return super().form_valid(form)
 
     def form_invalid(self, form):
         logger.warning(
