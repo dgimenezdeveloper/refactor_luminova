@@ -32,7 +32,64 @@
   </div>
 </div>
 
+<!-- Modal de notificación -->
+<div class="modal fade" id="modalNotificacion" tabindex="-1" aria-labelledby="modalNotificacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header" id="notificacion-header">
+        <h5 class="modal-title" id="modalNotificacionLabel">
+          <i id="notificacion-icon" class="me-2"></i>
+          <span id="notificacion-titulo">Notificación</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p id="notificacion-mensaje" class="mb-0"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" id="notificacion-btn" data-bs-dismiss="modal">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+// Función para mostrar notificaciones con Bootstrap
+function mostrarNotificacion(tipo, titulo, mensaje) {
+    const modal = document.getElementById('modalNotificacion');
+    const header = document.getElementById('notificacion-header');
+    const icon = document.getElementById('notificacion-icon');
+    const tituloEl = document.getElementById('notificacion-titulo');
+    const mensajeEl = document.getElementById('notificacion-mensaje');
+    const btn = document.getElementById('notificacion-btn');
+    
+    // Limpiar clases anteriores
+    header.className = 'modal-header';
+    icon.className = 'me-2';
+    btn.className = 'btn';
+    
+    if (tipo === 'success') {
+        header.classList.add('bg-success', 'text-white');
+        icon.classList.add('bi', 'bi-check-circle-fill');
+        btn.classList.add('btn-success');
+    } else if (tipo === 'error') {
+        header.classList.add('bg-danger', 'text-white');
+        icon.classList.add('bi', 'bi-exclamation-triangle-fill');
+        btn.classList.add('btn-danger');
+    } else if (tipo === 'warning') {
+        header.classList.add('bg-warning', 'text-dark');
+        icon.classList.add('bi', 'bi-exclamation-triangle-fill');
+        btn.classList.add('btn-warning');
+    }
+    
+    tituloEl.textContent = titulo;
+    mensajeEl.textContent = mensaje;
+    
+    // Mostrar modal
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+}
+
 function submitFormulario() {
     const form = document.getElementById('formCrearDeposito');
     const errorDiv = document.getElementById('deposito-form-error');
@@ -102,7 +159,7 @@ function submitFormulario() {
             }
             
             // Mostrar mensaje de éxito
-            alert('Depósito creado exitosamente: ' + data.nombre);
+            mostrarNotificacion('success', '¡Éxito!', 'Depósito "' + data.nombre + '" creado exitosamente');
             
         } else {
             console.error('Error del servidor:', data);
