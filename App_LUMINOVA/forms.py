@@ -889,3 +889,14 @@ class TransferenciaProductoForm(forms.Form):
         if cleaned_data.get('deposito_origen') == cleaned_data.get('deposito_destino'):
             raise forms.ValidationError("El depósito origen y destino deben ser diferentes.")
         return cleaned_data
+
+
+class DepositoForm(forms.ModelForm):
+    class Meta:
+        model = Deposito
+        fields = ['nombre', 'ubicacion', 'descripcion']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'ubicacion': forms.TextInput(attrs={'class': 'form-control'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }

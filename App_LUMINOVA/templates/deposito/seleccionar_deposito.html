@@ -8,12 +8,17 @@
 {% block sidebar_content %}{% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card shadow">
                 <div class="card-body">
                     <h2 class="mb-4 fw-bold text-primary">Seleccionar Depósito</h2>
+                    {# Mostrar solo a admin (superusuario o grupo administrador) #}
+                    {% if user.is_superuser or user.groups.all.0.name == 'administrador' %}
+                        {% include 'deposito/boton_crear_deposito.html' %}
+                    {% endif %}
                     <form method="post">
                         {% csrf_token %}
                         <div class="mb-3">

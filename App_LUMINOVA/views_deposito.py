@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
-from .forms import TransferenciaInsumoForm, TransferenciaProductoForm
+from .forms import TransferenciaInsumoForm, TransferenciaProductoForm, DepositoForm
 from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito
 from django.db.models import Q
 from django.http import HttpResponseForbidden
@@ -1258,4 +1258,36 @@ def deposito_enviar_lote_pt_view(request, lote_id):
         f"Lote de {cantidad_a_enviar} x '{producto_terminado.descripcion}' enviado exitosamente.",
     )
     return redirect("App_LUMINOVA:deposito_view")
+
+
+@login_required
+def crear_deposito_ajax(request):
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[CREAR_DEPOSITO] Usuario: {request.user.username}, Método: {request.method}")
+    logger.info(f"[CREAR_DEPOSITO] Es superuser: {request.user.is_superuser}")
+    logger.info(f"[CREAR_DEPOSITO] Grupos: {[g.name for g in request.user.groups.all()]}")
+    
+    if not request.user.is_superuser and not request.user.groups.filter(name__in=['administrador']).exists():
+        logger.warning(f"[CREAR_DEPOSITO] Acceso denegado para usuario {request.user.username}")
+        return JsonResponse({'success': False, 'error': 'Acceso denegado'}, status=403)
+    
+    if request.method == 'POST':
+        logger.info(f"[CREAR_DEPOSITO] Datos POST: {request.POST}")
+        form = DepositoForm(request.POST)
+        if form.is_valid():
+            try:
+                deposito = form.save()
+                logger.info(f"[CREAR_DEPOSITO] Depósito creado exitosamente: ID={deposito.id}, Nombre={deposito.nombre}")
+                return JsonResponse({'success': True, 'id': deposito.id, 'nombre': deposito.nombre})
+            except Exception as e:
+                logger.error(f"[CREAR_DEPOSITO] Error al guardar: {str(e)}")
+                return JsonResponse({'success': False, 'error': f'Error al guardar: {str(e)}'}, status=500)
+        else:
+            logger.warning(f"[CREAR_DEPOSITO] Formulario inválido: {form.errors}")
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    else:
+        logger.warning(f"[CREAR_DEPOSITO] Método no permitido: {request.method}")
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
 
