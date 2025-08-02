@@ -599,3 +599,118 @@ class MovimientoStock(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     motivo = models.CharField(max_length=255, blank=True)
+
+
+class NotificacionSistema(models.Model):
+    """Sistema de notificaciones entre módulos para mantener separación de responsabilidades"""
+    TIPOS_NOTIFICACION = [
+        ('stock_bajo', 'Stock Bajo'),
+        ('oc_creada', 'Orden de Compra Creada'),
+        ('oc_enviada', 'Orden de Compra Enviada'),
+        ('oc_recibida', 'Orden de Compra Recibida'),
+        ('pedido_recibido', 'Pedido Recibido en Depósito'),
+        ('transferencia_solicitada', 'Transferencia Solicitada'),
+        ('produccion_completada', 'Producción Completada'),
+        ('solicitud_insumos', 'Solicitud de Insumos'),
+        ('general', 'Notificación General'),
+    ]
+    
+    GRUPOS_DESTINO = [
+        ('compras', 'Departamento de Compras'),
+        ('ventas', 'Departamento de Ventas'),
+        ('deposito', 'Depósito'),
+        ('produccion', 'Producción'),
+        ('control_calidad', 'Control de Calidad'),
+        ('administrador', 'Administración'),
+        ('todos', 'Todos los usuarios'),
+    ]
+    
+    PRIORIDADES = [
+        ('baja', 'Baja'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+        ('critica', 'Crítica'),
+    ]
+    
+    tipo = models.CharField(max_length=30, choices=TIPOS_NOTIFICACION, default='general')
+    titulo = models.CharField(max_length=200)
+    mensaje = models.TextField()
+    remitente = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notificaciones_enviadas')
+    destinatario_grupo = models.CharField(max_length=20, choices=GRUPOS_DESTINO)
+    prioridad = models.CharField(max_length=10, choices=PRIORIDADES, default='media')
+    
+    # Datos adicionales en formato JSON para contexto específico
+    datos_contexto = models.JSONField(blank=True, null=True, help_text="Datos adicionales en formato JSON")
+    
+    # Estado de la notificación
+    leida = models.BooleanField(default=False)
+    atendida = models.BooleanField(default=False, help_text="Indica si se tomó acción sobre la notificación")
+    
+    # Timestamps
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_lectura = models.DateTimeField(null=True, blank=True)
+    fecha_atencion = models.DateTimeField(null=True, blank=True)
+    
+    # Para notificaciones que expiran
+    fecha_expiracion = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-fecha_creacion']
+        verbose_name = "Notificación del Sistema"
+        verbose_name_plural = "Notificaciones del Sistema"
+        indexes = [
+            models.Index(fields=['destinatario_grupo', 'leida']),
+            models.Index(fields=['tipo', 'fecha_creacion']),
+            models.Index(fields=['prioridad', 'fecha_creacion']),
+        ]
+    
+    def __str__(self):
+        return f"{self.titulo} - {self.get_destinatario_grupo_display()}"
+    
+    def marcar_como_leida(self, usuario=None):
+        """Marca la notificación como leída"""
+        self.leida = True
+        self.fecha_lectura = timezone.now()
+        self.save(update_fields=['leida', 'fecha_lectura'])
+    
+    def marcar_como_atendida(self, usuario=None):
+        """Marca la notificación como atendida"""
+        self.atendida = True
+        self.fecha_atencion = timezone.now()
+        if not self.leida:
+            self.marcar_como_leida(usuario)
+        else:
+            self.save(update_fields=['atendida', 'fecha_atencion'])
+    
+    def esta_expirada(self):
+        """Verifica si la notificación ha expirado"""
+        if self.fecha_expiracion:
+            return timezone.now() > self.fecha_expiracion
+        return False
+    
+    @property
+    def css_prioridad(self):
+        """Retorna la clase CSS según la prioridad"""
+        mapping = {
+            'baja': 'text-muted',
+            'media': 'text-info',
+            'alta': 'text-warning',
+            'critica': 'text-danger'
+        }
+        return mapping.get(self.prioridad, 'text-info')
+    
+    @property
+    def icono_tipo(self):
+        """Retorna el ícono Bootstrap según el tipo"""
+        mapping = {
+            'stock_bajo': 'bi-exclamation-triangle-fill',
+            'oc_creada': 'bi-cart-plus-fill',
+            'oc_enviada': 'bi-truck',
+            'oc_recibida': 'bi-check-circle-fill',
+            'pedido_recibido': 'bi-box-seam-fill',
+            'transferencia_solicitada': 'bi-arrow-left-right',
+            'produccion_completada': 'bi-gear-fill',
+            'solicitud_insumos': 'bi-clipboard-data',
+            'general': 'bi-info-circle-fill'
+        }
+        return mapping.get(self.tipo, 'bi-bell-fill')

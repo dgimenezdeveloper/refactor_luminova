@@ -42,7 +42,8 @@ from ..views_deposito import (
     entrada_stock_insumo,
     salida_stock_insumo,
     entrada_stock_producto,
-    salida_stock_producto
+    salida_stock_producto,
+    notificar_stock_bajo_view
 )
 from App_LUMINOVA.views_transferencias import historial_transferencias_view
 
@@ -207,4 +208,5 @@ urlpatterns = [
     path("deposito/entrada-producto/<int:producto_id>/<int:deposito_id>/", entrada_stock_producto, name="entrada_stock_producto"),
     path("deposito/salida-producto/<int:producto_id>/<int:deposito_id>/", salida_stock_producto, name="salida_stock_producto"),
     path("deposito/historial-transferencias/", historial_transferencias_view, name="historial_transferencias"),
+    path("deposito/notificar-stock-bajo/<int:insumo_id>/", notificar_stock_bajo_view, name="notificar_stock_bajo"),
 ]

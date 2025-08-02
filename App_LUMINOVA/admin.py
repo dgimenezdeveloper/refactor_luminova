@@ -28,6 +28,7 @@ from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAs
     StockInsumo,
     StockProductoTerminado,
     MovimientoStock,
+    NotificacionSistema,
 )
 
 
@@ -365,3 +366,45 @@ class MovimientoStockAdmin(admin.ModelAdmin):
     list_display = ("insumo", "producto", "deposito_origen", "deposito_destino", "cantidad", "tipo", "fecha", "usuario")
     list_filter = ("tipo", "fecha", "deposito_origen", "deposito_destino")
     search_fields = ("insumo__descripcion", "producto__descripcion", "usuario__username")
+
+
+@admin.register(NotificacionSistema)
+class NotificacionSistemaAdmin(admin.ModelAdmin):
+    list_display = ("titulo", "tipo", "destinatario_grupo", "prioridad", "remitente", "leida", "atendida", "fecha_creacion")
+    list_filter = ("tipo", "destinatario_grupo", "prioridad", "leida", "atendida", "fecha_creacion")
+    search_fields = ("titulo", "mensaje", "remitente__username")
+    readonly_fields = ("fecha_creacion", "fecha_lectura", "fecha_atencion")
+    
+    fieldsets = (
+        ("Información Principal", {
+            "fields": ("tipo", "titulo", "mensaje", "prioridad")
+        }),
+        ("Remitente y Destinatario", {
+            "fields": ("remitente", "destinatario_grupo")
+        }),
+        ("Estado", {
+            "fields": ("leida", "atendida", "fecha_expiracion")
+        }),
+        ("Datos Adicionales", {
+            "fields": ("datos_contexto",),
+            "classes": ("collapse",)
+        }),
+        ("Timestamps", {
+            "fields": ("fecha_creacion", "fecha_lectura", "fecha_atencion"),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    actions = ["marcar_como_leida", "marcar_como_atendida"]
+    
+    def marcar_como_leida(self, request, queryset):
+        for notificacion in queryset:
+            notificacion.marcar_como_leida()
+        self.message_user(request, f"{queryset.count()} notificaciones marcadas como leídas.")
+    marcar_como_leida.short_description = "Marcar como leída"
+    
+    def marcar_como_atendida(self, request, queryset):
+        for notificacion in queryset:
+            notificacion.marcar_como_atendida()
+        self.message_user(request, f"{queryset.count()} notificaciones marcadas como atendidas.")
+    marcar_como_atendida.short_description = "Marcar como atendida"

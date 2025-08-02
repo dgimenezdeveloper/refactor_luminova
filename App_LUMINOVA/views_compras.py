@@ -78,7 +78,11 @@ from .models import (
     Reportes,
     RolDescripcion,
     SectorAsignado,
+    NotificacionSistema,
 )
+
+# Local Application Imports (Services)
+from .services.notification_service import NotificationService
 from .signals import get_client_ip
 
 from .services.document_services import generar_siguiente_numero_documento
@@ -124,7 +128,18 @@ def compras_lista_oc_view(request):
 
 @login_required
 def compras_desglose_view(request):
+    """Vista principal de compras con notificaciones de depósito"""
+    # Validar permisos de acceso solo para compras y administradores
+    if not es_admin_o_rol(request.user, ["compras", "administrador"]):
+        messages.error(request, "Acceso denegado. No tiene permisos para acceder a Compras.")
+        return redirect("App_LUMINOVA:dashboard")
+        
     logger.info("--- compras_desglose_view: INICIO ---")
+
+    # Obtener notificaciones de stock bajo del depósito
+    notificaciones_stock_bajo = NotificationService.obtener_notificaciones_usuario(
+        request.user, solo_no_leidas=True
+    ).filter(tipo='stock_bajo')
 
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
@@ -213,23 +228,15 @@ def compras_desglose_view(request):
         ).exists()
         insumo.tiene_oc_borrador = tiene_oc_borrador
         insumos_por_deposito[insumo.deposito.nombre if insumo.deposito else "Sin depósito"].append(insumo)
+    
     context = {
         "insumos_por_deposito": dict(insumos_por_deposito),
+        "notificaciones_stock_bajo": notificaciones_stock_bajo,
         "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
         "titulo_seccion": "Gestionar Compra por Stock Bajo",
     }
-    return render(request, "compras/compras_desglose.html", context)
-
-    logger.info(
-        f"Insumos críticos que requieren acción de Compras: {insumos_criticos_para_gestionar.count()}"
-    )
-
-    # La variable pasada a la plantilla necesita un nombre consistente
-    context = {
-        "insumos_criticos_list_con_estado": insumos_criticos_para_gestionar,
-        "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
-        "titulo_seccion": "Gestionar Compra por Stock Bajo",
-    }
+    
+    logger.info(f"Notificaciones de stock bajo: {notificaciones_stock_bajo.count()}")
     return render(request, "compras/compras_desglose.html", context)
 
 

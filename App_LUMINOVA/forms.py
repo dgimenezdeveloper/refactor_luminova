@@ -743,6 +743,35 @@ class ReporteProduccionForm(forms.ModelForm):
 
 
 class InsumoForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Para creación, mostrar el campo depósito normalmente
+        if not (self.instance and self.instance.pk):
+            self.fields["deposito"].required = True
+            self.fields["deposito"].empty_label = None
+
+    class Meta:
+        model = Insumo
+        # Para edición, NO incluir el campo depósito (se preserva automáticamente)
+        fields = ["descripcion", "categoria", "fabricante", "stock", "imagen"]
+        widgets = {
+            "descripcion": forms.TextInput(attrs={"class": "form-control"}),
+            "categoria": forms.Select(attrs={"class": "form-select"}),
+            "fabricante": forms.Select(attrs={"class": "form-select"}),
+            "stock": forms.NumberInput(attrs={"class": "form-control"}),
+            "imagen": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
+
+class InsumoCreateForm(forms.ModelForm):
+    """Formulario específico para crear insumos con campo depósito visible"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["deposito"].required = True
+        self.fields["deposito"].empty_label = None
+
     class Meta:
         model = Insumo
         fields = ["descripcion", "categoria", "fabricante", "stock", "deposito", "imagen"]
@@ -757,6 +786,12 @@ class InsumoForm(forms.ModelForm):
         labels = {
             "deposito": "Depósito",
         }
+
+    def clean_deposito(self):
+        deposito = self.cleaned_data.get("deposito")
+        if not deposito:
+            raise forms.ValidationError("El campo Depósito es obligatorio. El insumo debe estar asignado a un depósito.")
+        return deposito
 
 
 class TransferenciaInsumoForm(forms.Form):

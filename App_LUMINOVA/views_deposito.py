@@ -2,9 +2,12 @@ from django.db import transaction
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
 from .forms import TransferenciaInsumoForm, TransferenciaProductoForm
-from .models import Insumo, ProductoTerminado, UsuarioDeposito
+from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito
+from django.db.models import Q
 from django.http import HttpResponseForbidden
+from .services.notification_service import NotificationService
 # --- TRANSFERENCIA DE INSUMOS ENTRE DEPÓSITOS ---
 from .utils import es_admin_o_rol
 
@@ -46,6 +49,64 @@ def _auditar_movimiento(tipo, usuario, insumo=None, producto=None, deposito_orig
         usuario=usuario,
         motivo=motivo or f"{tipo.title()} registrado automáticamente"
     )
+
+@login_required
+def notificar_stock_bajo_view(request, insumo_id):
+    """Vista para que depósito notifique a compras sobre stock bajo (AJAX)"""
+    if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
+        return JsonResponse({"success": False, "error": "Acceso denegado"}, status=403)
+    
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Método no permitido"}, status=405)
+    
+    try:
+        insumo = get_object_or_404(Insumo, id=insumo_id)
+        
+        # Intentar obtener el depósito de múltiples fuentes
+        deposito = None
+        
+        # 1. Desde la sesión
+        deposito_id = request.session.get('deposito_seleccionado')
+        if deposito_id:
+            try:
+                deposito = Deposito.objects.get(id=deposito_id)
+            except Deposito.DoesNotExist:
+                pass
+        
+        # 2. Desde el insumo mismo
+        if not deposito and insumo.deposito:
+            deposito = insumo.deposito
+            # Actualizar la sesión para futuras operaciones
+            request.session['deposito_seleccionado'] = deposito.id
+        
+        # 3. Como último recurso, usar el primer depósito disponible
+        if not deposito:
+            deposito = Deposito.objects.first()
+            if deposito:
+                request.session['deposito_seleccionado'] = deposito.id
+        
+        if not deposito:
+            return JsonResponse({"success": False, "error": "No se pudo determinar el depósito"})
+        
+        # Crear la notificación usando el servicio
+        notificacion = NotificationService.notificar_stock_bajo(
+            insumo=insumo,
+            deposito=deposito,
+            usuario_remitente=request.user,
+            umbral_critico=15000  # O el umbral que uses
+        )
+        
+        return JsonResponse({
+            "success": True, 
+            "message": f"Notificación enviada a Compras sobre {insumo.descripcion}",
+            "notificacion_id": notificacion.id
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error al notificar stock bajo: {str(e)}")
+        return JsonResponse({"success": False, "error": "Error interno del servidor"})
 
 @login_required
 @transaction.atomic
@@ -940,21 +1001,25 @@ def deposito_view(request):
     # Insumos con stock bajo SOLO de este depósito
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
-    # Refuerza la sincronización: SIEMPRE actualiza StockInsumo con el valor actual de stock de Insumo
-    from .models import StockInsumo
+    # SOLUCIÓN: Usar directamente insumo.stock en lugar de StockInsumo para consistencia
+    # con los indicadores visuales del template
+    # Solo mostrar insumos realmente asignados a este depósito (nunca sin depósito)
     insumos_del_deposito = Insumo.objects.filter(deposito=deposito)
+    
+    # DEBUG: Verificar qué insumos tenemos
+    logger.info(f"[DEBUG] Depósito seleccionado: {deposito.nombre} (ID: {deposito.id})")
+    logger.info(f"[DEBUG] Total insumos en depósito: {insumos_del_deposito.count()}")
+    
+    # Mostrar stock de todos los insumos para debug
     for insumo in insumos_del_deposito:
-        stock_obj, created = StockInsumo.objects.get_or_create(insumo=insumo, deposito=deposito, defaults={"cantidad": insumo.stock})
-        # Siempre sincroniza, aunque el valor sea igual (por si hay triggers externos)
-        if stock_obj.cantidad != insumo.stock:
-            stock_obj.cantidad = insumo.stock
-            stock_obj.save()
-
-    # Obtener insumos con stock bajo según StockInsumo
-    stock_insumos_bajo = StockInsumo.objects.filter(
-        deposito=deposito, cantidad__lt=UMBRAL_STOCK_BAJO_INSUMOS
-    ).select_related('insumo')
-    insumos_con_stock_bajo = [si.insumo for si in stock_insumos_bajo]
+        logger.info(f"[DEBUG] Insumo: {insumo.descripcion} - Stock: {insumo.stock}")
+    
+    # Filtrar insumos con stock bajo usando el campo directo del modelo
+    insumos_con_stock_bajo = insumos_del_deposito.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    logger.info(f"[DEBUG] Insumos con stock < {UMBRAL_STOCK_BAJO_INSUMOS}: {insumos_con_stock_bajo.count()}")
+    
+    for insumo in insumos_con_stock_bajo:
+        logger.info(f"[DEBUG] Insumo crítico: {insumo.descripcion} - Stock: {insumo.stock}")
 
     # Estados que consideramos como "pedido en firme"
     ESTADOS_OC_EN_PROCESO = [
@@ -964,11 +1029,12 @@ def deposito_view(request):
         "RECIBIDA_PARCIAL",
     ]
 
+
     insumos_a_gestionar = []
     insumos_en_pedido = []
 
-    for stock_insumo in stock_insumos_bajo:
-        insumo = stock_insumo.insumo
+    # Procesar cada insumo con stock bajo
+    for insumo in insumos_con_stock_bajo:
         oc_en_proceso = (
             Orden.objects.filter(
                 insumo_principal=insumo, estado__in=ESTADOS_OC_EN_PROCESO
@@ -977,9 +1043,14 @@ def deposito_view(request):
             .first()
         )
         if oc_en_proceso:
-            insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso, "stock_real": stock_insumo.cantidad})
+            insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso, "stock_real": insumo.stock})
+            logger.info(f"[DEBUG] Insumo EN PEDIDO: {insumo.descripcion}")
         else:
-            insumos_a_gestionar.append({"insumo": insumo, "stock_real": stock_insumo.cantidad})
+            insumos_a_gestionar.append(insumo)
+            logger.info(f"[DEBUG] Insumo A GESTIONAR: {insumo.descripcion}")
+
+    logger.info(f"[DEBUG] Total insumos a gestionar: {len(insumos_a_gestionar)}")
+    logger.info(f"[DEBUG] Total insumos en pedido: {len(insumos_en_pedido)}")
 
     context = {
         "deposito": deposito,
