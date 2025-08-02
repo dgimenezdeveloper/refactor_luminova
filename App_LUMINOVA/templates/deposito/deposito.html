@@ -17,8 +17,6 @@
             {{ deposito.nombre }}
         </h2>
     </div>
-
-
     {# ... Pestañas Insumos / Prod. Terminados ... #}
     <ul class="nav justify-content-start flex-wrap" style="background-color: white;">
         <li class="nav-item">
@@ -194,16 +192,16 @@
                     <td class="text-white text-center fw-bold text-danger">{{ insumo.stock }}</td>
                     <td class="text-white text-center">
                         {% if insumo.notificado_a_compras %}
-                            <button class="btn btn-success btn-sm" disabled title="Ya notificado a Compras">
-                                <i class="bi bi-check-circle-fill"></i> Notificado
+                            <button class="btn btn-success btn-sm" title="Ya notificado a Compras" aria-disabled="true" style="opacity: 0.5;">
+                                <i class="bi bi-check-circle-fill"></i>
                             </button>
                         {% else %}
-                            <button class="btn btn-warning btn-sm btn-notificar-stock" 
+                            <button class="btn btn-warning btn-sm btn-notificar-stock"
                                     data-insumo-id="{{ insumo.id }}"
                                     data-insumo-descripcion="{{ insumo.descripcion|escapejs }}"
-                                    title="Notificar a Compras sobre stock bajo de {{ insumo.descripcion|escape }}" 
+                                    title="Notificar a Compras sobre stock bajo de {{ insumo.descripcion|escape }}"
                                     id="btn-notificar-{{ insumo.id }}">
-                                <i class="bi bi-bell-fill"></i> Notificar
+                                <i class="bi bi-bell-fill"></i>
                             </button>
                         {% endif %}
                     </td>
@@ -456,11 +454,11 @@
 function notificarStockBajo(insumoId, insumoDescripcion) {
     var boton = document.getElementById('btn-notificar-' + insumoId);
     var originalContent = boton.innerHTML;
-    
+
     // Deshabilitar el botón y mostrar loading
     boton.disabled = true;
     boton.innerHTML = '<i class="bi bi-spinner"></i> Enviando...';
-    
+
     // Obtener el token CSRF desde el DOM o meta tag
     var csrfToken = '';
     var csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
@@ -472,7 +470,7 @@ function notificarStockBajo(insumoId, insumoDescripcion) {
             csrfToken = metaCsrf.getAttribute('content');
         }
     }
-    
+
     fetch("{% url 'App_LUMINOVA:notificar_stock_bajo' 0 %}".replace('0', insumoId), {
         method: 'POST',
         headers: {
@@ -490,10 +488,10 @@ function notificarStockBajo(insumoId, insumoDescripcion) {
             boton.innerHTML = '<i class="bi bi-check-circle-fill"></i> Notificado';
             boton.className = 'btn btn-success btn-sm';
             boton.title = 'Notificación enviada para ' + insumoDescripcion;
-            
+
             // Mostrar mensaje de éxito
             showNotification('success', data.message);
-            
+
             // Opcional: deshabilitar permanentemente
             setTimeout(function() {
                 boton.disabled = true;
@@ -520,10 +518,10 @@ function showNotification(type, message) {
     notification.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger') + ' alert-dismissible fade show position-fixed';
     notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
     notification.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-    
+
     // Agregar al body
     document.body.appendChild(notification);
-    
+
     // Auto-remover después de 5 segundos
     setTimeout(function() {
         if (notification.parentNode) {
@@ -543,7 +541,7 @@ document.addEventListener('DOMContentLoaded', function() {
         csrfInput.value = '{{ csrf_token }}';
         document.body.appendChild(csrfInput);
     }
-    
+
     // Alternativamente, agregar como meta tag
     if (!document.querySelector('meta[name="csrf-token"]')) {
         var metaCsrf = document.createElement('meta');
@@ -551,7 +549,7 @@ document.addEventListener('DOMContentLoaded', function() {
         metaCsrf.content = '{{ csrf_token }}';
         document.head.appendChild(metaCsrf);
     }
-    
+
     // Agregar event listeners para los botones de notificación
     var botonesNotificar = document.querySelectorAll('.btn-notificar-stock');
     botonesNotificar.forEach(function(boton) {
