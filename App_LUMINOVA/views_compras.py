@@ -16,7 +16,7 @@ def ajax_marcar_notificacion_leida(request):
         notif = NotificacionSistema.objects.get(id=notif_id)
         # Solo marcar como leída si el insumo ya no es crítico
         # Buscar el insumo relacionado (asumiendo que el mensaje tiene el id del insumo)
-        insumo_id = getattr(notif, 'objeto_id', None)
+        insumo_id = notif.datos_contexto.get('insumo_id') if notif.datos_contexto else None
         logger.info(f"[AJAX] Intentando marcar notificación {notif_id} como leída. insumo_id={insumo_id}")
         if insumo_id:
             from App_LUMINOVA.models import Insumo, Orden
@@ -95,7 +95,7 @@ def ajax_notificaciones_no_leidas(request):
         NotificacionSistema.objects.filter(
             leida=False,
             tipo='stock_bajo',
-            objeto_id__in=insumos_con_oc_post_borrador,
+            datos_contexto__insumo_id__in=insumos_con_oc_post_borrador,
             destinatario_grupo__in=grupos
         ).update(leida=True)
 
@@ -121,7 +121,7 @@ def ajax_notificaciones_no_leidas(request):
     # Para evitar duplicados, llevamos registro de insumos ya notificados
     insumos_notificados = set()
     for n in notificaciones:
-        insumo_id = getattr(n, 'objeto_id', None)
+        insumo_id = n.datos_contexto.get('insumo_id') if n.datos_contexto else None
         if n.tipo == 'stock_bajo' and insumo_id:
             try:
                 insumo = Insumo.objects.get(id=insumo_id)
@@ -138,7 +138,7 @@ def ajax_notificaciones_no_leidas(request):
                     NotificacionSistema.objects.filter(
                         leida=False,
                         tipo='stock_bajo',
-                        objeto_id=insumo_id,
+                        datos_contexto__insumo_id=insumo_id,
                         destinatario_grupo__in=grupos
                     ).update(leida=True)
                     continue  # No mostrar ninguna notificación de este insumo
