@@ -421,6 +421,9 @@ def produccion_detalle_op_view(request, op_id):
             )
 
     if request.method == "POST":
+        # --- LOGGING Y PROTECCIÓN EXTRA PARA DETECTAR EL ERROR DE 'stock' ---
+        if "stock" in request.POST or "stock" in request.GET:
+            logger.warning(f"[DEBUG] Se detectó 'stock' en los datos del request: POST={request.POST.get('stock')}, GET={request.GET.get('stock')}")
         form_update = OrdenProduccionUpdateForm(
             request.POST, instance=op, estado_op_queryset=estado_op_queryset_para_form
         )
@@ -463,7 +466,6 @@ def produccion_detalle_op_view(request, op_id):
                 producto_terminado_obj = op_actualizada.producto_a_producir
                 cantidad_producida = op_actualizada.cantidad_a_producir
                 if producto_terminado_obj and cantidad_producida > 0:
-
                     try:
                         # 1. Actualizar el stock principal del ProductoTerminado
                         producto_terminado_obj.stock = F("stock") + cantidad_producida
@@ -474,24 +476,36 @@ def produccion_detalle_op_view(request, op_id):
 
                         # 2. Crear el lote para registro y envío
                         try:
-                            # Obtener el depósito del producto de forma segura
                             deposito_lote = None
                             if hasattr(producto_terminado_obj, 'deposito_id') and producto_terminado_obj.deposito_id:
                                 from .models import Deposito
                                 try:
                                     deposito_lote = Deposito.objects.get(id=producto_terminado_obj.deposito_id)
-                                except Deposito.DoesNotExist:
+                                    logger.debug(f"Depósito encontrado para el lote: {deposito_lote}")
+                                except Exception as e_depo:
+                                    logger.error(f"Error buscando depósito para el producto terminado: {e_depo}")
                                     deposito_lote = None
-                            
-                            # Crear el lote usando create() para evitar problemas con save()
-                            lote = LoteProductoTerminado.objects.create(
-                                producto_id=producto_terminado_obj.id,
-                                op_asociada_id=op_actualizada.id,
+                            # --- PROTECCIÓN: limpiar kwargs de create() ---
+                            lote_kwargs = dict(
+                                producto=producto_terminado_obj,
+                                op_asociada=op_actualizada,
                                 cantidad=cantidad_producida,
                                 deposito=deposito_lote,
                                 enviado=False
                             )
+                            # Eliminar cualquier clave 'stock' si accidentalmente llega
+                            lote_kwargs.pop('stock', None)
+                            logger.debug(f"Creando lote con: {lote_kwargs}")
+                            logger.debug(f"Producto objeto: {producto_terminado_obj} (ID: {producto_terminado_obj.id})")
+                            logger.debug(f"OP objeto: {op_actualizada} (ID: {op_actualizada.id})")
+                            logger.debug(f"Depósito objeto: {deposito_lote}")
                             
+                            # NUEVO: Intentar crear paso a paso para identificar el problema
+                            with transaction.atomic():
+                                logger.debug("Iniciando creación de lote...")
+                                lote = LoteProductoTerminado.objects.create(**lote_kwargs)
+                                logger.debug(f"Lote creado exitosamente con ID: {lote.id}")
+                                
                             logger.info(f"Lote ID {lote.id} creado exitosamente para OP {op_actualizada.numero_op}")
                             messages.info(
                                 request,
@@ -507,7 +521,10 @@ def produccion_detalle_op_view(request, op_id):
                                 f"Stock actualizado correctamente, pero hubo un problema al crear el lote: {e_lote}",
                             )
                     except Exception as e:
-                        logger.error(f"Error al crear lote para OP {op_actualizada.numero_op}: {e}")
+                        logger.error(f"[DEBUG] Error al crear lote para OP {op_actualizada.numero_op}: {e}")
+                        logger.error(f"[DEBUG] Tipo de excepción: {type(e).__name__}")
+                        if hasattr(e, 'args'):
+                            logger.error(f"[DEBUG] Argumentos de la excepción: {e.args}")
                         messages.error(
                             request,
                             f"Error al crear el lote de producción: {e}. Por favor, contacte al administrador.",
@@ -523,7 +540,6 @@ def produccion_detalle_op_view(request, op_id):
             if op_actualizada.orden_venta_origen:
                 try:
                     orden_venta_asociada = op_actualizada.orden_venta_origen
-                    # Usar solo() para asegurar que se obtenga una sola instancia
                     ops_de_la_ov = OrdenProduccion.objects.filter(
                         orden_venta_origen=orden_venta_asociada
                     ).only('id', 'estado_op')

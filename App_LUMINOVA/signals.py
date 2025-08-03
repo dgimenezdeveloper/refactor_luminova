@@ -14,14 +14,28 @@ def sync_stock_insumo(sender, instance, **kwargs):
         )
 
 # Sincronizar StockProductoTerminado al crear o actualizar un ProductoTerminado
-@receiver(post_save, sender=ProductoTerminado)
-def sync_stock_producto_terminado(sender, instance, **kwargs):
+# TEMPORALMENTE DESHABILITADO PARA DEBUGGING
+# @receiver(post_save, sender=ProductoTerminado)
+def sync_stock_producto_terminado_disabled(sender, instance, **kwargs):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Signal sync_stock_producto_terminado ejecutándose para producto: {instance}")
+    
     if instance.deposito:
-        StockProductoTerminado.objects.update_or_create(
-            producto=instance,
-            deposito=instance.deposito,
-            defaults={"cantidad": instance.stock},
-        )
+        try:
+            logger.debug(f"Sincronizando stock para producto {instance.id} en depósito {instance.deposito.id}")
+            StockProductoTerminado.objects.update_or_create(
+                producto=instance,
+                deposito=instance.deposito,
+                defaults={"cantidad": instance.stock},
+            )
+            logger.debug(f"Stock sincronizado exitosamente")
+        except Exception as e:
+            logger.error(f"Error en sync_stock_producto_terminado: {e}")
+            logger.error(f"Tipo de excepción: {type(e).__name__}")
+            if hasattr(e, 'args'):
+                logger.error(f"Argumentos de la excepción: {e.args}")
+            raise
 # TP_LUMINOVA-main/App_LUMINOVA/signals.py
 
 from django.contrib.auth.signals import user_logged_in, user_logged_out
