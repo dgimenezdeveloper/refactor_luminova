@@ -800,14 +800,19 @@ class TransferenciaInsumoForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
+        deposito_actual = kwargs.pop('deposito_actual', None)
         super().__init__(*args, **kwargs)
-        
         # Filtrar depósitos según permisos del usuario
         if user and not user.is_superuser:
-            # Si el usuario no es superusuario, filtrar depósitos según su rol
             depositos_permitidos = self._get_depositos_permitidos(user)
             self.fields['deposito_origen'].queryset = depositos_permitidos
             self.fields['deposito_destino'].queryset = depositos_permitidos
+        # Si se pasa el depósito actual, setearlo como valor inicial y deshabilitar el campo
+        if deposito_actual:
+            self.fields['deposito_origen'].initial = deposito_actual.id
+            self.fields['deposito_origen'].disabled = True
+            # Excluir el depósito actual de los destinos
+            self.fields['deposito_destino'].queryset = self.fields['deposito_destino'].queryset.exclude(id=deposito_actual.id)
 
     def _get_depositos_permitidos(self, user):
         """Obtiene los depósitos a los que el usuario tiene acceso"""
@@ -849,13 +854,19 @@ class TransferenciaProductoForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
+        deposito_actual = kwargs.pop('deposito_actual', None)
         super().__init__(*args, **kwargs)
-        
         # Filtrar depósitos según permisos del usuario
         if user and not user.is_superuser:
             depositos_permitidos = self._get_depositos_permitidos(user)
             self.fields['deposito_origen'].queryset = depositos_permitidos
             self.fields['deposito_destino'].queryset = depositos_permitidos
+        # Si se pasa el depósito actual, setearlo como valor inicial y deshabilitar el campo
+        if deposito_actual:
+            self.fields['deposito_origen'].initial = deposito_actual.id
+            self.fields['deposito_origen'].disabled = True
+            # Excluir el depósito actual de los destinos
+            self.fields['deposito_destino'].queryset = self.fields['deposito_destino'].queryset.exclude(id=deposito_actual.id)
 
     def _get_depositos_permitidos(self, user):
         """Obtiene los depósitos a los que el usuario tiene acceso"""

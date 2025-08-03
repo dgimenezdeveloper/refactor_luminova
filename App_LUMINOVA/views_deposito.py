@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from .forms import TransferenciaInsumoForm, TransferenciaProductoForm, DepositoForm
-from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito
+from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito, StockInsumo, MovimientoStock, CategoriaInsumo
 from django.db.models import Q
 from django.http import HttpResponseForbidden
 from .services.notification_service import NotificationService
@@ -139,91 +139,96 @@ def transferencia_insumo_view(request):
                 messages.error(request, "No tiene permisos para transferir entre los depósitos seleccionados.")
                 return redirect("App_LUMINOVA:transferencia_insumo")
             
-            from .models import StockInsumo, MovimientoStock, CategoriaInsumo
-
-            # Buscar o crear la categoría en el destino
-            categoria_destino = CategoriaInsumo.objects.filter(nombre=insumo.categoria.nombre, deposito=deposito_destino).first()
-            if not categoria_destino:
-                categoria_destino = CategoriaInsumo.objects.create(
-                    nombre=insumo.categoria.nombre,
-                    imagen=insumo.categoria.imagen,
-                    deposito=deposito_destino
+            try:
+                # Ejecutar la transferencia
+                transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cantidad)
+                
+                # Registrar movimiento usando la función de auditoría
+                _auditar_movimiento(
+                    tipo="transferencia",
+                    usuario=request.user,
+                    insumo=insumo,
+                    deposito_origen=deposito_origen,
+                    deposito_destino=deposito_destino,
+                    cantidad=cantidad,
+                    motivo=motivo or "Transferencia entre depósitos"
                 )
-
-            # Buscar o crear el insumo en el destino
-            insumo_destino = Insumo.objects.filter(
-                descripcion=insumo.descripcion,
-                fabricante=insumo.fabricante,
-                categoria=categoria_destino,
-                deposito=deposito_destino
-            ).first()
-            if not insumo_destino:
-                insumo_destino = Insumo.objects.create(
-                    descripcion=insumo.descripcion,
-                    categoria=categoria_destino,
-                    fabricante=insumo.fabricante,
-                    imagen=insumo.imagen,
-                    deposito=deposito_destino
-                )
-
-            import logging
-            logger = logging.getLogger(__name__)
-            # Descontar stock del origen (StockInsumo)
-            stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
-            logger.info(f"[TRANSFERENCIA] Stock origen antes: {stock_origen.cantidad}")
-            if stock_origen.cantidad < cantidad:
-                messages.error(request, "Stock insuficiente en el depósito de origen.")
-                logger.warning(f"[TRANSFERENCIA] Stock insuficiente en origen: {stock_origen.cantidad} < {cantidad}")
-                return redirect("App_LUMINOVA:transferencia_insumo")
-            stock_origen.cantidad -= cantidad
-            stock_origen.save()
-            logger.info(f"[TRANSFERENCIA] Stock origen después: {stock_origen.cantidad}")
-            # Sincronizar campo stock del Insumo origen si existe
-            if hasattr(insumo, 'stock'):
-                insumo.stock = stock_origen.cantidad
-                insumo.save(update_fields=["stock"])
-                logger.info(f"[TRANSFERENCIA] Insumo origen stock actualizado a {insumo.stock}")
-            else:
-                logger.warning(f"[TRANSFERENCIA] El modelo Insumo no tiene campo 'stock'.")
-
-            # Sumar stock al destino (StockInsumo)
-            stock_destino, created = StockInsumo.objects.get_or_create(
-                insumo=insumo_destino, deposito=deposito_destino, defaults={"cantidad": 0}
-            )
-            logger.info(f"[TRANSFERENCIA] Stock destino antes: {stock_destino.cantidad}")
-            stock_destino.cantidad += cantidad
-            stock_destino.save()
-            logger.info(f"[TRANSFERENCIA] Stock destino después: {stock_destino.cantidad}")
-            # Sincronizar campo stock del Insumo destino si existe
-            if hasattr(insumo_destino, 'stock'):
-                insumo_destino.stock = stock_destino.cantidad
-                insumo_destino.save(update_fields=["stock"])
-                logger.info(f"[TRANSFERENCIA] Insumo destino stock actualizado a {insumo_destino.stock}")
-            else:
-                logger.warning(f"[TRANSFERENCIA] El modelo Insumo no tiene campo 'stock'.")
-
-            # Registrar movimiento usando la función de auditoría
-            _auditar_movimiento(
-                tipo="transferencia",
-                usuario=request.user,
-                insumo=insumo_destino,
-                deposito_origen=deposito_origen,
-                deposito_destino=deposito_destino,
-                cantidad=cantidad,
-                motivo=motivo or "Transferencia entre depósitos"
-            )
-            messages.success(request, "Transferencia realizada correctamente.")
-            # Redirigir al historial de transferencias
-            return redirect("App_LUMINOVA:historial_transferencias")
+                messages.success(request, "Transferencia realizada correctamente.")
+                # Redirigir al historial de transferencias
+                return redirect("App_LUMINOVA:historial_transferencias")
+            except Exception as e:
+                messages.error(request, f"Error al realizar la transferencia: {str(e)}")
+                logger.error(f"Error en transferencia_insumo_view: {str(e)}")
     else:
         form = TransferenciaInsumoForm(user=request.user)
     return render(request, "deposito/transferencia_insumo.html", {"form": form})
 
 
+def transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cantidad):
+    """
+    Maneja la transferencia de un insumo de un depósito a otro, incluyendo la creación
+    de la categoría y el insumo en el depósito destino si no existen.
+    """
+    # Buscar o crear la categoría en el destino
+    categoria_destino = CategoriaInsumo.objects.filter(nombre=insumo.categoria.nombre, deposito=deposito_destino).first()
+    if not categoria_destino:
+        categoria_destino = CategoriaInsumo.objects.create(
+            nombre=insumo.categoria.nombre,
+            imagen=insumo.categoria.imagen,
+            deposito=deposito_destino
+        )
+
+    # Buscar o crear el insumo en el destino
+    insumo_destino = Insumo.objects.filter(
+        descripcion=insumo.descripcion,
+        fabricante=insumo.fabricante,
+        categoria=categoria_destino,
+        deposito=deposito_destino
+    ).first()
+    if not insumo_destino:
+        insumo_destino = Insumo.objects.create(
+            descripcion=insumo.descripcion,
+            categoria=categoria_destino,
+            fabricante=insumo.fabricante,
+            imagen=insumo.imagen,
+            deposito=deposito_destino
+        )
+
+    # Descontar stock del origen
+    stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
+    if stock_origen.cantidad < cantidad:
+        raise ValueError("Stock insuficiente en el depósito de origen.")
+    stock_origen.cantidad -= cantidad
+    stock_origen.save()
+
+    # Incrementar stock en el destino
+    stock_destino, created = StockInsumo.objects.get_or_create(insumo=insumo_destino, deposito=deposito_destino)
+    stock_destino.cantidad += cantidad
+    stock_destino.save()
+
+    # Registrar el movimiento de stock
+    MovimientoStock.objects.create(
+        insumo=insumo,
+        deposito_origen=deposito_origen,
+        deposito_destino=deposito_destino,
+        cantidad=cantidad,
+        tipo="transferencia",
+        motivo="Transferencia automática"
+    )
+
 @login_required
 @transaction.atomic
 def transferencia_producto_view(request):
     """Vista para transferir productos terminados entre depósitos"""
+
+    deposito_id = request.session.get('deposito_seleccionado')
+    deposito_actual = None
+    if deposito_id:
+        try:
+            deposito_actual = Deposito.objects.get(id=deposito_id)
+        except Deposito.DoesNotExist:
+            deposito_actual = None
+
     # Solo usuarios con rol 'deposito' o 'administrador'
     if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
         messages.error(request, "Acceso denegado. No tiene permisos para transferir productos.")
@@ -281,7 +286,11 @@ def transferencia_producto_view(request):
                 )
 
             # Descontar stock del origen
-            stock_origen = StockProductoTerminado.objects.get(producto=producto, deposito=deposito_origen)
+            try:
+                stock_origen = StockProductoTerminado.objects.get(producto=producto, deposito=deposito_origen)
+            except StockProductoTerminado.DoesNotExist:
+                messages.error(request, "No hay stock disponible para este producto en el depósito de origen.")
+                return redirect("App_LUMINOVA:transferencia_producto")
             logger.info(f"[TRANSFERENCIA PT] Stock origen antes: {stock_origen.cantidad}")
             if stock_origen.cantidad < cantidad:
                 messages.error(request, "Stock insuficiente en el depósito de origen.")
@@ -298,7 +307,7 @@ def transferencia_producto_view(request):
                 producto.save(update_fields=["stock"])
                 logger.info(f"[TRANSFERENCIA PT] Producto origen stock actualizado a {producto.stock}")
 
-            # Sumar stock al destino
+            # Incrementar stock en el destino
             stock_destino, created = StockProductoTerminado.objects.get_or_create(
                 producto=producto_destino, 
                 deposito=deposito_destino, 
@@ -329,9 +338,9 @@ def transferencia_producto_view(request):
             messages.success(request, "Transferencia de producto realizada correctamente.")
             return redirect("App_LUMINOVA:historial_transferencias")
     else:
-        form = TransferenciaProductoForm(user=request.user)
+        form = TransferenciaProductoForm(user=request.user, deposito_actual=deposito_actual)
     
-    return render(request, "deposito/transferencia_producto.html", {"form": form})
+    return render(request, "deposito/transferencia_producto.html", {"form": form, "deposito_actual": deposito_actual})
 
 
 @login_required

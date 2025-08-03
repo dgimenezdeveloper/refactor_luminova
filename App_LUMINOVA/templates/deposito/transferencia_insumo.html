@@ -24,7 +24,12 @@
                                 <label for="id_deposito_origen" class="form-label fw-semibold">Depósito Origen</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="bi bi-house-door"></i></span>
-                                    <select name="deposito_origen" id="id_deposito_origen" class="form-select">{% for opt in form.deposito_origen.field.queryset %}<option value="{{ opt.pk }}" {% if form.deposito_origen.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>{% endfor %}</select>
+                                    <select name="deposito_origen_disabled" id="id_deposito_origen" class="form-select" disabled>
+                                        {% for opt in form.deposito_origen.field.queryset %}
+                                            <option value="{{ opt.pk }}" {% if form.deposito_origen.value|stringformat:'s' == opt.pk|stringformat:'s' %}selected{% endif %}>{{ opt }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <input type="hidden" name="deposito_origen" value="{{ form.deposito_origen.value }}">
                                 </div>
                             </div>
                             <div class="col-md-6">
