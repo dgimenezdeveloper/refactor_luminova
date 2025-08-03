@@ -638,12 +638,16 @@ logger = logging.getLogger(__name__)
 # --- SELECTOR DE DEPÓSITOS ---
 def seleccionar_deposito_view(request):
     depositos = Deposito.objects.all()
+    sin_permisos = False
+    # Lógica para filtrar depósitos según permisos...
+    if not request.user.is_superuser and not request.user.groups.filter(name='Depósito').exists():
+        sin_permisos = True
     if request.method == "POST":
         deposito_id = request.POST.get("deposito_id")
         if deposito_id:
             request.session["deposito_seleccionado"] = deposito_id
             return redirect("App_LUMINOVA:deposito_view")
-    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos})
+    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos, "sin_permisos": sin_permisos})
 
 
 def deposito_dashboard_view(request):
