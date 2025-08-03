@@ -767,7 +767,7 @@ class InsumoCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["deposito"].required = True
-        self.fields["deposito"].empty_label = None
+        self.fields["deposito"].widget = forms.HiddenInput()  # Make the field hidden
 
     class Meta:
         model = Insumo
@@ -777,7 +777,7 @@ class InsumoCreateForm(forms.ModelForm):
             "categoria": forms.Select(attrs={"class": "form-select"}),
             "fabricante": forms.Select(attrs={"class": "form-select"}),
             "stock": forms.NumberInput(attrs={"class": "form-control"}),
-            "deposito": forms.Select(attrs={"class": "form-select"}),
+            "deposito": forms.HiddenInput(),  # Ensure the widget is hidden
             "imagen": forms.ClearableFileInput(attrs={"class": "form-control"}),
         }
         labels = {

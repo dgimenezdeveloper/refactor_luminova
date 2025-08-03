@@ -118,11 +118,35 @@ class InsumoDetailView(DetailView):
 
 
 class InsumoCreateView(CreateView):
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            from .models import Deposito
+            try:
+                deposito = Deposito.objects.get(id=deposito_id)
+                # Si es GET, setear initial; si es POST, inyectar en data
+                if self.request.method == "POST":
+                    data = kwargs.get("data", self.request.POST).copy()
+                    data["deposito"] = deposito.id
+                    kwargs["data"] = data
+                else:
+                    initial = kwargs.get("initial", {}).copy()
+                    initial["deposito"] = deposito.id
+                    kwargs["initial"] = initial
+            except Deposito.DoesNotExist:
+                pass
+        return kwargs
     model = Insumo
     template_name = "deposito/insumo_crear.html"
     form_class = InsumoCreateForm  # Usar formulario específico para creación
 
     def form_valid(self, form):
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            from .models import Deposito
+            deposito = Deposito.objects.get(id=deposito_id)
+            form.instance.deposito = deposito
         messages.success(
             self.request, f"Insumo '{form.instance.descripcion}' creado exitosamente."
         )

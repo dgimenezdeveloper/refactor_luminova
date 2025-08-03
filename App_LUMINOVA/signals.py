@@ -1,3 +1,27 @@
+from .models import Insumo, ProductoTerminado, StockInsumo, StockProductoTerminado
+# Sincronizar StockInsumo al crear o actualizar un Insumo
+from django.db import transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Insumo)
+def sync_stock_insumo(sender, instance, **kwargs):
+    if instance.deposito:
+        StockInsumo.objects.update_or_create(
+            insumo=instance,
+            deposito=instance.deposito,
+            defaults={"cantidad": instance.stock},
+        )
+
+# Sincronizar StockProductoTerminado al crear o actualizar un ProductoTerminado
+@receiver(post_save, sender=ProductoTerminado)
+def sync_stock_producto_terminado(sender, instance, **kwargs):
+    if instance.deposito:
+        StockProductoTerminado.objects.update_or_create(
+            producto=instance,
+            deposito=instance.deposito,
+            defaults={"cantidad": instance.stock},
+        )
 # TP_LUMINOVA-main/App_LUMINOVA/signals.py
 
 from django.contrib.auth.signals import user_logged_in, user_logged_out
