@@ -808,92 +808,55 @@ def deposito_enviar_insumos_op_view(request, op_id):
 
 @login_required
 def deposito_solicitudes_insumos_view(request):
-    ops_pendientes_preparacion = OrdenProduccion.objects.none()
-    ops_con_insumos_enviados = OrdenProduccion.objects.none()
+    # Filtrar por depósito asignado al usuario (excepto admin)
+    from .models import UsuarioDeposito
+    titulo_seccion = "Gestión de Insumos para Producción"
+    logger.info("--- Entrando a deposito_solicitudes_insumos_view ---")
 
-    titulo_seccion = "Gestión de Insumos para Producción"  # Correcto
-    logger.info(
-        "--- Entrando a deposito_solicitudes_insumos_view ---"
-    )  # Log de entrada
+    deposito_id = request.session.get("deposito_seleccionado")
+    deposito = None
+    if not request.user.is_superuser:
+        if deposito_id:
+            deposito = Deposito.objects.filter(id=deposito_id).first()
+        else:
+            # Buscar el primer depósito asignado
+            asignacion = UsuarioDeposito.objects.filter(usuario=request.user).first()
+            if asignacion:
+                deposito = asignacion.deposito
+    # Si es admin, no filtra por depósito
 
     try:
-        # 1. OBTENER OPs QUE ESTÁN SOLICITANDO INSUMOS
-        estado_insumos_solicitados_obj = EstadoOrden.objects.filter(
-            nombre__iexact="Insumos Solicitados"
-        ).first()  # Renombrado para claridad
-
+        estado_insumos_solicitados_obj = EstadoOrden.objects.filter(nombre__iexact="Insumos Solicitados").first()
         if estado_insumos_solicitados_obj:
-            logger.info(
-                f"Estado 'Insumos Solicitados' encontrado (ID: {estado_insumos_solicitados_obj.id}, Nombre: '{estado_insumos_solicitados_obj.nombre}')."
-            )
-            ops_pendientes_preparacion = (
-                OrdenProduccion.objects.filter(
-                    estado_op=estado_insumos_solicitados_obj  # Usar el objeto encontrado
-                )
-                .select_related(
-                    "producto_a_producir", "estado_op", "orden_venta_origen__cliente"
-                )
-                .order_by("fecha_solicitud")
-            )
-            logger.info(
-                f"Encontradas {ops_pendientes_preparacion.count()} OPs pendientes de preparación."
-            )
+            qs = OrdenProduccion.objects.filter(estado_op=estado_insumos_solicitados_obj)
+            if not request.user.is_superuser and deposito:
+                qs = qs.filter(producto_a_producir__deposito=deposito)
+            ops_pendientes_preparacion = qs.select_related("producto_a_producir", "estado_op", "orden_venta_origen__cliente").order_by("fecha_solicitud")
         else:
-            messages.error(
-                request,
-                "Configuración crítica: El estado 'Insumos Solicitados' no existe en la base de datos. No se pueden mostrar las solicitudes pendientes.",
-            )
-            logger.error(
-                "CRÍTICO: Estado 'Insumos Solicitados' no encontrado en deposito_solicitudes_insumos_view."
-            )
+            ops_pendientes_preparacion = OrdenProduccion.objects.none()
+            messages.error(request, "Configuración crítica: El estado 'Insumos Solicitados' no existe en la base de datos. No se pueden mostrar las solicitudes pendientes.")
 
-        # 2. OBTENER OPs A LAS QUE YA SE LES ENVIARON INSUMOS (AHORA EN ESTADO "En Proceso")
-        estado_en_proceso_nombre_buscado = "En Proceso"
-        estado_en_proceso_obj = EstadoOrden.objects.filter(
-            nombre__iexact=estado_en_proceso_nombre_buscado
-        ).first()  # Renombrado
-
+        estado_en_proceso_obj = EstadoOrden.objects.filter(nombre__iexact="En Proceso").first()
         if estado_en_proceso_obj:
-            logger.info(
-                f"Estado '{estado_en_proceso_nombre_buscado}' encontrado (ID: {estado_en_proceso_obj.id}, Nombre: '{estado_en_proceso_obj.nombre}')."
-            )
-            ops_con_insumos_enviados = (
-                OrdenProduccion.objects.filter(
-                    estado_op=estado_en_proceso_obj  # Usar el objeto encontrado
-                )
-                .select_related(
-                    "producto_a_producir", "estado_op", "orden_venta_origen__cliente"
-                )
-                .order_by("-fecha_inicio_real", "-fecha_solicitud")
-            )
-            logger.info(
-                f"Encontradas {ops_con_insumos_enviados.count()} OPs con insumos ya enviados/en proceso."
-            )
+            qs2 = OrdenProduccion.objects.filter(estado_op=estado_en_proceso_obj)
+            if not request.user.is_superuser and deposito:
+                qs2 = qs2.filter(producto_a_producir__deposito=deposito)
+            ops_con_insumos_enviados = qs2.select_related("producto_a_producir", "estado_op", "orden_venta_origen__cliente").order_by("-fecha_inicio_real", "-fecha_solicitud")
         else:
-            messages.warning(
-                request,
-                f"Advertencia de configuración: El estado '{estado_en_proceso_nombre_buscado}' no existe. No se mostrará la lista de OPs con insumos enviados.",
-            )
-            logger.warning(
-                f"Configuración: Estado '{estado_en_proceso_nombre_buscado}' no encontrado en deposito_solicitudes_insumos_view."
-            )
-
-    except Exception as e:  # Captura más genérica para cualquier otro error inesperado
-        messages.error(
-            request,
-            f"Ocurrió un error inesperado al cargar las solicitudes de insumos: {e}",
-        )
+            ops_con_insumos_enviados = OrdenProduccion.objects.none()
+            messages.warning(request, "Advertencia de configuración: El estado 'En Proceso' no existe. No se mostrará la lista de OPs con insumos enviados.")
+    except Exception as e:
+        ops_pendientes_preparacion = OrdenProduccion.objects.none()
+        ops_con_insumos_enviados = OrdenProduccion.objects.none()
+        messages.error(request, f"Ocurrió un error inesperado al cargar las solicitudes de insumos: {e}")
         logger.exception("Excepción inesperada en deposito_solicitudes_insumos_view:")
-        # ops_pendientes_preparacion y ops_con_insumos_enviados ya están como QuerySet vacíos.
 
     context = {
         "ops_pendientes_list": ops_pendientes_preparacion,
         "ops_enviadas_list": ops_con_insumos_enviados,
         "titulo_seccion": titulo_seccion,
     }
-    logger.info(
-        f"Contexto para deposito_solicitudes_insumos.html: ops_pendientes_list count = {ops_pendientes_preparacion.count()}, ops_enviadas_list count = {ops_con_insumos_enviados.count()}"
-    )
+    logger.info(f"Contexto para deposito_solicitudes_insumos.html: ops_pendientes_list count = {ops_pendientes_preparacion.count()}, ops_enviadas_list count = {ops_con_insumos_enviados.count()}")
     return render(request, "deposito/deposito_solicitudes_insumos.html", context)
 
 
@@ -906,11 +869,21 @@ def recepcion_pedidos_view(request):
     #     messages.error(request, "Acceso no permitido.")
     #     return redirect('App_LUMINOVA:dashboard')
 
-    ocs_en_transito = (
-        Orden.objects.filter(tipo="compra", estado="EN_TRANSITO")
-        .select_related("proveedor", "insumo_principal")
-        .order_by("fecha_estimada_entrega")
-    )
+    from .models import UsuarioDeposito
+    deposito_id = request.session.get("deposito_seleccionado")
+    deposito = None
+    if not request.user.is_superuser:
+        if deposito_id:
+            deposito = Deposito.objects.filter(id=deposito_id).first()
+        else:
+            asignacion = UsuarioDeposito.objects.filter(usuario=request.user).first()
+            if asignacion:
+                deposito = asignacion.deposito
+
+    qs = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO")
+    if not request.user.is_superuser and deposito:
+        qs = qs.filter(deposito=deposito)
+    ocs_en_transito = qs.select_related("proveedor", "insumo_principal").order_by("fecha_estimada_entrega")
 
     context = {
         "ordenes_a_recibir": ocs_en_transito,
@@ -978,7 +951,8 @@ def deposito_view(request):
     # Validar que el usuario tenga asignado el depósito (excepto admin)
     if not request.user.is_superuser:
         if not UsuarioDeposito.objects.filter(usuario=request.user, deposito=deposito).exists():
-            return HttpResponseForbidden("No tienes acceso a este depósito.")
+            messages.error(request, "No tienes acceso a este depósito.")
+            return redirect("App_LUMINOVA:seleccionar_deposito")
 
     categorias_I = CategoriaInsumo.objects.filter(deposito=deposito)
     categorias_PT = CategoriaProductoTerminado.objects.filter(deposito=deposito)
