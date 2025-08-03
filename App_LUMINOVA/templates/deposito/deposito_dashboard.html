@@ -1,5 +1,8 @@
 {% extends 'padre.html' %}
 
+{% load static %}
+{% load humanize %}
+
 {% block sidebar_content %}
     {% if not dashboard_global %}
         {% include 'deposito/deposito_sidebar.html' %}
@@ -17,31 +20,29 @@
             Dashboard de Depósito
         {% endif %}
     </h1>
+    
+    {% if dashboard_global %}
+    <!-- Dashboard Global -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-primary mb-3">
                 <div class="card-header bg-primary text-white">Insumos</div>
                 <div class="card-body">
                     <h4 class="card-title">{{ insumos_count }}</h4>
-                    <p class="card-text">
-                        {% if dashboard_global %}Total de insumos en todos los depósitos.{% else %}Total de insumos en este depósito.{% endif %}
-                    </p>
+                    <p class="card-text">Total de insumos en todos los depósitos.</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-success mb-3">
                 <div class="card-header bg-success text-white">Productos Terminados</div>
                 <div class="card-body">
                     <h4 class="card-title">{{ productos_count }}</h4>
-                    <p class="card-text">
-                        {% if dashboard_global %}Total de productos terminados en todos los depósitos.{% else %}Total de productos terminados en este depósito.{% endif %}
-                    </p>
+                    <p class="card-text">Total de productos terminados en todos los depósitos.</p>
                 </div>
             </div>
         </div>
-        {% if dashboard_global %}
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-info mb-3">
                 <div class="card-header bg-info text-white">Depósitos</div>
                 <div class="card-body">
@@ -50,7 +51,209 @@
                 </div>
             </div>
         </div>
-        {% endif %}
+        <div class="col-md-3">
+            <div class="card border-warning mb-3">
+                <div class="card-header bg-warning text-white">Actividad Pendiente</div>
+                <div class="card-body">
+                    <h4 class="card-title">{{ ocs_en_transito_count|add:ops_solicitudes_count }}</h4>
+                    <p class="card-text">OCs en tránsito + OPs solicitando insumos.</p>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Sección de Actividad Global -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">OCs en Tránsito ({{ ocs_en_transito_count }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if ocs_en_transito_list %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>N° OC</th>
+                                        <th>Depósito</th>
+                                        <th>Proveedor</th>
+                                        <th>Insumo</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for oc in ocs_en_transito_list %}
+                                    <tr>
+                                        <td>{{ oc.numero_orden }}</td>
+                                        <td>{{ oc.deposito.nombre|default:"Sin asignar" }}</td>
+                                        <td>{{ oc.proveedor.nombre|truncatechars:15 }}</td>
+                                        <td>{{ oc.insumo_principal.descripcion|truncatechars:20 }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if ocs_en_transito_count > 10 %}
+                            <small class="text-muted">Mostrando las primeras 10 de {{ ocs_en_transito_count }} OCs en tránsito.</small>
+                        {% endif %}
+                    {% else %}
+                        <p class="text-muted">No hay OCs en tránsito.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0">Solicitudes de Insumos ({{ ops_solicitudes_count }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if ops_solicitudes_list %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>N° OP</th>
+                                        <th>Depósito</th>
+                                        <th>Producto</th>
+                                        <th>Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for op in ops_solicitudes_list %}
+                                    <tr>
+                                        <td>{{ op.numero_op }}</td>
+                                        <td>{{ op.producto_a_producir.deposito.nombre|default:"Sin asignar" }}</td>
+                                        <td>{{ op.producto_a_producir.descripcion|truncatechars:20 }}</td>
+                                        <td>{{ op.cantidad_a_producir }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if ops_solicitudes_count > 10 %}
+                            <small class="text-muted">Mostrando las primeras 10 de {{ ops_solicitudes_count }} solicitudes.</small>
+                        {% endif %}
+                    {% else %}
+                        <p class="text-muted">No hay solicitudes de insumos pendientes.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Crítico por Depósito -->
+    {% if depositos_con_stock_critico %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Depósitos con Stock Crítico (< {{ umbral_stock_bajo|intcomma }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for item in depositos_con_stock_critico %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-danger">
+                                <div class="card-header">{{ item.deposito.nombre }}</div>
+                                <div class="card-body">
+                                    <h6 class="text-danger">{{ item.insumos_criticos_count }} insumos críticos</h6>
+                                    <ul class="list-unstyled">
+                                        {% for insumo in item.insumos_criticos %}
+                                        <li><small>{{ insumo.descripcion|truncatechars:25 }} ({{ insumo.stock|intcomma }})</small></li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Resumen por Depósito -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Resumen por Depósito</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Depósito</th>
+                                    <th>Total Insumos</th>
+                                    <th>Total Productos</th>
+                                    <th>OCs en Tránsito</th>
+                                    <th>OPs Solicitando</th>
+                                    <th>Insumos Críticos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in depositos_resumen %}
+                                <tr>
+                                    <td><strong>{{ item.deposito.nombre }}</strong></td>
+                                    <td>{{ item.total_insumos }}</td>
+                                    <td>{{ item.total_productos }}</td>
+                                    <td>
+                                        {% if item.ocs_en_transito > 0 %}
+                                            <span class="badge bg-warning">{{ item.ocs_en_transito }}</span>
+                                        {% else %}
+                                            <span class="text-muted">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.ops_solicitando > 0 %}
+                                            <span class="badge bg-info">{{ item.ops_solicitando }}</span>
+                                        {% else %}
+                                            <span class="text-muted">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.insumos_criticos > 0 %}
+                                            <span class="badge bg-danger">{{ item.insumos_criticos }}</span>
+                                        {% else %}
+                                            <span class="text-success">0</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- Dashboard Individual -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-primary mb-3">
+                <div class="card-header bg-primary text-white">Insumos</div>
+                <div class="card-body">
+                    <h4 class="card-title">{{ insumos_count }}</h4>
+                    <p class="card-text">Total de insumos en este depósito.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success mb-3">
+                <div class="card-header bg-success text-white">Productos Terminados</div>
+                <div class="card-body">
+                    <h4 class="card-title">{{ productos_count }}</h4>
+                    <p class="card-text">Total de productos terminados en este depósito.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

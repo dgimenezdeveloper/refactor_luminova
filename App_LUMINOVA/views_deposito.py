@@ -675,16 +675,78 @@ def deposito_dashboard_view(request):
         return redirect("App_LUMINOVA:seleccionar_deposito")
         
     if es_admin and deposito_id == "-1":  # -1 significa "todos los depósitos"
-        # Dashboard global para admin
+        # Dashboard global para admin con información detallada de todos los depósitos
+        from .models import EstadoOrden
+        
+        # Información básica
         insumos_count = Insumo.objects.count()
         productos_count = ProductoTerminado.objects.count()
         depositos_count = Deposito.objects.count()
+        
+        # OCs en tránsito (recepción pendiente)
+        ocs_en_transito = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO").select_related("proveedor", "insumo_principal", "deposito")
+        ocs_en_transito_count = ocs_en_transito.count()
+        
+        # Solicitudes de insumos pendientes (OPs)
+        try:
+            estado_sol = EstadoOrden.objects.get(nombre__iexact="Insumos Solicitados")
+            ops_solicitudes = OrdenProduccion.objects.filter(estado_op=estado_sol).select_related("producto_a_producir__deposito")
+            ops_solicitudes_count = ops_solicitudes.count()
+        except EstadoOrden.DoesNotExist:
+            ops_solicitudes = OrdenProduccion.objects.none()
+            ops_solicitudes_count = 0
+        
+        # Stock crítico por depósito
+        UMBRAL_STOCK_BAJO = 15000
+        depositos_con_stock_critico = []
+        for deposito in Deposito.objects.all():
+            insumos_criticos = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO)
+            if insumos_criticos.exists():
+                depositos_con_stock_critico.append({
+                    'deposito': deposito,
+                    'insumos_criticos_count': insumos_criticos.count(),
+                    'insumos_criticos': insumos_criticos[:5]  # Primeros 5 más críticos
+                })
+        
+        # OCs por aprobar (estado BORRADOR)
+        ocs_por_aprobar = Orden.objects.filter(tipo="compra", estado="BORRADOR").select_related("proveedor", "insumo_principal", "deposito")
+        ocs_por_aprobar_count = ocs_por_aprobar.count()
+        
+        # Resumen por depósito
+        depositos_resumen = []
+        for deposito in Deposito.objects.all():
+            # OCs en tránsito para este depósito
+            ocs_deposito = ocs_en_transito.filter(deposito=deposito).count()
+            # OPs solicitando insumos para este depósito
+            ops_deposito = ops_solicitudes.filter(producto_a_producir__deposito=deposito).count()
+            # Insumos críticos en este depósito
+            criticos_deposito = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO).count()
+            
+            depositos_resumen.append({
+                'deposito': deposito,
+                'ocs_en_transito': ocs_deposito,
+                'ops_solicitando': ops_deposito,
+                'insumos_criticos': criticos_deposito,
+                'total_insumos': Insumo.objects.filter(deposito=deposito).count(),
+                'total_productos': ProductoTerminado.objects.filter(deposito=deposito).count(),
+            })
+        
         context = {
             "deposito": None,
             "insumos_count": insumos_count,
             "productos_count": productos_count,
             "depositos_count": depositos_count,
             "dashboard_global": True,
+            # Información detallada global
+            "ocs_en_transito_count": ocs_en_transito_count,
+            "ocs_en_transito_list": ocs_en_transito[:10],  # Primeras 10
+            "ops_solicitudes_count": ops_solicitudes_count,
+            "ops_solicitudes_list": ops_solicitudes[:10],  # Primeras 10
+            "ocs_por_aprobar_count": ocs_por_aprobar_count,
+            "ocs_por_aprobar_list": ocs_por_aprobar[:10],  # Primeras 10
+            "depositos_con_stock_critico": depositos_con_stock_critico,
+            "depositos_resumen": depositos_resumen,
+            "umbral_stock_bajo": UMBRAL_STOCK_BAJO,
         }
         return render(request, "deposito/deposito_dashboard.html", context)
         
@@ -1059,17 +1121,79 @@ def deposito_view(request):
     es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
-    if es_admin and deposito_id == "-1":
-        # Dashboard global para admin
+    if es_admin and deposito_id == "-1":  # -1 significa "todos los depósitos"
+        # Dashboard global para admin con información detallada de todos los depósitos
+        from .models import EstadoOrden
+        
+        # Información básica
         insumos_count = Insumo.objects.count()
         productos_count = ProductoTerminado.objects.count()
         depositos_count = Deposito.objects.count()
+        
+        # OCs en tránsito (recepción pendiente)
+        ocs_en_transito = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO").select_related("proveedor", "insumo_principal", "deposito")
+        ocs_en_transito_count = ocs_en_transito.count()
+        
+        # Solicitudes de insumos pendientes (OPs)
+        try:
+            estado_sol = EstadoOrden.objects.get(nombre__iexact="Insumos Solicitados")
+            ops_solicitudes = OrdenProduccion.objects.filter(estado_op=estado_sol).select_related("producto_a_producir__deposito")
+            ops_solicitudes_count = ops_solicitudes.count()
+        except EstadoOrden.DoesNotExist:
+            ops_solicitudes = OrdenProduccion.objects.none()
+            ops_solicitudes_count = 0
+        
+        # Stock crítico por depósito
+        UMBRAL_STOCK_BAJO = 15000
+        depositos_con_stock_critico = []
+        for deposito in Deposito.objects.all():
+            insumos_criticos = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO)
+            if insumos_criticos.exists():
+                depositos_con_stock_critico.append({
+                    'deposito': deposito,
+                    'insumos_criticos_count': insumos_criticos.count(),
+                    'insumos_criticos': insumos_criticos[:5]  # Primeros 5 más críticos
+                })
+        
+        # OCs por aprobar (estado BORRADOR)
+        ocs_por_aprobar = Orden.objects.filter(tipo="compra", estado="BORRADOR").select_related("proveedor", "insumo_principal", "deposito")
+        ocs_por_aprobar_count = ocs_por_aprobar.count()
+        
+        # Resumen por depósito
+        depositos_resumen = []
+        for deposito in Deposito.objects.all():
+            # OCs en tránsito para este depósito
+            ocs_deposito = ocs_en_transito.filter(deposito=deposito).count()
+            # OPs solicitando insumos para este depósito
+            ops_deposito = ops_solicitudes.filter(producto_a_producir__deposito=deposito).count()
+            # Insumos críticos en este depósito
+            criticos_deposito = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO).count()
+            
+            depositos_resumen.append({
+                'deposito': deposito,
+                'ocs_en_transito': ocs_deposito,
+                'ops_solicitando': ops_deposito,
+                'insumos_criticos': criticos_deposito,
+                'total_insumos': Insumo.objects.filter(deposito=deposito).count(),
+                'total_productos': ProductoTerminado.objects.filter(deposito=deposito).count(),
+            })
+        
         context = {
             "deposito": None,
             "insumos_count": insumos_count,
             "productos_count": productos_count,
             "depositos_count": depositos_count,
             "dashboard_global": True,
+            # Información detallada global
+            "ocs_en_transito_count": ocs_en_transito_count,
+            "ocs_en_transito_list": ocs_en_transito[:10],  # Primeras 10
+            "ops_solicitudes_count": ops_solicitudes_count,
+            "ops_solicitudes_list": ops_solicitudes[:10],  # Primeras 10
+            "ocs_por_aprobar_count": ocs_por_aprobar_count,
+            "ocs_por_aprobar_list": ocs_por_aprobar[:10],  # Primeras 10
+            "depositos_con_stock_critico": depositos_con_stock_critico,
+            "depositos_resumen": depositos_resumen,
+            "umbral_stock_bajo": UMBRAL_STOCK_BAJO,
         }
         return render(request, "deposito/deposito_dashboard.html", context)
     # Solo permitir acceso a depósitos individuales
