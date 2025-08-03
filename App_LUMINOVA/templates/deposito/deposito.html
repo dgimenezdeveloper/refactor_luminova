@@ -103,21 +103,20 @@
             <tbody class="bg-white text-dark">
                 <tr>
                     <th class="text-white text-center" style="background-color: #014BAC;">N° OP</th>
-                    <th class="text-white" style="background-color: #014BAC;" colspan="2">Producto</th>
+                    <th class="text-white" style="background-color: #014BAC;">Producto</th>
                     <th class="text-white text-center" style="background-color: #014BAC;">Cantidad</th>
-
+                    <th class="text-white text-center" style="background-color: #014BAC;">Estado</th>
                 </tr>
                 {% for op_solicitud in ops_pendientes_deposito_list %}
                 <tr class="{% if forloop.counter|divisibleby:2 %}table-row-even{% else %}table-row-odd{% endif %}">
-                    <td class="text-white text-center" >{{ op_solicitud.numero_op }}</td>
-                    <td class="text-white" colspan="2">{{ op_solicitud.producto_a_producir.descripcion|truncatechars:20 }}</td>
+                    <td class="text-white text-center">{{ op_solicitud.numero_op }}</td>
+                    <td class="text-white">{{ op_solicitud.producto_a_producir.descripcion|truncatechars:20 }}</td>
                     <td class="text-white text-center">{{ op_solicitud.cantidad_a_producir }}</td>
+                    <td class="text-white text-center">{{ op_solicitud.estado_op.nombre }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center text-white" style="background-color: #A19898;">No hay OPs con
-                        insumos
-                        solicitados.</td>
+                    <td colspan="4" class="text-center text-white" style="background-color: #A19898;">No hay OPs relevantes para el depósito.</td>
                 </tr>
                 {% endfor %}
                 <tr>

@@ -1207,23 +1207,29 @@ def deposito_view(request):
         if not UsuarioDeposito.objects.filter(usuario=request.user, deposito=deposito).exists():
             return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
+    from .models import EstadoOrden, OrdenProduccion
     categorias_I = CategoriaInsumo.objects.filter(deposito=deposito)
     categorias_PT = CategoriaProductoTerminado.objects.filter(deposito=deposito)
 
-    # OPs pendientes SOLO del depósito seleccionado
+    # OPs relevantes para el depósito (no solo Insumos Solicitados)
+    estados_relevantes = [
+        "Insumos Solicitados",
+        "Insumos Recibidos",
+        "Producción Iniciada",
+        "En Proceso",
+        "Pausada",
+    ]
     ops_pendientes_deposito_list = OrdenProduccion.objects.none()
     ops_pendientes_deposito_count = 0
     try:
-        estado_sol = EstadoOrden.objects.filter(
-            nombre__iexact="Insumos Solicitados"
-        ).first()
-        if estado_sol:
+        estados_objs = list(EstadoOrden.objects.filter(nombre__in=estados_relevantes))
+        if estados_objs:
             ops_pendientes_deposito_list = (
                 OrdenProduccion.objects.filter(
-                    estado_op=estado_sol,
+                    estado_op__in=estados_objs,
                     producto_a_producir__deposito=deposito
                 )
-                .select_related("producto_a_producir")
+                .select_related("producto_a_producir", "estado_op")
                 .order_by("fecha_solicitud")
             )
             ops_pendientes_deposito_count = ops_pendientes_deposito_list.count()

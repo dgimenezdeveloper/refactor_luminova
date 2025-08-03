@@ -309,6 +309,7 @@ def solicitar_insumos_op_view(request, op_id):
 @login_required
 @transaction.atomic
 def produccion_detalle_op_view(request, op_id):
+    # Restaurar prefetch de componentes para que la vista funcione correctamente
     op = get_object_or_404(
         OrdenProduccion.objects.select_related(
             "producto_a_producir__categoria",
@@ -316,7 +317,6 @@ def produccion_detalle_op_view(request, op_id):
             "estado_op",
             "sector_asignado_op",
         ).prefetch_related(
-            "orden_venta_origen__ops_generadas__estado_op",
             "producto_a_producir__componentes_requeridos__insumo",
         ),
         id=op_id,
@@ -376,7 +376,7 @@ def produccion_detalle_op_view(request, op_id):
         ):
             puede_solicitar_insumos = True
         elif estado_actual_nombre_lower == ESTADO_OP_INSUMOS_SOLICITADOS_LOWER:
-            nombres_permitidos_dropdown.extend(["Pausada", "Cancelada"])
+            nombres_permitidos_dropdown.extend(["Insumos Recibidos", "Producción Iniciada", "Pausada", "Cancelada"])
         elif estado_actual_nombre_lower == ESTADO_OP_INSUMOS_RECIBIDOS_LOWER:
             nombres_permitidos_dropdown.extend(
                 ["Producción Iniciada", "Pausada", "Cancelada"]
@@ -464,23 +464,55 @@ def produccion_detalle_op_view(request, op_id):
                 cantidad_producida = op_actualizada.cantidad_a_producir
                 if producto_terminado_obj and cantidad_producida > 0:
 
-                    # 1. Actualizar el stock principal del ProductoTerminado
-                    producto_terminado_obj.stock = F("stock") + cantidad_producida
-                    producto_terminado_obj.save(update_fields=["stock"])
-                    logger.info(
-                        f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida}."
-                    )
+                    try:
+                        # 1. Actualizar el stock principal del ProductoTerminado
+                        producto_terminado_obj.stock = F("stock") + cantidad_producida
+                        producto_terminado_obj.save(update_fields=["stock"])
+                        logger.info(
+                            f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida}."
+                        )
 
-                    # 2. Crear el lote para registro y envío
-                    LoteProductoTerminado.objects.create(
-                        producto=producto_terminado_obj,
-                        op_asociada=op_actualizada,
-                        cantidad=cantidad_producida,
-                    )
-                    messages.info(
-                        request,
-                        f"Lote de {cantidad_producida} x '{producto_terminado_obj.descripcion}' generado y stock actualizado.",
-                    )
+                        # 2. Crear el lote para registro y envío
+                        try:
+                            # Obtener el depósito del producto de forma segura
+                            deposito_lote = None
+                            if hasattr(producto_terminado_obj, 'deposito_id') and producto_terminado_obj.deposito_id:
+                                from .models import Deposito
+                                try:
+                                    deposito_lote = Deposito.objects.get(id=producto_terminado_obj.deposito_id)
+                                except Deposito.DoesNotExist:
+                                    deposito_lote = None
+                            
+                            # Crear el lote usando create() para evitar problemas con save()
+                            lote = LoteProductoTerminado.objects.create(
+                                producto_id=producto_terminado_obj.id,
+                                op_asociada_id=op_actualizada.id,
+                                cantidad=cantidad_producida,
+                                deposito=deposito_lote,
+                                enviado=False
+                            )
+                            
+                            logger.info(f"Lote ID {lote.id} creado exitosamente para OP {op_actualizada.numero_op}")
+                            messages.info(
+                                request,
+                                f"Lote de {cantidad_producida} x '{producto_terminado_obj.descripcion}' generado y stock actualizado.",
+                            )
+                        except Exception as e_lote:
+                            logger.error(f"Error detallado al crear lote para OP {op_actualizada.numero_op}: {e_lote}")
+                            logger.error(f"Tipo de excepción: {type(e_lote).__name__}")
+                            if hasattr(e_lote, 'args'):
+                                logger.error(f"Argumentos de la excepción: {e_lote.args}")
+                            messages.warning(
+                                request,
+                                f"Stock actualizado correctamente, pero hubo un problema al crear el lote: {e_lote}",
+                            )
+                    except Exception as e:
+                        logger.error(f"Error al crear lote para OP {op_actualizada.numero_op}: {e}")
+                        messages.error(
+                            request,
+                            f"Error al crear el lote de producción: {e}. Por favor, contacte al administrador.",
+                        )
+                        # Continuar con el resto del proceso aunque falle la creación del lote
 
             op_actualizada.save()
             messages.success(
@@ -489,44 +521,52 @@ def produccion_detalle_op_view(request, op_id):
             )
 
             if op_actualizada.orden_venta_origen:
-                orden_venta_asociada = op_actualizada.orden_venta_origen
-                ops_de_la_ov = OrdenProduccion.objects.filter(
-                    orden_venta_origen=orden_venta_asociada
-                )
+                try:
+                    orden_venta_asociada = op_actualizada.orden_venta_origen
+                    # Usar solo() para asegurar que se obtenga una sola instancia
+                    ops_de_la_ov = OrdenProduccion.objects.filter(
+                        orden_venta_origen=orden_venta_asociada
+                    ).only('id', 'estado_op')
 
-                total_ops_en_ov = ops_de_la_ov.count()
-                count_completada = ops_de_la_ov.filter(
-                    estado_op__nombre__iexact=ESTADO_OP_COMPLETADA_LOWER
-                ).count()
-                count_cancelada = ops_de_la_ov.filter(
-                    estado_op__nombre__iexact=ESTADO_OP_CANCELADA_LOWER
-                ).count()
+                    total_ops_en_ov = ops_de_la_ov.count()
+                    count_completada = ops_de_la_ov.filter(
+                        estado_op__nombre__iexact=ESTADO_OP_COMPLETADA_LOWER
+                    ).count()
+                    count_cancelada = ops_de_la_ov.filter(
+                        estado_op__nombre__iexact=ESTADO_OP_CANCELADA_LOWER
+                    ).count()
 
-                if total_ops_en_ov > 0 and (
-                    count_completada + count_cancelada == total_ops_en_ov
-                ):
-                    if orden_venta_asociada.estado != "LISTA_ENTREGA":
-                        estado_ov_anterior_str = (
-                            orden_venta_asociada.get_estado_display()
-                        )
-                        orden_venta_asociada.estado = "LISTA_ENTREGA"
-                        orden_venta_asociada.save(update_fields=["estado"])
+                    if total_ops_en_ov > 0 and (
+                        count_completada + count_cancelada == total_ops_en_ov
+                    ):
+                        if orden_venta_asociada.estado != "LISTA_ENTREGA":
+                            estado_ov_anterior_str = (
+                                orden_venta_asociada.get_estado_display()
+                            )
+                            orden_venta_asociada.estado = "LISTA_ENTREGA"
+                            orden_venta_asociada.save(update_fields=["estado"])
 
-                        descripcion_ov = f"Estado de la OV cambió de '{estado_ov_anterior_str}' a 'Lista para Entrega'."
-                        HistorialOV.objects.create(
-                            orden_venta=orden_venta_asociada,
-                            descripcion=descripcion_ov,
-                            tipo_evento="Cambio Estado OV",
-                            realizado_por=request.user,
-                        )
+                            descripcion_ov = f"Estado de la OV cambió de '{estado_ov_anterior_str}' a 'Lista para Entrega'."
+                            HistorialOV.objects.create(
+                                orden_venta=orden_venta_asociada,
+                                descripcion=descripcion_ov,
+                                tipo_evento="Cambio Estado OV",
+                                realizado_por=request.user,
+                            )
 
-                        messages.info(
-                            request,
-                            f"Todos los ítems de la OV {orden_venta_asociada.numero_ov} están listos. El estado de la OV se ha actualizado a 'Lista para Entrega'.",
-                        )
-                        logger.info(
-                            f"OV {orden_venta_asociada.numero_ov} actualizada a 'LISTA_ENTREGA' porque todas sus OPs han finalizado."
-                        )
+                            messages.info(
+                                request,
+                                f"Todos los ítems de la OV {orden_venta_asociada.numero_ov} están listos. El estado de la OV se ha actualizado a 'Lista para Entrega'.",
+                            )
+                            logger.info(
+                                f"OV {orden_venta_asociada.numero_ov} actualizada a 'LISTA_ENTREGA' porque todas sus OPs han finalizado."
+                            )
+                except Exception as e:
+                    logger.error(f"Error al actualizar estado de OV asociada a OP {op_actualizada.numero_op}: {e}")
+                    messages.warning(
+                        request,
+                        "OP actualizada correctamente, pero hubo un problema al verificar el estado de la OV asociada.",
+                    )
 
             return redirect(
                 "App_LUMINOVA:produccion_detalle_op", op_id=op_actualizada.id
