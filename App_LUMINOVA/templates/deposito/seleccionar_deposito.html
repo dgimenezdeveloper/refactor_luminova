@@ -26,6 +26,9 @@
                         <div class="mb-3">
                             <select name="deposito_id" class="form-select" required>
                                 <option value="">Seleccione un depósito</option>
+                                {% if es_admin %}
+                                    <option value="ALL">Todos los depósitos</option>
+                                {% endif %}
                                 {% for dep in depositos %}
                                     <option value="{{ dep.id }}">{{ dep.nombre }}</option>
                                 {% endfor %}

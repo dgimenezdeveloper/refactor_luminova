@@ -8,6 +8,7 @@ def notificaciones_context(request):
 
 
     deposito_id = request.session.get("deposito_seleccionado")
+    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
 
     # Notificaciones de OPs con problemas (no cambia, ya que depende de reportes, pero podría filtrarse por depósito si se requiere)
     ops_con_problemas_count = (
@@ -18,17 +19,30 @@ def notificaciones_context(request):
     )
 
     # Solicitudes de insumos SOLO del depósito seleccionado
-    if deposito_id:
-        solicitudes_insumos_count = Orden.solicitudes_por_deposito(deposito_id).filter(
-            estado_op__nombre__iexact="Insumos Solicitados"
-        ).count()
-        ocs_para_aprobar_count = Orden.pedidos_por_deposito(deposito_id).filter(
-            tipo="compra", estado="BORRADOR"
-        ).count()
-        ocs_en_transito_count = Orden.pedidos_por_deposito(deposito_id).filter(
-            tipo="compra", estado="EN_TRANSITO"
-        ).count()
+    if deposito_id and deposito_id != "-1":  # Si no es "todos los depósitos"
+        try:
+            solicitudes_insumos_count = Orden.solicitudes_por_deposito(deposito_id).filter(
+                estado_op__nombre__iexact="Insumos Solicitados"
+            ).count()
+            ocs_para_aprobar_count = Orden.pedidos_por_deposito(deposito_id).filter(
+                tipo="compra", estado="BORRADOR"
+            ).count()
+            ocs_en_transito_count = Orden.pedidos_por_deposito(deposito_id).filter(
+                tipo="compra", estado="EN_TRANSITO"
+            ).count()
+        except (ValueError, TypeError):
+            # Si deposito_id no es válido, usar totales globales
+            solicitudes_insumos_count = OrdenProduccion.objects.filter(
+                estado_op__nombre__iexact="Insumos Solicitados"
+            ).count()
+            ocs_para_aprobar_count = Orden.objects.filter(
+                tipo="compra", estado="BORRADOR"
+            ).count()
+            ocs_en_transito_count = Orden.objects.filter(
+                tipo="compra", estado="EN_TRANSITO"
+            ).count()
     else:
+        # Si no hay depósito seleccionado o es "todos", mostrar totales globales
         solicitudes_insumos_count = OrdenProduccion.objects.filter(
             estado_op__nombre__iexact="Insumos Solicitados"
         ).count()

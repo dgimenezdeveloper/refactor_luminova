@@ -639,15 +639,24 @@ logger = logging.getLogger(__name__)
 def seleccionar_deposito_view(request):
     depositos = Deposito.objects.all()
     sin_permisos = False
-    # Lógica para filtrar depósitos según permisos...
-    if not request.user.is_superuser and not request.user.groups.filter(name='Depósito').exists():
+    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
+    if not es_admin and not request.user.groups.filter(name='Depósito').exists():
         sin_permisos = True
     if request.method == "POST":
         deposito_id = request.POST.get("deposito_id")
-        if deposito_id:
-            request.session["deposito_seleccionado"] = deposito_id
-            return redirect("App_LUMINOVA:deposito_view")
-    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos, "sin_permisos": sin_permisos})
+        # Validar que el deposito_id sea válido
+        if deposito_id == "ALL" and es_admin:
+            request.session["deposito_seleccionado"] = "-1"  # Usar -1 en lugar de ALL
+        elif deposito_id and deposito_id.isdigit():
+            # Verificar que el depósito existe
+            if Deposito.objects.filter(id=deposito_id).exists():
+                request.session["deposito_seleccionado"] = deposito_id
+            else:
+                return redirect("App_LUMINOVA:seleccionar_deposito")
+        else:
+            return redirect("App_LUMINOVA:seleccionar_deposito")
+        return redirect("App_LUMINOVA:deposito_view")
+    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos, "sin_permisos": sin_permisos, "es_admin": es_admin})
 
 
 @login_required
@@ -660,24 +669,47 @@ def deposito_dashboard_view(request):
         return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
     
     deposito_id = request.session.get("deposito_seleccionado")
-    
-    # Verificar que el usuario tenga acceso al depósito seleccionado
-    if not request.user.is_superuser and deposito_id:
-        from .models import UsuarioDeposito
-        asignaciones = UsuarioDeposito.objects.filter(usuario=request.user, deposito__id=deposito_id)
-        if not asignaciones.exists():
-            return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
     
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
         
-    deposito = get_object_or_404(Deposito, id=deposito_id)
+    if es_admin and deposito_id == "-1":  # -1 significa "todos los depósitos"
+        # Dashboard global para admin
+        insumos_count = Insumo.objects.count()
+        productos_count = ProductoTerminado.objects.count()
+        depositos_count = Deposito.objects.count()
+        context = {
+            "deposito": None,
+            "insumos_count": insumos_count,
+            "productos_count": productos_count,
+            "depositos_count": depositos_count,
+            "dashboard_global": True,
+        }
+        return render(request, "deposito/deposito_dashboard.html", context)
+        
+    # Verificar que el usuario tenga acceso al depósito seleccionado
+    if not es_admin and deposito_id:
+        from .models import UsuarioDeposito
+        try:
+            asignaciones = UsuarioDeposito.objects.filter(usuario=request.user, deposito__id=deposito_id)
+            if not asignaciones.exists():
+                return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+        except ValueError:
+            return redirect("App_LUMINOVA:seleccionar_deposito")
+        
+    try:
+        deposito = get_object_or_404(Deposito, id=deposito_id)
+    except ValueError:
+        return redirect("App_LUMINOVA:seleccionar_deposito")
+        
     insumos_count = Insumo.objects.filter(deposito=deposito).count()
     productos_count = ProductoTerminado.objects.filter(deposito=deposito).count()
     context = {
         "deposito": deposito,
         "insumos_count": insumos_count,
         "productos_count": productos_count,
+        "dashboard_global": False,
     }
     return render(request, "deposito/deposito_dashboard.html", context)
 
@@ -928,37 +960,36 @@ def recepcion_pedidos_view(request):
     from .models import UsuarioDeposito
     deposito_id = request.session.get("deposito_seleccionado")
     deposito = None
-    
-    # Para usuarios no superuser, verificar depósito asignado
-    if not request.user.is_superuser:
-        # Verificar asignación específica del usuario a depósitos
+    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
+    mostrar_todos = es_admin and (deposito_id == "-1")
+    if not es_admin:
         asignaciones = UsuarioDeposito.objects.filter(usuario=request.user)
         if asignaciones.exists():
-            # Si hay depósito seleccionado en sesión, verificar que el usuario tenga acceso
             if deposito_id:
                 deposito = asignaciones.filter(deposito__id=deposito_id).first()
                 if deposito:
                     deposito = deposito.deposito
                 else:
-                    # Usuario intenta acceder a un depósito no asignado
                     return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
             else:
-                # Usar el primer depósito asignado
                 deposito = asignaciones.first().deposito
                 request.session['deposito_seleccionado'] = deposito.id
         else:
-            # Usuario sin depósitos asignados
             return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
-    # Filtrar órdenes solo del depósito asignado
     qs = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO")
-    if not request.user.is_superuser and deposito:
+    if mostrar_todos:
+        pass  # No filtrar por depósito
+    elif not es_admin and deposito:
         qs = qs.filter(deposito=deposito)
+    elif es_admin and deposito_id and deposito_id != "-1":
+        qs = qs.filter(deposito_id=deposito_id)
     ocs_en_transito = qs.select_related("proveedor", "insumo_principal").order_by("fecha_estimada_entrega")
 
     context = {
         "ordenes_a_recibir": ocs_en_transito,
         "titulo_seccion": "Recepción de Pedidos de Compra",
+        "mostrar_todos": mostrar_todos,
     }
     return render(request, "deposito/deposito_recepcion.html", context)
 
@@ -1025,14 +1056,29 @@ def deposito_view(request):
         return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     deposito_id = request.session.get("deposito_seleccionado")
-    
+    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
-        
-    deposito = get_object_or_404(Deposito, id=deposito_id)
+    if es_admin and deposito_id == "-1":
+        # Dashboard global para admin
+        insumos_count = Insumo.objects.count()
+        productos_count = ProductoTerminado.objects.count()
+        depositos_count = Deposito.objects.count()
+        context = {
+            "deposito": None,
+            "insumos_count": insumos_count,
+            "productos_count": productos_count,
+            "depositos_count": depositos_count,
+            "dashboard_global": True,
+        }
+        return render(request, "deposito/deposito_dashboard.html", context)
+    # Solo permitir acceso a depósitos individuales
+    try:
+        deposito = get_object_or_404(Deposito, id=deposito_id)
+    except ValueError:
+        return redirect("App_LUMINOVA:seleccionar_deposito")
 
-    # Validar que el usuario tenga acceso al depósito seleccionado (excepto admin)
-    if not request.user.is_superuser:
+    if not es_admin:
         from .models import UsuarioDeposito
         if not UsuarioDeposito.objects.filter(usuario=request.user, deposito=deposito).exists():
             return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
@@ -1070,27 +1116,9 @@ def deposito_view(request):
     # Insumos con stock bajo SOLO de este depósito
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
-    # SOLUCIÓN: Usar directamente insumo.stock en lugar de StockInsumo para consistencia
-    # con los indicadores visuales del template
-    # Solo mostrar insumos realmente asignados a este depósito (nunca sin depósito)
     insumos_del_deposito = Insumo.objects.filter(deposito=deposito)
-    
-    # DEBUG: Verificar qué insumos tenemos
-    logger.info(f"[DEBUG] Depósito seleccionado: {deposito.nombre} (ID: {deposito.id})")
-    logger.info(f"[DEBUG] Total insumos en depósito: {insumos_del_deposito.count()}")
-    
-    # Mostrar stock de todos los insumos para debug
-    for insumo in insumos_del_deposito:
-        logger.info(f"[DEBUG] Insumo: {insumo.descripcion} - Stock: {insumo.stock}")
-    
-    # Filtrar insumos con stock bajo usando el campo directo del modelo
     insumos_con_stock_bajo = insumos_del_deposito.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
-    logger.info(f"[DEBUG] Insumos con stock < {UMBRAL_STOCK_BAJO_INSUMOS}: {insumos_con_stock_bajo.count()}")
-    
-    for insumo in insumos_con_stock_bajo:
-        logger.info(f"[DEBUG] Insumo crítico: {insumo.descripcion} - Stock: {insumo.stock}")
 
-    # Estados que consideramos como "pedido en firme"
     ESTADOS_OC_EN_PROCESO = [
         "APROBADA",
         "ENVIADA_PROVEEDOR",
@@ -1098,11 +1126,9 @@ def deposito_view(request):
         "RECIBIDA_PARCIAL",
     ]
 
-
     insumos_a_gestionar = []
     insumos_en_pedido = []
 
-    # Procesar cada insumo con stock bajo
     for insumo in insumos_con_stock_bajo:
         oc_en_proceso = (
             Orden.objects.filter(
@@ -1113,17 +1139,10 @@ def deposito_view(request):
         )
         if oc_en_proceso:
             insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso, "stock_real": insumo.stock})
-            logger.info(f"[DEBUG] Insumo EN PEDIDO: {insumo.descripcion}")
         elif insumo.notificado_a_compras:
-            # Si ya fue notificado, mostrarlo como notificado (no permitir botón de notificar)
             insumos_a_gestionar.append(insumo)
-            logger.info(f"[DEBUG] Insumo YA NOTIFICADO: {insumo.descripcion}")
         else:
             insumos_a_gestionar.append(insumo)
-            logger.info(f"[DEBUG] Insumo A GESTIONAR: {insumo.descripcion}")
-
-    logger.info(f"[DEBUG] Total insumos a gestionar: {len(insumos_a_gestionar)}")
-    logger.info(f"[DEBUG] Total insumos en pedido: {len(insumos_en_pedido)}")
 
     context = {
         "deposito": deposito,
@@ -1135,8 +1154,8 @@ def deposito_view(request):
         "insumos_a_gestionar_list": insumos_a_gestionar,
         "insumos_en_pedido_list": insumos_en_pedido,
         "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
+        "dashboard_global": False,
     }
-
     return render(request, "deposito/deposito.html", context)
 
 
@@ -1149,11 +1168,11 @@ def deposito_solicitudes_insumos_view(request):
     # Obtener depósito asignado para filtrar solicitudes
     from .models import UsuarioDeposito
     deposito = None
-    
-    if not request.user.is_superuser:
-        deposito_id = request.session.get("deposito_seleccionado")
+    deposito_id = request.session.get("deposito_seleccionado")
+    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
+    mostrar_todos = es_admin and (deposito_id == "-1")
+    if not es_admin:
         asignaciones = UsuarioDeposito.objects.filter(usuario=request.user)
-        
         if asignaciones.exists():
             if deposito_id:
                 deposito_asignacion = asignaciones.filter(deposito__id=deposito_id).first()
@@ -1174,27 +1193,25 @@ def deposito_solicitudes_insumos_view(request):
     try:
         estado_objetivo = EstadoOrden.objects.get(nombre__iexact="Insumos Solicitados")
         qs = OrdenProduccion.objects.filter(estado_op=estado_objetivo)
-        
-        # Filtrar por depósito para usuarios no admin
-        if not request.user.is_superuser and deposito:
+        if mostrar_todos:
+            pass
+        elif not es_admin and deposito:
             qs = qs.filter(producto_a_producir__deposito=deposito)
-            
+        elif es_admin and deposito_id and deposito_id != "-1":
+            qs = qs.filter(producto_a_producir__deposito_id=deposito_id)
         ops_necesitan_insumos = qs.select_related(
             "producto_a_producir", "estado_op", "orden_venta_origen__cliente"
         ).order_by("fecha_solicitud")
-
     except EstadoOrden.DoesNotExist:
         messages.error(
             request,
             "Error: El estado 'Insumos Solicitados' no está configurado para las Órdenes de Producción. No se pueden listar las solicitudes.",
         )
-        # ops_necesitan_insumos ya es un queryset vacío, así que está bien.
-        # O podrías decidir mostrar un error más prominente o redirigir.
-        # Para mantener la funcionalidad de la plantilla, dejaremos ops_necesitan_insumos como un queryset vacío.
 
     context = {
         "ops_necesitan_insumos_list": ops_necesitan_insumos,
         "titulo_seccion": "Solicitudes de Insumos desde Producción",
+        "mostrar_todos": mostrar_todos,
     }
     return render(request, "deposito/deposito_solicitudes_insumos.html", context)
 

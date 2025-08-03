@@ -1,0 +1,56 @@
+{% extends 'padre.html' %}
+
+{% block sidebar_content %}
+    {% if not dashboard_global %}
+        {% include 'deposito/deposito_sidebar.html' %}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="fw-bold text-primary mb-4">
+        {% if dashboard_global %}
+            Dashboard Global de Depósitos
+        {% elif deposito %}
+            Dashboard de {{ deposito.nombre }}
+        {% else %}
+            Dashboard de Depósito
+        {% endif %}
+    </h1>
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-primary mb-3">
+                <div class="card-header bg-primary text-white">Insumos</div>
+                <div class="card-body">
+                    <h4 class="card-title">{{ insumos_count }}</h4>
+                    <p class="card-text">
+                        {% if dashboard_global %}Total de insumos en todos los depósitos.{% else %}Total de insumos en este depósito.{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success mb-3">
+                <div class="card-header bg-success text-white">Productos Terminados</div>
+                <div class="card-body">
+                    <h4 class="card-title">{{ productos_count }}</h4>
+                    <p class="card-text">
+                        {% if dashboard_global %}Total de productos terminados en todos los depósitos.{% else %}Total de productos terminados en este depósito.{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% if dashboard_global %}
+        <div class="col-md-4">
+            <div class="card border-info mb-3">
+                <div class="card-header bg-info text-white">Depósitos</div>
+                <div class="card-body">
+                    <h4 class="card-title">{{ depositos_count }}</h4>
+                    <p class="card-text">Cantidad total de depósitos en el sistema.</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
