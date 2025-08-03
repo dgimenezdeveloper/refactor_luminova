@@ -37,23 +37,40 @@ logger = logging.getLogger(__name__)
 @login_required
 @user_passes_test(es_admin)
 def lista_usuarios(request):
+    from .models import Deposito, UsuarioDeposito
+    
     usuarios = (
         User.objects.filter(is_superuser=False)
-        .prefetch_related("groups")
+        .prefetch_related("groups", "depositos_asignados")
         .order_by("id")
     )
-    context = {"usuarios": usuarios, "titulo_seccion": "Gestión de Usuarios"}
+    
+    # Agregar información de depósitos asignados a cada usuario
+    for usuario in usuarios:
+        usuario.depositos_asignados_ids = list(
+            UsuarioDeposito.objects.filter(usuario=usuario).values_list('deposito_id', flat=True)
+        )
+    
+    depositos = Deposito.objects.all().order_by('nombre')
+    
+    context = {
+        "usuarios": usuarios, 
+        "depositos": depositos,
+        "titulo_seccion": "Gestión de Usuarios"
+    }
     return render(request, "admin/usuarios.html", context)
 
 
 @login_required
 @user_passes_test(es_admin)
+@transaction.atomic
 def crear_usuario(request):
     if request.method == "POST":
         username = request.POST.get("username")
         email = request.POST.get("email")
         rol_name = request.POST.get("rol")
         estado_str = request.POST.get("estado")
+        depositos_seleccionados = request.POST.getlist("depositos")
 
         # --- Se utiliza la contraseña por defecto definida en settings.py ---
         password = settings.DEFAULT_PASSWORD_FOR_NEW_USERS
@@ -94,27 +111,58 @@ def crear_usuario(request):
 
             user.save()
 
-            # Si el rol es Depósito, asignar automáticamente el primer depósito disponible
+            # Asignar depósitos según el rol y la selección
             if rol_name_normalizado == "Depósito":
                 from .models import Deposito, UsuarioDeposito
-                deposito = Deposito.objects.first()
-                if deposito:
-                    UsuarioDeposito.objects.get_or_create(
-                        usuario=user,
-                        deposito=deposito,
-                        defaults={
-                            "puede_transferir": True,
-                            "puede_entradas": True,
-                            "puede_salidas": True,
-                        }
-                    )
+                
+                if depositos_seleccionados:
+                    # Asignar depósitos seleccionados
+                    for deposito_id in depositos_seleccionados:
+                        try:
+                            deposito = Deposito.objects.get(id=deposito_id)
+                            UsuarioDeposito.objects.get_or_create(
+                                usuario=user,
+                                deposito=deposito,
+                                defaults={
+                                    "puede_transferir": True,
+                                    "puede_entradas": True,
+                                    "puede_salidas": True,
+                                }
+                            )
+                        except Deposito.DoesNotExist:
+                            continue
+                else:
+                    # Si no se seleccionó ningún depósito, asignar el primer disponible
+                    deposito = Deposito.objects.first()
+                    if deposito:
+                        UsuarioDeposito.objects.get_or_create(
+                            usuario=user,
+                            deposito=deposito,
+                            defaults={
+                                "puede_transferir": True,
+                                "puede_entradas": True,
+                                "puede_salidas": True,
+                            }
+                        )
 
             # --- Marcar al usuario para que cambie su contraseña en el primer login ---
             PasswordChangeRequired.objects.create(user=user)
 
+            depositos_info = ""
+            if rol_name_normalizado == "Depósito" and depositos_seleccionados:
+                depositos_nombres = []
+                for deposito_id in depositos_seleccionados:
+                    try:
+                        deposito = Deposito.objects.get(id=deposito_id)
+                        depositos_nombres.append(deposito.nombre)
+                    except Deposito.DoesNotExist:
+                        continue
+                if depositos_nombres:
+                    depositos_info = f" con acceso a: {', '.join(depositos_nombres)}"
+
             messages.success(
                 request,
-                f"Usuario '{user.username}' creado exitosamente. La contraseña por defecto es: '{password}'",
+                f"Usuario '{user.username}' creado exitosamente{depositos_info}. La contraseña por defecto es: '{password}'",
             )
 
         except DjangoIntegrityError as e:
@@ -182,9 +230,13 @@ def editar_usuario(request, id):
     if request.method == "POST":
         usuario.username = request.POST.get("username", usuario.username)
         usuario.email = request.POST.get("email", usuario.email)
+        depositos_seleccionados = request.POST.getlist("depositos")
+        
         # Actualizar rol
         rol_name = request.POST.get("rol")
+        rol_anterior = usuario.groups.first().name if usuario.groups.exists() else None
         usuario.groups.clear()
+        
         if rol_name:
             rol_name_normalizado = rol_name
             if rol_name_normalizado.lower() == "deposito":
@@ -201,8 +253,55 @@ def editar_usuario(request, id):
             usuario.is_active = estado_str == "Activo"
 
         usuario.save()
+
+        # Gestionar asignaciones de depósitos
+        from .models import Deposito, UsuarioDeposito
+        
+        # Eliminar todas las asignaciones existentes del usuario
+        UsuarioDeposito.objects.filter(usuario=usuario).delete()
+        
+        # Si el nuevo rol es Depósito, crear nuevas asignaciones
+        if rol_name_normalizado == "Depósito":
+            if depositos_seleccionados:
+                # Asignar depósitos seleccionados
+                for deposito_id in depositos_seleccionados:
+                    try:
+                        deposito = Deposito.objects.get(id=deposito_id)
+                        UsuarioDeposito.objects.create(
+                            usuario=usuario,
+                            deposito=deposito,
+                            puede_transferir=True,
+                            puede_entradas=True,
+                            puede_salidas=True,
+                        )
+                    except Deposito.DoesNotExist:
+                        continue
+            else:
+                # Si no se seleccionó ningún depósito, asignar el primer disponible
+                deposito = Deposito.objects.first()
+                if deposito:
+                    UsuarioDeposito.objects.create(
+                        usuario=usuario,
+                        deposito=deposito,
+                        puede_transferir=True,
+                        puede_entradas=True,
+                        puede_salidas=True,
+                    )
+
+        depositos_info = ""
+        if rol_name_normalizado == "Depósito" and depositos_seleccionados:
+            depositos_nombres = []
+            for deposito_id in depositos_seleccionados:
+                try:
+                    deposito = Deposito.objects.get(id=deposito_id)
+                    depositos_nombres.append(deposito.nombre)
+                except Deposito.DoesNotExist:
+                    continue
+            if depositos_nombres:
+                depositos_info = f" con acceso actualizado a: {', '.join(depositos_nombres)}"
+
         messages.success(
-            request, f"Usuario '{usuario.username}' actualizado exitosamente."
+            request, f"Usuario '{usuario.username}' actualizado exitosamente{depositos_info}."
         )
         return redirect("App_LUMINOVA:lista_usuarios")
     return redirect("App_LUMINOVA:lista_usuarios")  # Si no es POST

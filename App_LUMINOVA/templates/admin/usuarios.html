@@ -19,6 +19,7 @@
                     <th class="align-middle color-thead" style="background-color: #014BAC; color: white;">Nombre de Usuario</th>
                     <th class="align-middle color-thead" style="background-color: #014BAC; color: white;">Email</th>
                     <th class="align-middle color-thead" style="background-color: #014BAC; color: white;">Rol</th>
+                    <th class="align-middle color-thead" style="background-color: #014BAC; color: white;">Depósitos</th>
                     <th class="align-middle color-thead" style="background-color: #014BAC; color: white;">Estado</th>
                     <th class="align-middle color-thead" style="background-color: #014BAC; color: white;">Acciones</th>
                 </tr>
@@ -37,6 +38,21 @@
                             {% endif %}
                         </td>
                         <td>
+                            {% if usuario.groups.first and usuario.groups.first.name == 'Depósito' %}
+                                {% if usuario.depositos_asignados.exists %}
+                                    {% for asignacion in usuario.depositos_asignados.all %}
+                                        <div style="margin-bottom: 3px;">
+                                            <span class="badge bg-secondary">{{ asignacion.deposito.nombre }}</span>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted">Sin depósitos</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
                             {% if usuario.is_active %}
                                 Activo
                             {% else %}
@@ -50,6 +66,11 @@
                             <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#eliminarUsuarioModal{{ usuario.id }}">
                                 <i class="bi bi-trash-fill"></i>
                             </button>
+                            {% if usuario.groups.first and usuario.groups.first.name == 'Depósito' %}
+                            <a href="{% url 'App_LUMINOVA:gestionar_permisos_deposito' usuario.id %}" class="btn btn-sm btn-outline-info" title="Gestionar permisos de depósito">
+                                <i class="bi bi-key-fill"></i>
+                            </a>
+                            {% endif %}
                         </td>
                     </tr>
                 {% endfor %}
@@ -103,6 +124,22 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="form-group row p-1" id="depositos-section" style="display: none;">
+                            <label for="depositos" class="col-sm-5 col-form-label">Depósitos:</label>
+                            <div class="col-sm-7">
+                                <div class="form-check-wrapper" style="max-height: 120px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 0.375rem; padding: 8px;">
+                                    {% for deposito in depositos %}
+                                    <div class="form-check">
+                                        <input class="form-check-input deposito-checkbox" type="checkbox" name="depositos" value="{{ deposito.id }}" id="deposito_{{ deposito.id }}">
+                                        <label class="form-check-label" for="deposito_{{ deposito.id }}">
+                                            {{ deposito.nombre }} - {{ deposito.ubicacion }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <small class="form-text text-muted">Seleccione los depósitos a los que tendrá acceso este usuario</small>
+                            </div>
+                        </div>
                         <div class="modal-footer pt-4 d-flex justify-content-center">
                             <button type="submit" class="btn btn-primary">Aceptar</button>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -139,14 +176,14 @@
                             <div class="form-group row p-1">
                                 <label for="rol{{ usuario.id }}" class="col-sm-5 col-form-label">Rol:</label>
                                 <div class="col-sm-7">
-                                    <select class="form-select" id="rol{{ usuario.id }}" name="rol" required>
-                                        <option value="" disabled {% if not usuario.groups.first %}selected{% endif %}>Seleccionar...</option>
-                                        <option value="ventas" {% if usuario.groups.first and usuario.groups.first.name == 'ventas' %}selected{% endif %}>Ventas</option>
-                                        <option value="compras" {% if usuario.groups.first and usuario.groups.first.name == 'compras' %}selected{% endif %}>Compras</option>
-                                        <option value="produccion" {% if usuario.groups.first and usuario.groups.first.name == 'produccion' %}selected{% endif %}>Producción</option>
-                                        <option value="deposito" {% if usuario.groups.first and usuario.groups.first.name == 'deposito' %}selected{% endif %}>Depósito</option>
-                                        <option value="control de calidad" {% if usuario.groups.first and usuario.groups.first.name == 'control de calidad' %}selected{% endif %}>Control de Calidad</option>
-                                        <option value="administrador" {% if usuario.groups.first and usuario.groups.first.name == 'administrador' %}selected{% endif %}>Administrador</option>
+                                    <select class="form-select" id="rol{{ usuario.id }}" name="rol" required data-rol-actual="{{ usuario.groups.first.name|default:''|lower|slugify }}">
+                                        <option value="" disabled>Seleccionar...</option>
+                                        <option value="ventas">Ventas</option>
+                                        <option value="compras">Compras</option>
+                                        <option value="produccion">Producción</option>
+                                        <option value="deposito">Depósito</option>
+                                        <option value="control de calidad">Control de Calidad</option>
+                                        <option value="administrador">Administrador</option>
                                     </select>
                                 </div>
                             </div>
@@ -158,6 +195,23 @@
                                         <option value="Activo" {% if usuario.is_active %}selected{% endif %}>Activo</option>
                                         <option value="Inactivo" {% if not usuario.is_active %}selected{% endif %}>Inactivo</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="form-group row p-1" id="depositos-section-{{ usuario.id }}" style="{% if usuario.groups.first and usuario.groups.first.name != 'Depósito' %}display: none;{% endif %}">
+                                <label for="depositos{{ usuario.id }}" class="col-sm-5 col-form-label">Depósitos:</label>
+                                <div class="col-sm-7">
+                                    <div class="form-check-wrapper" style="max-height: 120px; overflow-y: auto; border: 1px solid #ced4da; border-radius: 0.375rem; padding: 8px;">
+                                        {% for deposito in depositos %}
+                                        <div class="form-check">
+                                            <input class="form-check-input deposito-checkbox" type="checkbox" name="depositos" value="{{ deposito.id }}" id="deposito_{{ usuario.id }}_{{ deposito.id }}"
+                                                {% if deposito.id in usuario.depositos_asignados_ids %}checked{% endif %}>
+                                            <label class="form-check-label" for="deposito_{{ usuario.id }}_{{ deposito.id }}">
+                                                {{ deposito.nombre }} - {{ deposito.ubicacion }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    <small class="form-text text-muted">Seleccione los depósitos a los que tendrá acceso este usuario</small>
                                 </div>
                             </div>
                             <div class="modal-footer pt-4 d-flex justify-content-center">
@@ -195,4 +249,71 @@
             </div>
         </div>
     {% endfor %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para mostrar/ocultar sección de depósitos
+    function toggleDepositosSection(rolSelect, depositosSection) {
+        const selectedRole = rolSelect.value;
+        if (selectedRole === 'deposito' || selectedRole === 'Depósito') {
+            depositosSection.style.display = 'block';
+        } else {
+            depositosSection.style.display = 'none';
+            // Desmarcar todos los checkboxes cuando se oculta la sección
+            const checkboxes = depositosSection.querySelectorAll('.deposito-checkbox');
+            checkboxes.forEach(checkbox => checkbox.checked = false);
+        }
+    }
+
+    // Para el modal de creación
+    const rolSelectCrear = document.getElementById('rol');
+    const depositosSectionCrear = document.getElementById('depositos-section');
+    
+    if (rolSelectCrear && depositosSectionCrear) {
+        rolSelectCrear.addEventListener('change', function() {
+            toggleDepositosSection(this, depositosSectionCrear);
+        });
+    }
+
+    // Para los modales de edición - usando selectores más genéricos
+    // Selección dinámica del rol al abrir el modal de edición
+    document.querySelectorAll('.modal[id^="editarUsuarioModal"]').forEach(function(modal) {
+        modal.addEventListener('show.bs.modal', function () {
+            const rolSelect = modal.querySelector('select[name="rol"]');
+            if (rolSelect) {
+                const rolActual = rolSelect.getAttribute('data-rol-actual');
+                if (rolActual) {
+                    // Normalizar para comparar sin tildes ni mayúsculas
+                    function normalize(str) {
+                        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                    }
+                    for (let i = 0; i < rolSelect.options.length; i++) {
+                        if (rolSelect.options[i].value && normalize(rolSelect.options[i].value) === normalize(rolActual)) {
+                            rolSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+                // Mostrar/ocultar sección depósitos según el rol
+                const userId = rolSelect.id.replace('rol', '');
+                const depositosSection = document.getElementById('depositos-section-' + userId);
+                if (depositosSection) {
+                    toggleDepositosSection(rolSelect, depositosSection);
+                }
+            }
+        });
+        // También mantener la lógica al cambiar el select
+        const rolSelect = modal.querySelector('select[name="rol"]');
+        if (rolSelect) {
+            const userId = rolSelect.id.replace('rol', '');
+            const depositosSection = document.getElementById('depositos-section-' + userId);
+            if (depositosSection) {
+                rolSelect.addEventListener('change', function() {
+                    toggleDepositosSection(this, depositosSection);
+                });
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

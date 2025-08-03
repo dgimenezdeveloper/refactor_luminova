@@ -15,6 +15,10 @@ from ..views import (
     get_oferta_proveedor_ajax,
 )
 
+from ..views_usuario_deposito import (
+    actualizar_permisos_deposito_ajax,
+)
+
 # No necesitamos un app_name aquí, porque será heredado del include principal
 
 urlpatterns = [
@@ -25,6 +29,9 @@ urlpatterns = [
     path('roles/eliminar/', eliminar_rol_ajax, name='eliminar_rol_ajax'),
     path('roles/get-permisos/', get_permisos_rol_ajax, name='get_permisos_rol_ajax'),
     path('roles/actualizar-permisos/', actualizar_permisos_rol_ajax, name='actualizar_permisos_rol_ajax'),
+
+    # Rutas para Usuario-Depósito
+    path('usuarios/actualizar-permisos-deposito/', actualizar_permisos_deposito_ajax, name='actualizar_permisos_deposito_ajax'),
 
     # Rutas para otras funcionalidades (Compras)
     path('proveedores/get-for-insumo/', ajax_get_proveedores_for_insumo, name='ajax_get_proveedores_for_insumo'),
