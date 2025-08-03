@@ -22,11 +22,26 @@
     </h1>
     
     {% if dashboard_global %}
+    <!-- Glosario de Colores Sutil -->
+    <div class="mb-2 ms-1 text-center">
+        <small class="text-muted">
+            <span class="align-middle badge bg-primary me-1" style="font-size:0.8em;"><i class="fas fa-boxes"></i></span> Insumos
+            <span class="align-middle badge bg-success me-1" style="font-size:0.8em;"><i class="fas fa-check-circle"></i></span> Productos
+            <span class="align-middle badge bg-info me-1" style="font-size:0.8em;"><i class="fas fa-warehouse"></i></span> Depósitos
+            <span class="align-middle badge bg-warning text-dark me-1" style="font-size:0.8em;"><i class="fas fa-truck"></i></span> OCs tránsito
+            <span class="align-middle badge bg-secondary me-1" style="font-size:0.8em;"><i class="fas fa-clipboard-list"></i></span> OPs solicitando
+            <span class="align-middle badge bg-danger me-1" style="font-size:0.8em;"><i class="fas fa-exclamation-triangle"></i></span> Stock crítico
+        </small>
+    </div>
+    {% endif %}
+    {% if dashboard_global %}
     <!-- Dashboard Global -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="card border-primary mb-3">
-                <div class="card-header bg-primary text-white">Insumos</div>
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-boxes"></i> Insumos
+                </div>
                 <div class="card-body">
                     <h4 class="card-title">{{ insumos_count }}</h4>
                     <p class="card-text">Total de insumos en todos los depósitos.</p>
@@ -35,7 +50,9 @@
         </div>
         <div class="col-md-3">
             <div class="card border-success mb-3">
-                <div class="card-header bg-success text-white">Productos Terminados</div>
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-check-circle"></i> Productos Terminados
+                </div>
                 <div class="card-body">
                     <h4 class="card-title">{{ productos_count }}</h4>
                     <p class="card-text">Total de productos terminados en todos los depósitos.</p>
@@ -44,19 +61,30 @@
         </div>
         <div class="col-md-3">
             <div class="card border-info mb-3">
-                <div class="card-header bg-info text-white">Depósitos</div>
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-warehouse"></i> Depósitos
+                </div>
                 <div class="card-body">
                     <h4 class="card-title">{{ depositos_count }}</h4>
                     <p class="card-text">Cantidad total de depósitos en el sistema.</p>
                 </div>
+    {% if dashboard_global %}
+   
+    {% endif %}
             </div>
         </div>
         <div class="col-md-3">
             <div class="card border-warning mb-3">
-                <div class="card-header bg-warning text-white">Actividad Pendiente</div>
+                <div class="card-header bg-warning text-white">
+                    <i class="fas fa-clock"></i> Actividad Pendiente
+                </div>
                 <div class="card-body">
                     <h4 class="card-title">{{ ocs_en_transito_count|add:ops_solicitudes_count }}</h4>
-                    <p class="card-text">OCs en tránsito + OPs solicitando insumos.</p>
+                    <p class="card-text mb-1">Total de actividades pendientes:</p>
+                    <small class="text-muted d-block">
+                        <i class="fas fa-truck"></i> {{ ocs_en_transito_count }} OCs en tránsito<br>
+                        <i class="fas fa-clipboard-list"></i> {{ ops_solicitudes_count }} OPs solicitando
+                    </small>
                 </div>
             </div>
         </div>
@@ -66,8 +94,8 @@
     <div class="row mb-4">
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">OCs en Tránsito ({{ ocs_en_transito_count }})</h5>
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0"><i class="fas fa-truck"></i> OCs en Tránsito ({{ ocs_en_transito_count }})</h5>
                 </div>
                 <div class="card-body">
                     {% if ocs_en_transito_list %}
@@ -105,8 +133,8 @@
         
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header bg-warning text-white">
-                    <h5 class="mb-0">Solicitudes de Insumos ({{ ops_solicitudes_count }})</h5>
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Solicitudes de Insumos ({{ ops_solicitudes_count }})</h5>
                 </div>
                 <div class="card-body">
                     {% if ops_solicitudes_list %}
@@ -149,7 +177,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">Depósitos con Stock Crítico (< {{ umbral_stock_bajo|intcomma }})</h5>
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Depósitos con Stock Crítico (< {{ umbral_stock_bajo|intcomma }})</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -180,7 +208,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">Resumen por Depósito</h5>
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Resumen por Depósito</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -188,11 +216,11 @@
                             <thead>
                                 <tr>
                                     <th>Depósito</th>
-                                    <th>Total Insumos</th>
-                                    <th>Total Productos</th>
-                                    <th>OCs en Tránsito</th>
-                                    <th>OPs Solicitando</th>
-                                    <th>Insumos Críticos</th>
+                                    <th class="text-primary"><i class="fas fa-boxes"></i> Total Insumos</th>
+                                    <th class="text-success"><i class="fas fa-check-circle"></i> Total Productos</th>
+                                    <th class="text-warning"><i class="fas fa-truck"></i> OCs en Tránsito</th>
+                                    <th class="text-secondary"><i class="fas fa-clipboard-list"></i> OPs Solicitando</th>
+                                    <th class="text-danger"><i class="fas fa-exclamation-triangle"></i> Insumos Críticos</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -210,7 +238,7 @@
                                     </td>
                                     <td>
                                         {% if item.ops_solicitando > 0 %}
-                                            <span class="badge bg-info">{{ item.ops_solicitando }}</span>
+                                            <span class="badge bg-secondary">{{ item.ops_solicitando }}</span>
                                         {% else %}
                                             <span class="text-muted">0</span>
                                         {% endif %}
@@ -237,7 +265,9 @@
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="card border-primary mb-3">
-                <div class="card-header bg-primary text-white">Insumos</div>
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-boxes"></i> Insumos
+                </div>
                 <div class="card-body">
                     <h4 class="card-title">{{ insumos_count }}</h4>
                     <p class="card-text">Total de insumos en este depósito.</p>
@@ -246,7 +276,9 @@
         </div>
         <div class="col-md-4">
             <div class="card border-success mb-3">
-                <div class="card-header bg-success text-white">Productos Terminados</div>
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-check-circle"></i> Productos Terminados
+                </div>
                 <div class="card-body">
                     <h4 class="card-title">{{ productos_count }}</h4>
                     <p class="card-text">Total de productos terminados en este depósito.</p>
