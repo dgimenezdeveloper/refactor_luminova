@@ -77,6 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.href = '{% url "App_LUMINOVA:produccion_lista_op" %}';
             } else if (userGroup === 'control de calidad') {
                 window.location.href = '{% url "App_LUMINOVA:control_calidad_view" %}';
+            } else if (userGroup === 'depósito' || userGroup === 'Depósito') {
+                window.location.href = '{% url "App_LUMINOVA:seleccionar_deposito" %}';
             } else if (userGroup === 'administrador') {
                 window.location.href = '{% url "App_LUMINOVA:dashboard" %}';
             } else {

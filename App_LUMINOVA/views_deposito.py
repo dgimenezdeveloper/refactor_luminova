@@ -9,16 +9,18 @@ from django.db.models import Q
 from django.http import HttpResponseForbidden
 from .services.notification_service import NotificationService
 # --- TRANSFERENCIA DE INSUMOS ENTRE DEPÓSITOS ---
-from .utils import es_admin_o_rol
+from .utils import es_admin_o_rol, redirigir_segun_rol
 
 def _usuario_puede_acceder_deposito(user, deposito, accion="transferir"):
     """Verifica si el usuario puede acceder al depósito especificado para la acción dada"""
+    # Administradores y superusuarios tienen acceso total
     if user.is_superuser or user.groups.filter(name='administrador').exists():
         return True
     
     from .models import UsuarioDeposito
     
     try:
+        # Verificar asignación específica del usuario al depósito
         asignacion = UsuarioDeposito.objects.get(usuario=user, deposito=deposito)
         if accion == "transferir":
             return asignacion.puede_transferir
@@ -29,10 +31,8 @@ def _usuario_puede_acceder_deposito(user, deposito, accion="transferir"):
         else:
             return True  # Por defecto permitir si la acción no está especificada
     except UsuarioDeposito.DoesNotExist:
-        # Si no hay asignación específica, verificar por rol general
-        # Usuarios con rol 'deposito' pueden acceder a todos por defecto
-        if user.groups.filter(name='Depósito').exists():
-            return True
+        # Si no hay asignación específica, denegar acceso
+        # Ya no permitimos acceso automático por tener rol 'Depósito'
         return False
 
 def _auditar_movimiento(tipo, usuario, insumo=None, producto=None, deposito_origen=None, deposito_destino=None, cantidad=0, motivo=""):
@@ -650,10 +650,27 @@ def seleccionar_deposito_view(request):
     return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos, "sin_permisos": sin_permisos})
 
 
+@login_required
 def deposito_dashboard_view(request):
+    """
+    Dashboard del depósito que muestra solo información del depósito asignado al usuario.
+    """
+    # Validar permisos de acceso
+    if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+    
     deposito_id = request.session.get("deposito_seleccionado")
+    
+    # Verificar que el usuario tenga acceso al depósito seleccionado
+    if not request.user.is_superuser and deposito_id:
+        from .models import UsuarioDeposito
+        asignaciones = UsuarioDeposito.objects.filter(usuario=request.user, deposito__id=deposito_id)
+        if not asignaciones.exists():
+            return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+    
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
+        
     deposito = get_object_or_404(Deposito, id=deposito_id)
     insumos_count = Insumo.objects.filter(deposito=deposito).count()
     productos_count = ProductoTerminado.objects.filter(deposito=deposito).count()
@@ -668,6 +685,14 @@ def deposito_dashboard_view(request):
 @login_required
 @transaction.atomic
 def deposito_enviar_insumos_op_view(request, op_id):
+    """
+    Vista para que el depósito envíe los insumos necesarios a una OP específica.
+    Solo permite enviar insumos si el usuario tiene acceso al depósito correspondiente.
+    """
+    # Validar permisos de acceso
+    if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+    
     op = get_object_or_404(
         OrdenProduccion.objects.select_related(
             "orden_venta_origen",
@@ -675,6 +700,18 @@ def deposito_enviar_insumos_op_view(request, op_id):
         ),
         id=op_id,
     )
+    
+    # Verificar que el usuario tenga acceso al depósito de la OP
+    if not request.user.is_superuser:
+        from .models import UsuarioDeposito
+        if op.producto_a_producir and op.producto_a_producir.deposito:
+            asignaciones = UsuarioDeposito.objects.filter(
+                usuario=request.user, 
+                deposito=op.producto_a_producir.deposito
+            )
+            if not asignaciones.exists():
+                return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+    
     logger.info(
         f"Procesando envío de insumos para OP: {op.numero_op} (Estado actual: {op.estado_op.nombre if op.estado_op else 'N/A'})"
     )
@@ -808,6 +845,10 @@ def deposito_enviar_insumos_op_view(request, op_id):
 
 @login_required
 def deposito_solicitudes_insumos_view(request):
+    # Solo usuarios con rol 'deposito' o 'administrador'
+    if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+    
     # Filtrar por depósito asignado al usuario (excepto admin)
     from .models import UsuarioDeposito
     titulo_seccion = "Gestión de Insumos para Producción"
@@ -815,20 +856,33 @@ def deposito_solicitudes_insumos_view(request):
 
     deposito_id = request.session.get("deposito_seleccionado")
     deposito = None
+    
+    # Para usuarios no superuser, obtener solo el depósito asignado
     if not request.user.is_superuser:
-        if deposito_id:
-            deposito = Deposito.objects.filter(id=deposito_id).first()
+        # Verificar asignación específica del usuario a depósitos
+        asignaciones = UsuarioDeposito.objects.filter(usuario=request.user)
+        if asignaciones.exists():
+            # Si hay depósito seleccionado en sesión, verificar que el usuario tenga acceso
+            if deposito_id:
+                deposito = asignaciones.filter(deposito__id=deposito_id).first()
+                if deposito:
+                    deposito = deposito.deposito
+                else:
+                    # Usuario intenta acceder a un depósito no asignado
+                    return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+            else:
+                # Usar el primer depósito asignado
+                deposito = asignaciones.first().deposito
+                request.session['deposito_seleccionado'] = deposito.id
         else:
-            # Buscar el primer depósito asignado
-            asignacion = UsuarioDeposito.objects.filter(usuario=request.user).first()
-            if asignacion:
-                deposito = asignacion.deposito
-    # Si es admin, no filtra por depósito
+            # Usuario sin depósitos asignados
+            return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     try:
         estado_insumos_solicitados_obj = EstadoOrden.objects.filter(nombre__iexact="Insumos Solicitados").first()
         if estado_insumos_solicitados_obj:
             qs = OrdenProduccion.objects.filter(estado_op=estado_insumos_solicitados_obj)
+            # Filtrar por depósito específico para usuarios no admin
             if not request.user.is_superuser and deposito:
                 qs = qs.filter(producto_a_producir__deposito=deposito)
             ops_pendientes_preparacion = qs.select_related("producto_a_producir", "estado_op", "orden_venta_origen__cliente").order_by("fecha_solicitud")
@@ -839,6 +893,7 @@ def deposito_solicitudes_insumos_view(request):
         estado_en_proceso_obj = EstadoOrden.objects.filter(nombre__iexact="En Proceso").first()
         if estado_en_proceso_obj:
             qs2 = OrdenProduccion.objects.filter(estado_op=estado_en_proceso_obj)
+            # Filtrar por depósito específico para usuarios no admin
             if not request.user.is_superuser and deposito:
                 qs2 = qs2.filter(producto_a_producir__deposito=deposito)
             ops_con_insumos_enviados = qs2.select_related("producto_a_producir", "estado_op", "orden_venta_origen__cliente").order_by("-fecha_inicio_real", "-fecha_solicitud")
@@ -864,22 +919,38 @@ def deposito_solicitudes_insumos_view(request):
 def recepcion_pedidos_view(request):
     """
     Muestra una lista de Órdenes de Compra que están "En Tránsito" y listas para ser recibidas.
+    Solo muestra pedidos del depósito asignado al usuario.
     """
-    # if not es_admin_o_rol(request.user, ['deposito', 'administrador']):
-    #     messages.error(request, "Acceso no permitido.")
-    #     return redirect('App_LUMINOVA:dashboard')
+    # Validar permisos de acceso
+    if not es_admin_o_rol(request.user, ['deposito', 'administrador']):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     from .models import UsuarioDeposito
     deposito_id = request.session.get("deposito_seleccionado")
     deposito = None
+    
+    # Para usuarios no superuser, verificar depósito asignado
     if not request.user.is_superuser:
-        if deposito_id:
-            deposito = Deposito.objects.filter(id=deposito_id).first()
+        # Verificar asignación específica del usuario a depósitos
+        asignaciones = UsuarioDeposito.objects.filter(usuario=request.user)
+        if asignaciones.exists():
+            # Si hay depósito seleccionado en sesión, verificar que el usuario tenga acceso
+            if deposito_id:
+                deposito = asignaciones.filter(deposito__id=deposito_id).first()
+                if deposito:
+                    deposito = deposito.deposito
+                else:
+                    # Usuario intenta acceder a un depósito no asignado
+                    return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+            else:
+                # Usar el primer depósito asignado
+                deposito = asignaciones.first().deposito
+                request.session['deposito_seleccionado'] = deposito.id
         else:
-            asignacion = UsuarioDeposito.objects.filter(usuario=request.user).first()
-            if asignacion:
-                deposito = asignacion.deposito
+            # Usuario sin depósitos asignados
+            return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
+    # Filtrar órdenes solo del depósito asignado
     qs = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO")
     if not request.user.is_superuser and deposito:
         qs = qs.filter(deposito=deposito)
@@ -898,12 +969,20 @@ def recepcion_pedidos_view(request):
 def recibir_pedido_oc_view(request, oc_id):
     """
     Procesa la recepción de una Orden de Compra.
+    Solo permite recibir pedidos del depósito asignado al usuario.
     """
-    # if not es_admin_o_rol(request.user, ['deposito', 'administrador']):
-    #     messages.error(request, "Acción no permitida.")
-    #     return redirect('App_LUMINOVA:deposito_recepcion_pedidos')
+    # Validar permisos de acceso
+    if not es_admin_o_rol(request.user, ['deposito', 'administrador']):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     orden_a_recibir = get_object_or_404(Orden, id=oc_id, estado="EN_TRANSITO")
+    
+    # Verificar que el usuario tenga acceso al depósito de la orden
+    if not request.user.is_superuser:
+        from .models import UsuarioDeposito
+        asignaciones = UsuarioDeposito.objects.filter(usuario=request.user, deposito=orden_a_recibir.deposito)
+        if not asignaciones.exists():
+            return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     insumo_recibido = orden_a_recibir.insumo_principal
     cantidad_recibida = orden_a_recibir.cantidad_principal
@@ -942,17 +1021,21 @@ def deposito_view(request):
     logger.info("--- deposito_view: INICIO ---")
 
     # Validación de permisos de acceso
-    if not (request.user.is_superuser or request.user.groups.filter(name='Depósito').exists()):
-        return HttpResponseForbidden("No tienes permisos para acceder a depósitos.")
+    if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     deposito_id = request.session.get("deposito_seleccionado")
+    
+    if not deposito_id:
+        return redirect("App_LUMINOVA:seleccionar_deposito")
+        
     deposito = get_object_or_404(Deposito, id=deposito_id)
 
-    # Validar que el usuario tenga asignado el depósito (excepto admin)
+    # Validar que el usuario tenga acceso al depósito seleccionado (excepto admin)
     if not request.user.is_superuser:
+        from .models import UsuarioDeposito
         if not UsuarioDeposito.objects.filter(usuario=request.user, deposito=deposito).exists():
-            messages.error(request, "No tienes acceso a este depósito.")
-            return redirect("App_LUMINOVA:seleccionar_deposito")
+            return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     categorias_I = CategoriaInsumo.objects.filter(deposito=deposito)
     categorias_PT = CategoriaProductoTerminado.objects.filter(deposito=deposito)
@@ -1059,9 +1142,30 @@ def deposito_view(request):
 
 @login_required
 def deposito_solicitudes_insumos_view(request):
-    # if not es_admin_o_rol(request.user, ['deposito', 'administrador']): # Control de permisos
-    #     messages.error(request, "Acceso denegado.")
-    #     return redirect('App_LUMINOVA:dashboard')
+    # Validar permisos de acceso
+    if not es_admin_o_rol(request.user, ['deposito', 'administrador']):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+
+    # Obtener depósito asignado para filtrar solicitudes
+    from .models import UsuarioDeposito
+    deposito = None
+    
+    if not request.user.is_superuser:
+        deposito_id = request.session.get("deposito_seleccionado")
+        asignaciones = UsuarioDeposito.objects.filter(usuario=request.user)
+        
+        if asignaciones.exists():
+            if deposito_id:
+                deposito_asignacion = asignaciones.filter(deposito__id=deposito_id).first()
+                if deposito_asignacion:
+                    deposito = deposito_asignacion.deposito
+                else:
+                    return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
+            else:
+                deposito = asignaciones.first().deposito
+                request.session['deposito_seleccionado'] = deposito.id
+        else:
+            return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     ops_necesitan_insumos = (
         OrdenProduccion.objects.none()
@@ -1069,15 +1173,15 @@ def deposito_solicitudes_insumos_view(request):
 
     try:
         estado_objetivo = EstadoOrden.objects.get(nombre__iexact="Insumos Solicitados")
-        ops_necesitan_insumos = (
-            OrdenProduccion.objects.filter(  # ASIGNACIÓN AQUÍ (Camino A)
-                estado_op=estado_objetivo
-            )
-            .select_related(
-                "producto_a_producir", "estado_op", "orden_venta_origen__cliente"
-            )
-            .order_by("fecha_solicitud")
-        )
+        qs = OrdenProduccion.objects.filter(estado_op=estado_objetivo)
+        
+        # Filtrar por depósito para usuarios no admin
+        if not request.user.is_superuser and deposito:
+            qs = qs.filter(producto_a_producir__deposito=deposito)
+            
+        ops_necesitan_insumos = qs.select_related(
+            "producto_a_producir", "estado_op", "orden_venta_origen__cliente"
+        ).order_by("fecha_solicitud")
 
     except EstadoOrden.DoesNotExist:
         messages.error(
@@ -1101,15 +1205,27 @@ def deposito_detalle_solicitud_op_view(request, op_id):
     Muestra el detalle de una OP desde la perspectiva del depósito,
     listando los insumos necesarios, su stock y si son suficientes.
     Permite confirmar el envío/descuento de insumos.
+    Solo permite ver OPs del depósito asignado al usuario.
     """
-    # if not es_admin_o_rol(request.user, ['deposito', 'administrador']): # Control de permisos
-    #     messages.error(request, "Acceso denegado.")
-    #     return redirect('App_LUMINOVA:dashboard')
+    # Validar permisos de acceso
+    if not es_admin_o_rol(request.user, ['deposito', 'administrador']):
+        return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     op = get_object_or_404(
         OrdenProduccion.objects.select_related("producto_a_producir", "estado_op"),
         id=op_id,
     )
+    
+    # Verificar que el usuario tenga acceso al depósito de la OP
+    if not request.user.is_superuser:
+        from .models import UsuarioDeposito
+        if op.producto_a_producir and op.producto_a_producir.deposito:
+            asignaciones = UsuarioDeposito.objects.filter(
+                usuario=request.user, 
+                deposito=op.producto_a_producir.deposito
+            )
+            if not asignaciones.exists():
+                return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
     insumos_necesarios_data = []
     todos_los_insumos_disponibles = (
         True  # Asumir que sí hasta que se demuestre lo contrario
