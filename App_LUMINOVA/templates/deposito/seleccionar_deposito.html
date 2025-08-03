@@ -7,8 +7,10 @@
 
 {% block sidebar_content %}{% endblock %}
 
+
 {% block content %}
 {% csrf_token %}
+{% if not sin_permisos %}
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-6">
@@ -36,4 +38,53 @@
         </div>
     </div>
 </div>
+{% endif %}
+
+<!-- Modal de advertencia de permisos -->
+<div class="modal fade" id="modalSinPermisos" tabindex="-1" aria-labelledby="modalSinPermisosLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="modalSinPermisosLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i>Acceso denegado</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        No tienes permisos para acceder a depósitos.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if sin_permisos %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var modal = new bootstrap.Modal(document.getElementById('modalSinPermisos'));
+    modal.show();
+    var btn = document.querySelector('#modalSinPermisos .btn-danger');
+    // Pasar el grupo principal del usuario a JavaScript
+    var userGroup = "{% if user.groups.all %}{{ user.groups.all.0.name|escapejs }}{% else %}none{% endif %}";
+    if (btn) {
+        btn.addEventListener('click', function() {
+            // Redirigir según el grupo principal del usuario
+            if (userGroup === 'compras') {
+                window.location.href = '{% url "App_LUMINOVA:compras_lista_oc" %}';
+            } else if (userGroup === 'ventas') {
+                window.location.href = '{% url "App_LUMINOVA:ventas_lista_ov" %}';
+            } else if (userGroup === 'produccion') {
+                window.location.href = '{% url "App_LUMINOVA:produccion_lista_op" %}';
+            } else if (userGroup === 'control de calidad') {
+                window.location.href = '{% url "App_LUMINOVA:control_calidad_view" %}';
+            } else if (userGroup === 'administrador') {
+                window.location.href = '{% url "App_LUMINOVA:dashboard" %}';
+            } else {
+                window.location.href = '/';
+            }
+        });
+    }
+});
+</script>
+{% endif %}
 {% endblock %}

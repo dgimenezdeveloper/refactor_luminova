@@ -118,9 +118,52 @@ class ProductoTerminadoDetailView(DetailView):
 
 
 class ProductoTerminadoCreateView(CreateView):
+    def form_valid(self, form):
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            from .models import Deposito
+            try:
+                deposito = Deposito.objects.get(id=deposito_id)
+                form.instance.deposito = deposito
+            except Deposito.DoesNotExist:
+                pass
+        return super().form_valid(form)
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        categoria_id = self.request.GET.get("categoria")
+        if deposito_id:
+            from .models import Deposito
+            try:
+                deposito = Deposito.objects.get(id=deposito_id)
+                if self.request.method == "POST":
+                    data = kwargs.get("data", self.request.POST).copy()
+                    data["deposito"] = deposito.id
+                    # Si la categoría viene en GET o POST, inyectarla también
+                    if "categoria" in self.request.POST:
+                        data["categoria"] = self.request.POST["categoria"]
+                    elif categoria_id:
+                        data["categoria"] = categoria_id
+                    kwargs["data"] = data
+                else:
+                    initial = kwargs.get("initial", {}).copy()
+                    initial["deposito"] = deposito.id
+                    if categoria_id:
+                        initial["categoria"] = categoria_id
+                    kwargs["initial"] = initial
+            except Deposito.DoesNotExist:
+                pass
+        return kwargs
     model = ProductoTerminado
     template_name = "deposito/productoterminado_crear.html"
     form_class = ProductoTerminadoForm
+
+    def get_success_url(self):
+        # Redirige al detalle de la categoría si existe, si no al depósito
+        categoria = self.object.categoria
+        if categoria:
+            return reverse_lazy("App_LUMINOVA:categoria_pt_detail", kwargs={"pk": categoria.pk})
+        return reverse_lazy("App_LUMINOVA:deposito_view")
 
 
 class ProductoTerminadoUpdateView(UpdateView):

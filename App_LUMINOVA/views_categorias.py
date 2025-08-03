@@ -110,6 +110,13 @@ class Categoria_IDetailView(DetailView):
 
 
 class Categoria_ICreateView(CreateView):
+    def form_valid(self, form):
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            from .models import Deposito
+            deposito = Deposito.objects.get(id=deposito_id)
+            form.instance.deposito = deposito
+        return super().form_valid(form)
     model = CategoriaInsumo
     template_name = "deposito/categoria_insumo_crear.html"
     fields = ("nombre", "imagen")
@@ -188,6 +195,13 @@ class Categoria_PTDetailView(DetailView):
 
 
 class Categoria_PTCreateView(CreateView):
+    def form_valid(self, form):
+        deposito_id = self.request.session.get("deposito_seleccionado")
+        if deposito_id:
+            from .models import Deposito
+            deposito = Deposito.objects.get(id=deposito_id)
+            form.instance.deposito = deposito
+        return super().form_valid(form)
     model = CategoriaProductoTerminado
     template_name = "deposito/categoria_producto_terminado_crear.html"
     fields = ("nombre", "imagen")
