@@ -192,7 +192,6 @@ def ventas_lista_ov_view(request):
 
 
 @login_required
-@transaction.atomic
 def ventas_crear_ov_view(request):
     """
     Gestiona la creación de una nueva Orden de Venta y sus ítems asociados.
@@ -208,56 +207,67 @@ def ventas_crear_ov_view(request):
 
         if form_ov.is_valid() and formset_items.is_valid():
             try:
-                ov_instance = form_ov.save(commit=False)
-                ov_instance.estado = "PENDIENTE"
-                ov_instance.save() # Se necesita ID para la relación
+                with transaction.atomic():
+                    ov_instance = form_ov.save(commit=False)
+                    ov_instance.estado = "PENDIENTE"
+                    ov_instance.save() # Se necesita ID para la relación
 
-                items_a_procesar = []
-                total_ov = 0
-                for form in formset_items:
-                    if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
-                        item = form.save(commit=False)
-                        item.orden_venta = ov_instance
-                        item.subtotal = item.cantidad * item.producto_terminado.precio_unitario
-                        total_ov += item.subtotal
-                        items_a_procesar.append(item)
-                
-                if not items_a_procesar:
-                    raise ValueError("Se debe añadir al menos un producto a la orden.")
+                    items_a_procesar = []
+                    total_ov = 0
+                    for form in formset_items:
+                        if form.is_valid() and form.cleaned_data and not form.cleaned_data.get('DELETE'):
+                            item = form.save(commit=False)
+                            item.orden_venta = ov_instance
+                            item.subtotal = item.cantidad * item.producto_terminado.precio_unitario
+                            total_ov += item.subtotal
+                            items_a_procesar.append(item)
 
-                ItemOrdenVenta.objects.bulk_create(items_a_procesar)
-                ov_instance.total_ov = total_ov
-                ov_instance.save(update_fields=['total_ov'])
+                    if not items_a_procesar:
+                        raise ValueError("Se debe añadir al menos un producto a la orden.")
 
-                estado_op_inicial = EstadoOrden.objects.get(nombre__iexact="Pendiente")
-                
-                ops_a_crear = []
-                for item_procesado in items_a_procesar:
-                    next_op_number = generar_siguiente_numero_documento(OrdenProduccion, 'OP', 'numero_op')
-                    ops_a_crear.append(
-                        OrdenProduccion(
-                            numero_op=next_op_number,
-                            orden_venta_origen=ov_instance,
-                            producto_a_producir=item_procesado.producto_terminado,
-                            cantidad_a_producir=item_procesado.cantidad,
-                            estado_op=estado_op_inicial,
-                        )
+                    ItemOrdenVenta.objects.bulk_create(items_a_procesar)
+                    ov_instance.total_ov = total_ov
+                    ov_instance.save(update_fields=['total_ov'])
+
+                    estado_op_inicial = EstadoOrden.objects.get(nombre__iexact="Pendiente")
+
+                    # Obtener el último número OP existente y generar secuencialmente en memoria
+                    from django.db.models import Max
+                    ultimo_numero_op = (
+                        OrdenProduccion.objects.filter(numero_op__startswith='OP-')
+                        .aggregate(max_num=Max('numero_op'))['max_num']
                     )
-                OrdenProduccion.objects.bulk_create(ops_a_crear)
+                    if ultimo_numero_op:
+                        try:
+                            ultimo_num = int(ultimo_numero_op.split('-')[1])
+                        except Exception:
+                            ultimo_num = 0
+                    else:
+                        ultimo_num = 0
+                    ops_a_crear = []
+                    for i, item_procesado in enumerate(items_a_procesar, start=1):
+                        next_op_number = f"OP-{ultimo_num + i:05d}"
+                        ops_a_crear.append(
+                            OrdenProduccion(
+                                numero_op=next_op_number,
+                                orden_venta_origen=ov_instance,
+                                producto_a_producir=item_procesado.producto_terminado,
+                                cantidad_a_producir=item_procesado.cantidad,
+                                estado_op=estado_op_inicial,
+                            )
+                        )
+                    OrdenProduccion.objects.bulk_create(ops_a_crear)
 
                 messages.success(request, f'Orden de Venta "{ov_instance.numero_ov}" y sus OPs asociadas se crearon exitosamente.')
                 return redirect('App_LUMINOVA:ventas_detalle_ov', ov_id=ov_instance.id)
 
             except EstadoOrden.DoesNotExist:
-                 messages.error(request, "Error de configuración: El estado 'Pendiente' para OP no existe. No se pudo continuar.")
-                 # La transacción se revertirá.
+                messages.error(request, "Error de configuración: El estado 'Pendiente' para OP no existe. No se pudo continuar.")
             except ValueError as e:
                 messages.error(request, str(e))
-                # La transacción se revertirá.
             except Exception as e:
                 messages.error(request, f"Ocurrió un error inesperado. Por favor, intente de nuevo. Detalle: {e}")
                 logger.exception("Error grave en la creación de OV/OPs")
-                # La transacción se revertirá.
     else: # GET
         initial_data = {'numero_ov': generar_siguiente_numero_documento(OrdenVenta, 'OV', 'numero_ov')}
         form_ov = OrdenVentaForm(prefix="ov", initial=initial_data)
