@@ -18,15 +18,15 @@ with transaction.atomic():
         if insumo.deposito:
             stock_obj = StockInsumo.objects.create(
                 insumo=insumo,
-                deposito=insumo.deposito,
-                cantidad=insumo.stock or 0
+                cantidad=insumo.cantidad,
+                deposito=insumo.deposito
             )
-            print(f"Creado: {insumo.descripcion[:50]}... en {insumo.deposito.nombre} - Stock: {insumo.stock}")
             count_created += 1
+            print(f"Stock creado para insumo: {insumo.nombre}, Cantidad: {insumo.cantidad}, Depósito: {insumo.deposito.nombre}")
         else:
-            print(f"ADVERTENCIA: {insumo.descripcion} no tiene depósito asignado")
+            print(f"Insumo {insumo.nombre} no tiene un depósito asignado. No se creó stock.")
 
-print(f"\nTotal registros StockInsumo creados: {count_created}")
+print(f"\nTotal de registros creados en StockInsumo: {count_created}")
 
 # Verificar por depósito
 print(f"\n=== VERIFICACIÓN STOCKINSUMO POR DEPÓSITO ===")

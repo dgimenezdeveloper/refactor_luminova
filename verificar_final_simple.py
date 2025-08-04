@@ -18,37 +18,23 @@ def verificar_estado():
     
     if insumos_sin_deposito.exists():
         print("   ❌ PROBLEMA: Hay insumos sin depósito:")
-        for insumo in insumos_sin_deposito[:5]:
-            print(f"      - {insumo.descripcion}")
+        for insumo in insumos_sin_deposito:
+            print(f"      - Insumo: {insumo.nombre}")
     else:
-        print("   ✅ Todos los insumos tienen depósito asignado")
-    
-    # 2. Verificar insumos con stock crítico en Depósito Central Luminova
-    try:
-        deposito_central = Deposito.objects.get(nombre="Depósito Central Luminova")
-        insumos_criticos = Insumo.objects.filter(
-            deposito=deposito_central,
-            stock__lte=15000
-        ).order_by('stock')
-        
-        print(f"\n2. Insumos con stock crítico en {deposito_central.nombre}: {insumos_criticos.count()}")
-        
-        if insumos_criticos.exists():
-            print("   📋 Lista de insumos críticos:")
-            for insumo in insumos_criticos:
-                print(f"      - {insumo.descripcion}: {insumo.stock} unidades")
-        else:
-            print("   ✅ No hay insumos con stock crítico")
-            
-    except Deposito.DoesNotExist:
-        print("   ❌ No se encontró el Depósito Central Luminova")
-    
-    # 3. Resumen por depósito
-    print(f"\n3. Resumen por depósito:")
-    for deposito in Deposito.objects.all():
-        total_insumos = Insumo.objects.filter(deposito=deposito).count()
-        criticos = Insumo.objects.filter(deposito=deposito, stock__lte=15000).count()
-        print(f"   - {deposito.nombre}: {total_insumos} insumos ({criticos} críticos)")
+        print("   ✅ Todos los insumos tienen depósito asignado.")
+
+    # 2. Verificar depósitos sin insumos
+    depositos_sin_insumos = Deposito.objects.filter(insumo__isnull=True)
+    print(f"2. Depósitos sin insumos: {depositos_sin_insumos.count()}")
+
+    if depositos_sin_insumos.exists():
+        print("   ❌ PROBLEMA: Hay depósitos sin insumos:")
+        for deposito in depositos_sin_insumos:
+            print(f"      - Depósito: {deposito.nombre}")
+    else:
+        print("   ✅ Todos los depósitos tienen al menos un insumo asignado.")
+
+    print("\n=== VERIFICACIÓN COMPLETADA ===")
 
 if __name__ == "__main__":
     verificar_estado()

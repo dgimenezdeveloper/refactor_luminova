@@ -79,6 +79,26 @@ def main():
     print(f"- Stock original: {insumo_critico.stock}")
     print(f"- Stock nuevo: {datos_formulario['stock']}")
     print(f"- Depósito preservado: {'✅ Sí' if insumo_actualizado.deposito else '❌ No'}")
+    
+    # Crear datos de prueba
+    deposito = Deposito.objects.create(nombre='Depósito Prueba')
+    insumo = Insumo.objects.create(nombre='Insumo Prueba', cantidad=10, deposito=deposito)
+
+    # Editar insumo utilizando el formulario
+    datos_actualizados = {
+        'nombre': 'Insumo Editado',
+        'cantidad': 20,
+        'deposito': deposito.id
+    }
+    form = InsumoForm(instance=insumo, data=datos_actualizados)
+    if form.is_valid():
+        insumo_editado = form.save()
+        print(f"Insumo editado: {insumo_editado.nombre}, Cantidad: {insumo_editado.cantidad}, Depósito: {insumo_editado.deposito.nombre}")
+
+        # Validar que el depósito no cambió
+        assert insumo_editado.deposito == deposito, "El depósito asignado cambió tras la edición."
+    else:
+        print("Error: El formulario no es válido.")
 
 if __name__ == "__main__":
     main()

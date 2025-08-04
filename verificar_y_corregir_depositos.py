@@ -115,3 +115,21 @@ with transaction.atomic():
 
 print("\n=== STOCK DEPOSITOS CORREGIDO ===")
 print("\n=== CORRECCIÓN COMPLETADA ===")
+
+# 2. Corregir insumos sin depósito
+print("\n2. CORRECCIÓN DE INSUMOS SIN DEPÓSITO:")
+with transaction.atomic():
+    if insumos_sin_deposito.exists():
+        deposito_default = Deposito.objects.first()
+        if not deposito_default:
+            print("Error: No hay depósitos disponibles para asignar.")
+            exit()
+
+        for insumo in insumos_sin_deposito:
+            insumo.deposito = deposito_default
+            insumo.save()
+            print(f"Insumo {insumo.nombre} asignado al depósito {deposito_default.nombre}.")
+    else:
+        print("No se encontraron insumos sin depósito.")
+
+print("\nCorrección completada con éxito.")

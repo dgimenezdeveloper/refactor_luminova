@@ -46,4 +46,27 @@ if categorias_sin_deposito.exists():
         categoria.save(update_fields=['deposito'])
         print(f"  ✓ {categoria.nombre} -> {central.nombre}")
 
-print(f"\n✅ Los datos están listos. Ahora prueba la vista del depósito.")
+# Asignar insumos a depósitos
+with transaction.atomic():
+    insumos = Insumo.objects.all()
+    if not insumos.exists():
+        print("No se encontraron insumos para asignar.")
+        exit()
+
+    for insumo in insumos:
+        if insumo.categoria.nombre == "Categoría A":
+            insumo.deposito = central
+        else:
+            insumo.deposito = maestranza
+        insumo.save()
+        print(f"Insumo {insumo.nombre} asignado a {insumo.deposito.nombre}.")
+
+    print("\nAsignando insumos críticos a depósitos alternativos...")
+    for insumo in insumos_criticos:
+        deposito_alternativo = maestranza if insumo.deposito == central else central
+        insumo.deposito = deposito_alternativo
+        insumo.save(update_fields=['deposito'])
+        print(f"  · {insumo.descripcion[:50]}... reasignado a {deposito_alternativo.nombre}")
+
+print("\n=== PROCESO COMPLETADO ===")
+print("✅ Los datos están listos. Ahora prueba la vista del depósito.")

@@ -103,6 +103,23 @@ print(f"\nINSUMOS QUE APARECERÁN EN LA TABLA 'Insumos en Pedido':")
 for i, item in enumerate(insumos_en_pedido, 1):
     print(f"  {i}. {item['insumo'].descripcion[:50]}... - OC: {item['oc'].numero_orden}")
 
+# 2. Obtener insumos del depósito
+insumos = Insumo.objects.filter(deposito=deposito)
+print(f"\nInsumos en el depósito {deposito.nombre}:")
+for insumo in insumos:
+    print(f"- {insumo.nombre} (Cantidad: {insumo.cantidad})")
+
+# 3. Simular procesamiento de órdenes
+ordenes = Orden.objects.filter(deposito=deposito, estado=EstadoOrden.PENDIENTE)
+print(f"\nÓrdenes pendientes en el depósito {deposito.nombre}:")
+for orden in ordenes:
+    print(f"- Orden ID: {orden.id}, Estado: {orden.estado}")
+
+    # Simular actualización de estado
+    orden.estado = EstadoOrden.PROCESANDO
+    orden.save()
+    print(f"  -> Orden {orden.id} actualizada a estado PROCESANDO.")
+
 # Context que se envía al template
 context = {
     "deposito": deposito,

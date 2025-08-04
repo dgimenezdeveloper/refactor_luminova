@@ -74,5 +74,30 @@ def main():
         import traceback
         traceback.print_exc()
 
+    # Crear un usuario de prueba
+    usuario_prueba = User.objects.create_user(username='notificador', password='password')
+    print(f"✅ Usuario de prueba creado: {usuario_prueba.username}")
+
+    # Crear un insumo de prueba
+    insumo_prueba = Insumo.objects.create(nombre='Insumo Prueba', cantidad=10)
+    print(f"✅ Insumo de prueba creado: {insumo_prueba.nombre}")
+
+    # Crear un depósito de prueba
+    deposito_prueba = Deposito.objects.create(nombre='Depósito Prueba')
+    print(f"✅ Depósito de prueba creado: {deposito_prueba.nombre}")
+
+    # Probar la creación de una notificación
+    servicio_notificaciones = NotificationService()
+    notificacion_prueba = servicio_notificaciones.crear_notificacion(
+        usuario=usuario_prueba,
+        mensaje='Prueba de notificación',
+        tipo='INFO'
+    )
+
+    print(f"✅ Notificación de prueba creada: {notificacion_prueba}")
+
+    # Validar que la notificación se guardó correctamente
+    assert notificacion_prueba.id is not None, "La notificación no se guardó correctamente."
+
 if __name__ == "__main__":
     main()
