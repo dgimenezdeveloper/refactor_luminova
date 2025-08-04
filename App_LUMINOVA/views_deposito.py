@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from .forms import TransferenciaInsumoForm, TransferenciaProductoForm, DepositoForm
-from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito, StockInsumo, MovimientoStock, CategoriaInsumo
+from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito, StockInsumo, MovimientoStock, CategoriaInsumo, StockProductoTerminado
 from django.db.models import Q
 from django.http import HttpResponseForbidden
 from .services.notification_service import NotificationService
@@ -36,9 +36,22 @@ def _usuario_puede_acceder_deposito(user, deposito, accion="transferir"):
         return False
 
 def _auditar_movimiento(tipo, usuario, insumo=None, producto=None, deposito_origen=None, deposito_destino=None, cantidad=0, motivo=""):
-    """Registra el movimiento en la auditoría"""
+    """Registra el movimiento en la auditoría, evitando duplicados"""
     from .models import MovimientoStock
-    
+
+    # Verificar si ya existe un movimiento similar
+    if MovimientoStock.objects.filter(
+        insumo=insumo,
+        producto=producto,
+        deposito_origen=deposito_origen,
+        deposito_destino=deposito_destino,
+        cantidad=cantidad,
+        tipo=tipo,
+        usuario=usuario,
+        motivo=motivo
+    ).exists():
+        return  # No registrar duplicado
+
     MovimientoStock.objects.create(
         insumo=insumo,
         producto=producto,
@@ -171,29 +184,20 @@ def transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cant
     de la categoría y el insumo en el depósito destino si no existen.
     """
     # Buscar o crear la categoría en el destino
-    categoria_destino = CategoriaInsumo.objects.filter(nombre=insumo.categoria.nombre, deposito=deposito_destino).first()
-    if not categoria_destino:
-        categoria_destino = CategoriaInsumo.objects.create(
-            nombre=insumo.categoria.nombre,
-            imagen=insumo.categoria.imagen,
-            deposito=deposito_destino
-        )
+    categoria_destino, created = CategoriaInsumo.objects.get_or_create(
+        nombre=insumo.categoria.nombre,
+        deposito=deposito_destino,
+        defaults={"imagen": insumo.categoria.imagen}  # Copiar imagen
+    )
 
     # Buscar o crear el insumo en el destino
-    insumo_destino = Insumo.objects.filter(
+    insumo_destino, created = Insumo.objects.get_or_create(
         descripcion=insumo.descripcion,
         fabricante=insumo.fabricante,
         categoria=categoria_destino,
-        deposito=deposito_destino
-    ).first()
-    if not insumo_destino:
-        insumo_destino = Insumo.objects.create(
-            descripcion=insumo.descripcion,
-            categoria=categoria_destino,
-            fabricante=insumo.fabricante,
-            imagen=insumo.imagen,
-            deposito=deposito_destino
-        )
+        deposito=deposito_destino,
+        defaults={"imagen": insumo.imagen}  # Copiar imagen
+    )
 
     # Descontar stock del origen
     stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
@@ -203,20 +207,76 @@ def transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cant
     stock_origen.save()
 
     # Incrementar stock en el destino
-    stock_destino, created = StockInsumo.objects.get_or_create(insumo=insumo_destino, deposito=deposito_destino)
+    stock_destino, created = StockInsumo.objects.get_or_create(insumo=insumo_destino, deposito=deposito_destino, defaults={"cantidad": 0})
     stock_destino.cantidad += cantidad
     stock_destino.save()
 
-    # Registrar el movimiento de stock
+    # Registrar el movimiento de stock si no existe
     MovimientoStock.objects.create(
         insumo=insumo,
         deposito_origen=deposito_origen,
         deposito_destino=deposito_destino,
         cantidad=cantidad,
         tipo="transferencia",
-        motivo="Transferencia automática"
+        motivo="Transferencia entre depósitos"
     )
 
+def transferir_producto_a_deposito(producto, deposito_origen, deposito_destino, cantidad):
+    """
+    Maneja la transferencia de un producto terminado de un depósito a otro, incluyendo la creación
+    de la categoría y el producto en el depósito destino si no existen.
+    """
+    # Buscar o crear la categoría en el destino
+    categoria_destino, created = CategoriaProductoTerminado.objects.get_or_create(
+        nombre=producto.categoria.nombre,
+        deposito=deposito_destino,
+        defaults={"imagen": producto.categoria.imagen}  # Copiar imagen
+    )
+
+    # Buscar o crear el producto en el destino
+    producto_destino, created = ProductoTerminado.objects.get_or_create(
+        descripcion=producto.descripcion,
+        categoria=categoria_destino,
+        deposito=deposito_destino,
+        defaults={
+            "precio_unitario": producto.precio_unitario,
+            "modelo": producto.modelo,
+            "potencia": producto.potencia,
+            "acabado": producto.acabado,
+            "color_luz": producto.color_luz,
+            "material": producto.material,
+            "imagen": producto.imagen  # Copiar imagen
+        }
+    )
+
+    # Descontar stock del origen
+    stock_origen = StockProductoTerminado.objects.get(producto=producto, deposito=deposito_origen)
+    if stock_origen.cantidad < cantidad:
+        raise ValueError("Stock insuficiente en el depósito de origen.")
+    stock_origen.cantidad -= cantidad
+    stock_origen.save()
+
+    # Incrementar stock en el destino
+    stock_destino, created = StockProductoTerminado.objects.get_or_create(producto=producto_destino, deposito=deposito_destino, defaults={"cantidad": 0})
+    stock_destino.cantidad += cantidad
+    stock_destino.save()
+
+    # Registrar el movimiento de stock si no existe
+    if not MovimientoStock.objects.filter(
+        producto=producto,
+        deposito_origen=deposito_origen,
+        deposito_destino=deposito_destino,
+        cantidad=cantidad,
+        tipo="transferencia"
+    ).exists():
+        MovimientoStock.objects.create(
+            producto=producto,
+            deposito_origen=deposito_origen,
+            deposito_destino=deposito_destino,
+            cantidad=cantidad,
+            tipo="transferencia",
+            motivo="Transferencia entre depósitos"
+        )
 @login_required
 @transaction.atomic
 def transferencia_producto_view(request):
