@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import JsonResponse
 from .forms import TransferenciaInsumoForm, TransferenciaProductoForm, DepositoForm
-from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito, StockInsumo, MovimientoStock, CategoriaInsumo, StockProductoTerminado
+from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito, StockInsumo, MovimientoStock, CategoriaInsumo, StockProductoTerminado, OrdenProduccion
 from django.db.models import Q
 from django.http import HttpResponseForbidden
 from .services.notification_service import NotificationService
@@ -944,7 +944,7 @@ def deposito_enviar_insumos_op_view(request, op_id):
                 insumos_descontados_correctamente = False
                 break  # Error crítico, no continuar si un insumo del BOM no existe
 
-        if errores_stock:  # Si hubo algún error de stock
+        if errores_stock: # Si hubo algún error de stock
             for error_msg in errores_stock:
                 messages.error(request, error_msg)
             # No es necesario reasignar insumos_descontados_correctamente = False aquí, ya se hizo.
@@ -1182,6 +1182,9 @@ def recibir_pedido_oc_view(request, oc_id):
 @login_required
 def deposito_view(request):
     logger.info("--- deposito_view: INICIO ---")
+    
+    # Importar modelos necesarios al inicio
+    from .models import EstadoOrden, UsuarioDeposito
 
     # Validación de permisos de acceso
     if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
@@ -1192,9 +1195,7 @@ def deposito_view(request):
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
     if es_admin and deposito_id == "-1":  # -1 significa "todos los depósitos"
-        # Dashboard global para admin con información detallada de todos los depósitos
-        from .models import EstadoOrden
-        
+        # Dashboard global para admin con información detallada de todos los depósitos        
         # Información básica
         insumos_count = Insumo.objects.count()
         productos_count = ProductoTerminado.objects.count()
@@ -1272,12 +1273,10 @@ def deposito_view(request):
     except ValueError:
         return redirect("App_LUMINOVA:seleccionar_deposito")
 
-    if not es_admin:
-        from .models import UsuarioDeposito
+    if not es_admin:        
         if not UsuarioDeposito.objects.filter(usuario=request.user, deposito=deposito).exists():
             return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
-    from .models import EstadoOrden, OrdenProduccion
     categorias_I = CategoriaInsumo.objects.filter(deposito=deposito)
     categorias_PT = CategoriaProductoTerminado.objects.filter(deposito=deposito)
 
