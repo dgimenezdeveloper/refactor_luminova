@@ -813,6 +813,10 @@ class TransferenciaInsumoForm(forms.Form):
             self.fields['deposito_origen'].disabled = True
             # Excluir el depósito actual de los destinos
             self.fields['deposito_destino'].queryset = self.fields['deposito_destino'].queryset.exclude(id=deposito_actual.id)
+            # Filtrar insumos solo del depósito actual y que tengan stock
+            from .models import StockInsumo
+            insumos_ids = StockInsumo.objects.filter(deposito=deposito_actual, cantidad__gt=0).values_list('insumo_id', flat=True)
+            self.fields['insumo'].queryset = self.fields['insumo'].queryset.filter(id__in=insumos_ids, deposito=deposito_actual)
 
     def _get_depositos_permitidos(self, user):
         """Obtiene los depósitos a los que el usuario tiene acceso"""
@@ -867,6 +871,8 @@ class TransferenciaProductoForm(forms.Form):
             self.fields['deposito_origen'].disabled = True
             # Excluir el depósito actual de los destinos
             self.fields['deposito_destino'].queryset = self.fields['deposito_destino'].queryset.exclude(id=deposito_actual.id)
+            # Filtrar productos solo del depósito actual
+            self.fields['producto'].queryset = self.fields['producto'].queryset.filter(deposito=deposito_actual)
 
     def _get_depositos_permitidos(self, user):
         """Obtiene los depósitos a los que el usuario tiene acceso"""

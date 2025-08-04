@@ -119,30 +119,31 @@ def notificar_stock_bajo_view(request, insumo_id):
 @login_required
 @transaction.atomic
 def transferencia_insumo_view(request):
-    # Solo usuarios con rol 'deposito' o 'administrador'
-    if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
-        messages.error(request, "Acceso denegado. No tiene permisos para transferir insumos.")
-        return redirect("App_LUMINOVA:deposito_view")
+    # Validar y sincronizar el depósito seleccionado
+    deposito_id = request.session.get('deposito_seleccionado')
+    if not deposito_id or not Deposito.objects.filter(id=deposito_id).exists():
+        messages.error(request, "Depósito seleccionado no válido. Por favor, seleccione un depósito.")
+        return redirect("App_LUMINOVA:seleccionar_deposito")
 
     if request.method == "POST":
-        form = TransferenciaInsumoForm(request.POST, user=request.user)
+        form = TransferenciaInsumoForm(request.POST, user=request.user, deposito_actual=Deposito.objects.get(id=deposito_id))
         if form.is_valid():
             insumo = form.cleaned_data["insumo"]
             deposito_origen = form.cleaned_data["deposito_origen"]
             deposito_destino = form.cleaned_data["deposito_destino"]
             cantidad = form.cleaned_data["cantidad"]
             motivo = form.cleaned_data["motivo"]
-            
+
             # Validar que el usuario tenga acceso a ambos depósitos para transferencias
             if not _usuario_puede_acceder_deposito(request.user, deposito_origen, "transferir") or \
                not _usuario_puede_acceder_deposito(request.user, deposito_destino, "transferir"):
                 messages.error(request, "No tiene permisos para transferir entre los depósitos seleccionados.")
                 return redirect("App_LUMINOVA:transferencia_insumo")
-            
+
             try:
                 # Ejecutar la transferencia
                 transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cantidad)
-                
+
                 # Registrar movimiento usando la función de auditoría
                 _auditar_movimiento(
                     tipo="transferencia",
@@ -160,7 +161,7 @@ def transferencia_insumo_view(request):
                 messages.error(request, f"Error al realizar la transferencia: {str(e)}")
                 logger.error(f"Error en transferencia_insumo_view: {str(e)}")
     else:
-        form = TransferenciaInsumoForm(user=request.user)
+        form = TransferenciaInsumoForm(user=request.user, deposito_actual=Deposito.objects.get(id=deposito_id))
     return render(request, "deposito/transferencia_insumo.html", {"form": form})
 
 
@@ -1540,4 +1541,16 @@ def crear_deposito_ajax(request):
     else:
         logger.warning(f"[CREAR_DEPOSITO] Método no permitido: {request.method}")
         return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+
+@login_required
+def actualizar_deposito_seleccionado(request, deposito_id):
+    """
+    Actualiza la variable de sesión 'deposito_seleccionado' con el depósito proporcionado.
+    """
+    try:
+        deposito = Deposito.objects.get(id=deposito_id)
+        request.session['deposito_seleccionado'] = deposito.id
+        return True
+    except Deposito.DoesNotExist:
+        return False
 
