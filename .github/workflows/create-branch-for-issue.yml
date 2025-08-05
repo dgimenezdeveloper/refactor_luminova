@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   create-branch:
@@ -35,3 +36,4 @@ jobs:
             Hola @${{ github.event.assignee.login }},
             Se te ha asignado el issue **${{ github.event.issue.title }}**.
             Se ha creado la rama **issue-${{ github.event.issue.number }}** para que puedas trabajar en ella.
+          token: ${{ secrets.GITHUB_TOKEN }}
