@@ -5,18 +5,23 @@ on:
     types:
       - assigned
 
+permissions:
+  contents: write
+
 jobs:
   create-branch:
     runs-on: ubuntu-latest
     steps:
+      - name: Install Git
+        run: sudo apt-get update && sudo apt-get install -y git
+
       - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Create branch
         run: |
           ISSUE_NUMBER=${{ github.event.issue.number }}
-          ISSUE_TITLE=${{ github.event.issue.title }}
-          BRANCH_NAME="issue-${ISSUE_NUMBER}-${ISSUE_TITLE// /-}"
+          BRANCH_NAME="issue-${ISSUE_NUMBER}"
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           git checkout -b $BRANCH_NAME
