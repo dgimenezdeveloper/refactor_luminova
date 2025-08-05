@@ -1,0 +1,32 @@
+name: Create branch for issue
+
+on:
+  issues:
+    types:
+      - assigned
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create branch
+        run: |
+          ISSUE_NUMBER=${{ github.event.issue.number }}
+          ISSUE_TITLE=${{ github.event.issue.title }}
+          BRANCH_NAME="issue-${ISSUE_NUMBER}-${ISSUE_TITLE// /-}"
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git checkout -b $BRANCH_NAME
+          git push origin $BRANCH_NAME
+
+      - name: Add comment to issue
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body: |
+            Hola @${{ github.event.assignee.login }},
+            Se te ha asignado el issue **${{ github.event.issue.title }}**.
+            Se ha creado la rama **issue-${{ github.event.issue.number }}** para que puedas trabajar en ella.
