@@ -682,10 +682,14 @@ def reportes_produccion_view(request, reporte_id=None, resolver=False):
         .order_by("-fecha_resolucion")
     )
 
+    # Detectar el parámetro de consulta 'tab'
+    tab_activo = request.GET.get("tab", "abiertos")
+
     context = {
         "reportes_abiertos": reportes_abiertos,
         "reportes_resueltos": reportes_resueltos,
         "titulo_seccion": "Reportes de Producción",
+        "tab_activo": tab_activo,
     }
     return render(request, "produccion/reportes.html", context)
 
