@@ -25,6 +25,7 @@ jobs:
           BRANCH_NAME="issue-${ISSUE_NUMBER}"
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git pull origin main
           git checkout -b $BRANCH_NAME
           git push origin $BRANCH_NAME
 
