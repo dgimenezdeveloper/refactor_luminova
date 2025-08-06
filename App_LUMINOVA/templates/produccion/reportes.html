@@ -16,12 +16,12 @@
 <!-- Pestañas para Abiertos y Resueltos -->
 <ul class="nav nav-tabs" id="myTab" role="tablist">
   <li class="nav-item" role="presentation">
-    <button class="nav-link active" id="abiertos-tab" data-bs-toggle="tab" data-bs-target="#abiertos-tab-pane" type="button" role="tab">
+    <button class="nav-link {% if tab_activo == 'abiertos' %}active{% endif %}" id="abiertos-tab" data-bs-toggle="tab" data-bs-target="#abiertos-tab-pane" type="button" role="tab">
       Abiertos <span class="badge bg-danger ms-1">{{ reportes_abiertos|length }}</span>
     </button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="resueltos-tab" data-bs-toggle="tab" data-bs-target="#resueltos-tab-pane" type="button" role="tab">
+    <button class="nav-link {% if tab_activo == 'resueltos' %}active{% endif %}" id="resueltos-tab" data-bs-toggle="tab" data-bs-target="#resueltos-tab-pane" type="button" role="tab">
       Resueltos
     </button>
   </li>
@@ -29,7 +29,7 @@
 
 <div class="tab-content" id="myTabContent">
   <!-- Panel de Reportes Abiertos -->
-  <div class="tab-pane fade show active" id="abiertos-tab-pane" role="tabpanel">
+  <div class="tab-pane fade {% if tab_activo == 'abiertos' %}show active{% endif %}" id="abiertos-tab-pane" role="tabpanel">
     <div class="table-responsive mt-3">
         <table class="table table-striped table-hover">
             <thead class="color-thead">
@@ -75,7 +75,7 @@
   </div>
   
   <!-- Panel de Reportes Resueltos -->
-  <div class="tab-pane fade" id="resueltos-tab-pane" role="tabpanel">
+  <div class="tab-pane fade {% if tab_activo == 'resueltos' %}show active{% endif %}" id="resueltos-tab-pane" role="tabpanel">
     <div class="table-responsive mt-3">
         <table class="table table-striped table-hover table-secondary">
              <thead class="color-thead">

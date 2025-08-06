@@ -89,9 +89,9 @@
                     {% endif %}
                      {% if ultimo_reporte %}
                     <div class="timeline-item">
-                        <div class="timeline-icon bg-danger"><i class="bi bi-exclamation-octagon-fill"></i></div>
+                        <div class="timeline-icon {% if ultimo_reporte.resuelto %}bg-success{% else %}bg-danger{% endif %}"><i class="bi bi-exclamation-octagon-fill"></i></div>
                         <div class="flex-grow-1">
-                            Reporte <a href="{% url 'App_LUMINOVA:reportes_produccion' %}">{{ ultimo_reporte.n_reporte }}</a> generado
+                            Reporte <a href="{% url 'App_LUMINOVA:reportes_produccion' %}?tab={% if ultimo_reporte.resuelto %}resueltos{% else %}abiertos{% endif %}">{{ ultimo_reporte.n_reporte }}</a> generado
                             <small class="d-block text-muted">{{ ultimo_reporte.fecha|timesince }} atrás</small>
                         </div>
                     </div>
