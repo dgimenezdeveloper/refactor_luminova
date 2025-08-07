@@ -269,29 +269,36 @@ def compras_lista_oc_view(request):
 
     # Filtrar órdenes de tipo 'compra'
     # Asumiendo que tu modelo Orden tiene un campo 'tipo' y 'proveedor'
+    # Agrupar OCs por estado para las pestañas
+    from collections import OrderedDict
+    ESTADOS_OC = OrderedDict([
+        ("BORRADOR", "Borrador"),
+        ("APROBADA", "Aprobada"),
+        ("ENVIADA_PROVEEDOR", "Enviada a Proveedor"),
+        ("EN_TRANSITO", "En Tránsito"),
+        ("RECIBIDA_PARCIAL", "Recibida Parcial"),
+        ("RECIBIDA_TOTAL", "Recibida Total"),
+        ("COMPLETADA", "Completada"),
+        ("CANCELADA", "Cancelada"),
+    ])
     ordenes_compra = (
         Orden.objects.filter(tipo="compra")
-        .select_related(
-            "proveedor",  # Si el campo se llama 'proveedor' en el modelo Orden
-            "insumo_principal",  # Si el campo se llama 'insumo' en el modelo Orden
-        )
+        .select_related("proveedor", "insumo_principal")
         .order_by("-fecha_creacion")
     )
-
-    # Para un futuro modal de creación de OC
-    # from .forms import OrdenCompraForm # Necesitarás crear este formulario
-    # form_oc = OrdenCompraForm()
-    # oc_count = Orden.objects.filter(tipo='compra').count()
-    # next_oc_number = f"OC-{str(oc_count + 1).zfill(4)}"
-    # form_oc.fields['numero_orden'].initial = next_oc_number
-
+    ordenes_por_estado = {estado: [] for estado in ESTADOS_OC.keys()}
+    for oc in ordenes_compra:
+        if oc.estado in ordenes_por_estado:
+            ordenes_por_estado[oc.estado].append(oc)
+    # Preparar lista de tuplas para la plantilla: (estado, nombre, ocs)
+    estados_oc_tabs = []
+    for estado, nombre in ESTADOS_OC.items():
+        ocs = ordenes_por_estado.get(estado, [])
+        estados_oc_tabs.append((estado, nombre, ocs))
     context = {
-        "ordenes_list": ordenes_compra,  # Nombre genérico para la plantilla
+        "estados_oc_tabs": estados_oc_tabs,
         "titulo_seccion": "Listado de Órdenes de Compra",
-        # 'form_orden': form_oc, # Para el modal de creación
-        # 'tipo_orden_actual': 'compra',
     }
-    # Necesitarás una plantilla para esto, ej. 'compras/compras_lista_oc.html'
     return render(request, "compras/compras_lista_oc.html", context)
 
 
@@ -446,15 +453,24 @@ def compras_seguimiento_view(request):
     Muestra las Órdenes de Compra que ya fueron gestionadas y están
     en proceso de envío o recepción.
     """
-    estados_en_seguimiento = ["ENVIADA_PROVEEDOR", "EN_TRANSITO", "RECIBIDA_PARCIAL"]
-    ordenes = (
-        Orden.objects.filter(tipo="compra", estado__in=estados_en_seguimiento)
-        .select_related("proveedor")
-        .order_by("-fecha_creacion")
-    )
+    estados_en_seguimiento = [
+        ("ENVIADA_PROVEEDOR", "Enviada al Proveedor"),
+        ("EN_TRANSITO", "En Tránsito"),
+        ("RECIBIDA_PARCIAL", "Recibida Parcialmente"),
+        ("RECIBIDA_TOTAL", "Recibida Totalmente"),
+        ("COMPLETADA", "Completada"),
+    ]
+    estados_oc_tabs = []
+    for estado, nombre in estados_en_seguimiento:
+        ocs = (
+            Orden.objects.filter(tipo="compra", estado=estado)
+            .select_related("proveedor")
+            .order_by("-fecha_creacion")
+        )
+        estados_oc_tabs.append((estado, nombre, ocs))
 
     context = {
-        "ordenes_en_seguimiento": ordenes,
+        "estados_oc_tabs": estados_oc_tabs,
         "titulo_seccion": "Seguimiento de Órdenes de Compra",
     }
     return render(request, "compras/seguimiento.html", context)
