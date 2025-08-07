@@ -624,9 +624,16 @@ def compras_crear_oc_view(request, insumo_id=None, proveedor_id=None):
         initial_data['insumo_principal'] = insumo_preseleccionado_obj
         form_kwargs['insumo_fijado'] = insumo_preseleccionado_obj
 
-        UMBRAL_STOCK_BAJO = 15000
-        cantidad_sugerida = max(10, UMBRAL_STOCK_BAJO - insumo_preseleccionado_obj.stock)
-        initial_data['cantidad_principal'] = cantidad_sugerida
+        # Calcular la cantidad sugerida global sumando la sugerencia de todos los depósitos
+        from App_LUMINOVA.models import StockInsumo, Deposito
+        depositos = list(Deposito.objects.all().order_by("nombre"))
+        cantidad_total_sugerida = 0
+        for deposito in depositos:
+            stock_deposito = StockInsumo.objects.filter(insumo=insumo_preseleccionado_obj, deposito=deposito).first()
+            cantidad_actual = stock_deposito.cantidad if stock_deposito else 0
+            cantidad_sugerida = max(0, 15000 - cantidad_actual)
+            cantidad_total_sugerida += cantidad_sugerida
+        initial_data['cantidad_principal'] = max(10, cantidad_total_sugerida)
 
         if proveedor_id:
             proveedor_preseleccionado_obj = get_object_or_404(Proveedor, id=proveedor_id)
