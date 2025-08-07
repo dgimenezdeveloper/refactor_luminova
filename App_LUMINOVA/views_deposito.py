@@ -2,7 +2,7 @@ from django.db import transaction
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from .forms import TransferenciaInsumoForm, TransferenciaProductoForm, DepositoForm
 from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito, StockInsumo, MovimientoStock, CategoriaInsumo, StockProductoTerminado, OrdenProduccion
 from django.db.models import Q
@@ -132,14 +132,18 @@ def notificar_stock_bajo_view(request, insumo_id):
 @login_required
 @transaction.atomic
 def transferencia_insumo_view(request):
-    # Validar y sincronizar el depósito seleccionado
-    deposito_id = request.session.get('deposito_seleccionado')
-    if not deposito_id or not Deposito.objects.filter(id=deposito_id).exists():
-        messages.error(request, "Depósito seleccionado no válido. Por favor, seleccione un depósito.")
-        return redirect("App_LUMINOVA:seleccionar_deposito")
+    """Vista para transferir insumos entre depósitos"""
+    # Validar y obtener depósito actual
+    deposito_actual = _validar_y_actualizar_deposito_sesion(request)
+    if isinstance(deposito_actual, HttpResponseRedirect):
+        return deposito_actual
+    
+    if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
+        messages.error(request, "Acceso denegado.")
+        return redirect("App_LUMINOVA:deposito_view")
 
     if request.method == "POST":
-        form = TransferenciaInsumoForm(request.POST, user=request.user, deposito_actual=Deposito.objects.get(id=deposito_id))
+        form = TransferenciaInsumoForm(request.POST, user=request.user, deposito_actual=deposito_actual)
         if form.is_valid():
             insumo = form.cleaned_data["insumo"]
             deposito_origen = form.cleaned_data["deposito_origen"]
@@ -147,7 +151,7 @@ def transferencia_insumo_view(request):
             cantidad = form.cleaned_data["cantidad"]
             motivo = form.cleaned_data["motivo"]
 
-            # Validar que el usuario tenga acceso a ambos depósitos para transferencias
+            # Validar permisos
             if not _usuario_puede_acceder_deposito(request.user, deposito_origen, "transferir") or \
                not _usuario_puede_acceder_deposito(request.user, deposito_destino, "transferir"):
                 messages.error(request, "No tiene permisos para transferir entre los depósitos seleccionados.")
@@ -155,9 +159,9 @@ def transferencia_insumo_view(request):
 
             try:
                 # Ejecutar la transferencia
-                transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cantidad)
+                insumo_destino = transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cantidad)
 
-                # Registrar movimiento usando la función de auditoría
+                # Registrar movimiento
                 _auditar_movimiento(
                     tipo="transferencia",
                     usuario=request.user,
@@ -167,74 +171,97 @@ def transferencia_insumo_view(request):
                     cantidad=cantidad,
                     motivo=motivo or "Transferencia entre depósitos"
                 )
-                messages.success(request, "Transferencia realizada correctamente.")
-                # Redirigir al historial de transferencias
+
+                messages.success(request, 
+                    f"Transferencia exitosa: {cantidad} unidades de '{insumo.descripcion}' "
+                    f"de {deposito_origen.nombre} a {deposito_destino.nombre}")
                 return redirect("App_LUMINOVA:historial_transferencias")
+                
+            except ValueError as e:
+                messages.error(request, f"Error en transferencia: {str(e)}")
             except Exception as e:
-                messages.error(request, f"Error al realizar la transferencia: {str(e)}")
+                messages.error(request, f"Error inesperado: {str(e)}")
                 logger.error(f"Error en transferencia_insumo_view: {str(e)}")
     else:
-        form = TransferenciaInsumoForm(user=request.user, deposito_actual=Deposito.objects.get(id=deposito_id))
-    return render(request, "deposito/transferencia_insumo.html", {"form": form})
-
+        form = TransferenciaInsumoForm(user=request.user, deposito_actual=deposito_actual)
+    
+    return render(request, "deposito/transferencia_insumo.html", {
+        "form": form,
+        "deposito_actual": deposito_actual
+    })
 
 def transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cantidad):
-    """
-    Maneja la transferencia de un insumo de un depósito a otro, incluyendo la creación
-    de la categoría y el insumo en el depósito destino si no existen.
-    """
-    # Buscar o crear la categoría en el destino
-    categoria_destino, created = CategoriaInsumo.objects.get_or_create(
+    from .models import StockInsumo, CategoriaInsumo, OfertaProveedor, Insumo
+
+    # Verificar stock suficiente en origen
+    stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
+    if stock_origen.cantidad < cantidad:
+        raise ValueError("Stock insuficiente en el depósito de origen.")
+
+    # Crear o buscar categoría en destino
+    categoria_destino, _ = CategoriaInsumo.objects.get_or_create(
         nombre=insumo.categoria.nombre,
         deposito=deposito_destino,
-        defaults={"imagen": insumo.categoria.imagen}  # Copiar imagen
+        defaults={"imagen": getattr(insumo.categoria, 'imagen', None)}
     )
 
-    # Buscar o crear el insumo en el destino
-    insumo_destino, created = Insumo.objects.get_or_create(
+    # Crear o buscar insumo en destino (solo con campos válidos)
+    insumo_destino, _ = Insumo.objects.get_or_create(
         descripcion=insumo.descripcion,
         fabricante=insumo.fabricante,
         categoria=categoria_destino,
         deposito=deposito_destino,
-        defaults={"imagen": insumo.imagen}  # Copiar imagen
+        defaults={
+            "imagen": getattr(insumo, "imagen", None),
+            "stock": 0,
+            "cantidad_en_pedido": getattr(insumo, "cantidad_en_pedido", 0),
+            "notificado_a_compras": getattr(insumo, "notificado_a_compras", False),
+        }
     )
 
-    # Descontar stock del origen
-    stock_origen = StockInsumo.objects.get(insumo=insumo, deposito=deposito_origen)
-    if stock_origen.cantidad < cantidad:
-        raise ValueError("Stock insuficiente en el depósito de origen.")
+    # Copiar ofertas de proveedor si corresponde
+    if hasattr(insumo, 'ofertas'):
+        for oferta in insumo.ofertas.all():
+            OfertaProveedor.objects.get_or_create(
+                proveedor=oferta.proveedor,
+                insumo=insumo_destino,
+                defaults={
+                    'precio_unitario': oferta.precio_unitario,
+                    'cantidad_minima': oferta.cantidad_minima,
+                    'tiempo_entrega': oferta.tiempo_entrega,
+                    'activa': oferta.activa,
+                }
+            )
+
+    # Actualizar stocks
     stock_origen.cantidad -= cantidad
-    stock_origen.save()
-
-    # Incrementar stock en el destino
-    stock_destino, created = StockInsumo.objects.get_or_create(insumo=insumo_destino, deposito=deposito_destino, defaults={"cantidad": 0})
+    stock_origen.save(update_fields=['cantidad'])
+    stock_destino, _ = StockInsumo.objects.get_or_create(insumo=insumo_destino, deposito=deposito_destino, defaults={"cantidad": 0})
     stock_destino.cantidad += cantidad
-    stock_destino.save()
+    stock_destino.save(update_fields=['cantidad'])
 
-    # Registrar el movimiento de stock si no existe
-    MovimientoStock.objects.create(
-        insumo=insumo,
-        deposito_origen=deposito_origen,
-        deposito_destino=deposito_destino,
-        cantidad=cantidad,
-        tipo="transferencia",
-        motivo="Transferencia entre depósitos"
-    )
+    # Sincronizar campo stock directo
+    insumo.stock = stock_origen.cantidad
+    insumo.save(update_fields=['stock'])
+    insumo_destino.stock = stock_destino.cantidad
+    insumo_destino.save(update_fields=['stock'])
+
+    return insumo_destino
 
 def transferir_producto_a_deposito(producto, deposito_origen, deposito_destino, cantidad):
-    """
-    Maneja la transferencia de un producto terminado de un depósito a otro, incluyendo la creación
-    de la categoría y el producto en el depósito destino si no existen.
-    """
-    # Buscar o crear la categoría en el destino
-    categoria_destino, created = CategoriaProductoTerminado.objects.get_or_create(
+    from .models import StockProductoTerminado, CategoriaProductoTerminado, ProductoTerminado, ComponenteProducto
+
+    stock_origen = StockProductoTerminado.objects.get(producto=producto, deposito=deposito_origen)
+    if stock_origen.cantidad < cantidad:
+        raise ValueError("Stock insuficiente en el depósito de origen.")
+
+    categoria_destino, _ = CategoriaProductoTerminado.objects.get_or_create(
         nombre=producto.categoria.nombre,
         deposito=deposito_destino,
-        defaults={"imagen": producto.categoria.imagen}  # Copiar imagen
+        defaults={"imagen": producto.categoria.imagen}
     )
 
-    # Buscar o crear el producto en el destino
-    producto_destino, created = ProductoTerminado.objects.get_or_create(
+    producto_destino, _ = ProductoTerminado.objects.get_or_create(
         descripcion=producto.descripcion,
         categoria=categoria_destino,
         deposito=deposito_destino,
@@ -245,58 +272,47 @@ def transferir_producto_a_deposito(producto, deposito_origen, deposito_destino, 
             "acabado": producto.acabado,
             "color_luz": producto.color_luz,
             "material": producto.material,
-            "imagen": producto.imagen  # Copiar imagen
+            "imagen": producto.imagen,
+            "stock": 0,
         }
     )
 
-    # Descontar stock del origen
-    stock_origen = StockProductoTerminado.objects.get(producto=producto, deposito=deposito_origen)
-    if stock_origen.cantidad < cantidad:
-        raise ValueError("Stock insuficiente en el depósito de origen.")
+    # Copiar componentes (BOM)
+    if hasattr(producto, 'componentes'):
+        for componente in producto.componentes.all():
+            ComponenteProducto.objects.get_or_create(
+                producto_terminado=producto_destino,
+                insumo=componente.insumo,
+                defaults={'cantidad_necesaria': componente.cantidad_necesaria}
+            )
+
     stock_origen.cantidad -= cantidad
-    stock_origen.save()
-
-    # Incrementar stock en el destino
-    stock_destino, created = StockProductoTerminado.objects.get_or_create(producto=producto_destino, deposito=deposito_destino, defaults={"cantidad": 0})
+    stock_origen.save(update_fields=['cantidad'])
+    stock_destino, _ = StockProductoTerminado.objects.get_or_create(producto=producto_destino, deposito=deposito_destino, defaults={"cantidad": 0})
     stock_destino.cantidad += cantidad
-    stock_destino.save()
+    stock_destino.save(update_fields=['cantidad'])
 
-    # Registrar el movimiento de stock si no existe
-    if not MovimientoStock.objects.filter(
-        producto=producto,
-        deposito_origen=deposito_origen,
-        deposito_destino=deposito_destino,
-        cantidad=cantidad,
-        tipo="transferencia"
-    ).exists():
-        MovimientoStock.objects.create(
-            producto=producto,
-            deposito_origen=deposito_origen,
-            deposito_destino=deposito_destino,
-            cantidad=cantidad,
-            tipo="transferencia",
-            motivo="Transferencia entre depósitos"
-        )
+    producto.stock = stock_origen.cantidad
+    producto.save(update_fields=['stock'])
+    producto_destino.stock = stock_destino.cantidad
+    producto_destino.save(update_fields=['stock'])
+
+    return producto_destino
 @login_required
 @transaction.atomic
 def transferencia_producto_view(request):
     """Vista para transferir productos terminados entre depósitos"""
+    # Validar y obtener depósito actual
+    deposito_actual = _validar_y_actualizar_deposito_sesion(request)
+    if isinstance(deposito_actual, HttpResponseRedirect):
+        return deposito_actual
 
-    deposito_id = request.session.get('deposito_seleccionado')
-    deposito_actual = None
-    if deposito_id:
-        try:
-            deposito_actual = Deposito.objects.get(id=deposito_id)
-        except Deposito.DoesNotExist:
-            deposito_actual = None
-
-    # Solo usuarios con rol 'deposito' o 'administrador'
     if not es_admin_o_rol(request.user, ["deposito", "administrador"]):
-        messages.error(request, "Acceso denegado. No tiene permisos para transferir productos.")
+        messages.error(request, "Acceso denegado.")
         return redirect("App_LUMINOVA:deposito_view")
 
     if request.method == "POST":
-        form = TransferenciaProductoForm(request.POST, user=request.user)
+        form = TransferenciaProductoForm(request.POST, user=request.user, deposito_actual=deposito_actual)
         if form.is_valid():
             producto = form.cleaned_data["producto"]
             deposito_origen = form.cleaned_data["deposito_origen"]
@@ -304,104 +320,44 @@ def transferencia_producto_view(request):
             cantidad = form.cleaned_data["cantidad"]
             motivo = form.cleaned_data["motivo"]
             
-            # Validar que el usuario tenga acceso a ambos depósitos para transferencias
+            # Validar permisos
             if not _usuario_puede_acceder_deposito(request.user, deposito_origen, "transferir") or \
                not _usuario_puede_acceder_deposito(request.user, deposito_destino, "transferir"):
                 messages.error(request, "No tiene permisos para transferir entre los depósitos seleccionados.")
                 return redirect("App_LUMINOVA:transferencia_producto")
             
-            from .models import StockProductoTerminado, CategoriaProductoTerminado
-            import logging
-            logger = logging.getLogger(__name__)
-
-            # Buscar o crear la categoría en el destino
-            categoria_destino = CategoriaProductoTerminado.objects.filter(
-                nombre=producto.categoria.nombre, 
-                deposito=deposito_destino
-            ).first()
-            if not categoria_destino:
-                categoria_destino = CategoriaProductoTerminado.objects.create(
-                    nombre=producto.categoria.nombre,
-                    imagen=producto.categoria.imagen,
-                    deposito=deposito_destino
-                )
-
-            # Buscar o crear el producto en el destino
-            producto_destino = ProductoTerminado.objects.filter(
-                descripcion=producto.descripcion,
-                categoria=categoria_destino,
-                deposito=deposito_destino
-            ).first()
-            if not producto_destino:
-                producto_destino = ProductoTerminado.objects.create(
-                    descripcion=producto.descripcion,
-                    categoria=categoria_destino,
-                    precio_unitario=producto.precio_unitario,
-                    modelo=producto.modelo,
-                    potencia=producto.potencia,
-                    acabado=producto.acabado,
-                    color_luz=producto.color_luz,
-                    material=producto.material,
-                    imagen=producto.imagen,
-                    deposito=deposito_destino
-                )
-
-            # Descontar stock del origen
             try:
-                stock_origen = StockProductoTerminado.objects.get(producto=producto, deposito=deposito_origen)
-            except StockProductoTerminado.DoesNotExist:
-                messages.error(request, "No hay stock disponible para este producto en el depósito de origen.")
-                return redirect("App_LUMINOVA:transferencia_producto")
-            logger.info(f"[TRANSFERENCIA PT] Stock origen antes: {stock_origen.cantidad}")
-            if stock_origen.cantidad < cantidad:
-                messages.error(request, "Stock insuficiente en el depósito de origen.")
-                logger.warning(f"[TRANSFERENCIA PT] Stock insuficiente en origen: {stock_origen.cantidad} < {cantidad}")
-                return redirect("App_LUMINOVA:transferencia_producto")
-            
-            stock_origen.cantidad -= cantidad
-            stock_origen.save()
-            logger.info(f"[TRANSFERENCIA PT] Stock origen después: {stock_origen.cantidad}")
-            
-            # Sincronizar campo stock del Producto origen si existe
-            if hasattr(producto, 'stock'):
-                producto.stock = stock_origen.cantidad
-                producto.save(update_fields=["stock"])
-                logger.info(f"[TRANSFERENCIA PT] Producto origen stock actualizado a {producto.stock}")
+                # Ejecutar la transferencia
+                producto_destino = transferir_producto_a_deposito(producto, deposito_origen, deposito_destino, cantidad)
 
-            # Incrementar stock en el destino
-            stock_destino, created = StockProductoTerminado.objects.get_or_create(
-                producto=producto_destino, 
-                deposito=deposito_destino, 
-                defaults={"cantidad": 0}
-            )
-            logger.info(f"[TRANSFERENCIA PT] Stock destino antes: {stock_destino.cantidad}")
-            stock_destino.cantidad += cantidad
-            stock_destino.save()
-            logger.info(f"[TRANSFERENCIA PT] Stock destino después: {stock_destino.cantidad}")
-            
-            # Sincronizar campo stock del Producto destino si existe
-            if hasattr(producto_destino, 'stock'):
-                producto_destino.stock = stock_destino.cantidad
-                producto_destino.save(update_fields=["stock"])
-                logger.info(f"[TRANSFERENCIA PT] Producto destino stock actualizado a {producto_destino.stock}")
-
-            # Registrar movimiento usando la función de auditoría
-            _auditar_movimiento(
-                tipo="transferencia",
-                usuario=request.user,
-                producto=producto_destino,
-                deposito_origen=deposito_origen,
-                deposito_destino=deposito_destino,
-                cantidad=cantidad,
-                motivo=motivo or "Transferencia entre depósitos"
-            )
-            
-            messages.success(request, "Transferencia de producto realizada correctamente.")
-            return redirect("App_LUMINOVA:historial_transferencias")
+                # Registrar movimiento
+                _auditar_movimiento(
+                    tipo="transferencia",
+                    usuario=request.user,
+                    producto=producto,
+                    deposito_origen=deposito_origen,
+                    deposito_destino=deposito_destino,
+                    cantidad=cantidad,
+                    motivo=motivo or "Transferencia entre depósitos"
+                )
+                
+                messages.success(request, 
+                    f"Transferencia exitosa: {cantidad} unidades de '{producto.descripcion}' "
+                    f"de {deposito_origen.nombre} a {deposito_destino.nombre}")
+                return redirect("App_LUMINOVA:historial_transferencias")
+                
+            except ValueError as e:
+                messages.error(request, f"Error en transferencia: {str(e)}")
+            except Exception as e:
+                messages.error(request, f"Error inesperado: {str(e)}")
+                logger.error(f"Error en transferencia_producto_view: {str(e)}")
     else:
         form = TransferenciaProductoForm(user=request.user, deposito_actual=deposito_actual)
     
-    return render(request, "deposito/transferencia_producto.html", {"form": form, "deposito_actual": deposito_actual})
+    return render(request, "deposito/transferencia_producto.html", {
+        "form": form,
+        "deposito_actual": deposito_actual
+    })
 
 
 @login_required
@@ -1612,4 +1568,61 @@ def actualizar_deposito_seleccionado(request, deposito_id):
         return True
     except Deposito.DoesNotExist:
         return False
+
+def _obtener_deposito_actual(request, usuario=None):
+    """
+    Obtiene el depósito actual del usuario, validando permisos y consistencia
+    """
+    if usuario is None:
+        usuario = request.user
+    
+    deposito_id = request.session.get('deposito_seleccionado')
+    deposito = None
+    
+    # 1. Validar que el depósito en sesión existe y el usuario tiene acceso
+    if deposito_id:
+        try:
+            deposito_candidato = Deposito.objects.get(id=deposito_id)
+            # Verificar si el usuario puede acceder a este depósito
+            if _usuario_puede_acceder_deposito(usuario, deposito_candidato):
+                deposito = deposito_candidato
+            else:
+                # Limpiar sesión si no tiene acceso
+                request.session.pop('deposito_seleccionado', None)
+        except Deposito.DoesNotExist:
+            # Limpiar sesión si el depósito no existe
+            request.session.pop('deposito_seleccionado', None)
+    
+    # 2. Si no hay depósito válido, obtener el primero al que tenga acceso
+    if not deposito:
+        from .models import UsuarioDeposito
+        
+        if usuario.is_superuser:
+            deposito = Deposito.objects.first()
+        else:
+            # Buscar primer depósito asignado
+            asignacion = UsuarioDeposito.objects.filter(usuario=usuario).first()
+            if asignacion:
+                deposito = asignacion.deposito
+            elif usuario.groups.filter(name='Depósito').exists():
+                # Si tiene rol general pero no asignación específica
+                deposito = Deposito.objects.first()
+        
+        # Actualizar sesión
+        if deposito:
+            request.session['deposito_seleccionado'] = deposito.id
+    
+    return deposito
+
+def _validar_y_actualizar_deposito_sesion(request):
+    """
+    Valida y actualiza el depósito en sesión, redirige si es necesario
+    """
+    deposito = _obtener_deposito_actual(request)
+    
+    if not deposito:
+        messages.error(request, "No tiene depósitos asignados o no se pudo determinar el depósito actual.")
+        return redirect("App_LUMINOVA:seleccionar_deposito")
+    
+    return deposito
 
