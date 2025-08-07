@@ -15,63 +15,77 @@
 </div>
 
 
-<div class="accordion" id="accordionDepositos">
-  {% for deposito_nombre, insumos_list in insumos_por_deposito.items %}
-    <div class="accordion-item">
-      <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
-          <span class="me-2">
-            <i class="bi bi-bell-fill" style="color: #0dcaf0; font-size: 1.2em; vertical-align: middle;"></i>
-          </span>
-          {{ deposito_nombre }} <span class="badge bg-info ms-2" style="font-size: 1em;">{{ insumos_list|length }}</span>
-        </button>
-      </h2>
-      <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#accordionDepositos">
-        <div class="accordion-body">
-          <table class="table table-hover table-sm align-middle">
-            <thead class="color-thead">
-              <tr>
-                <th>Insumo</th>
-                <th>Categoría</th>
-                <th class="text-center">Stock Actual</th>
-                <th class="text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for insumo_item in insumos_list %}
-                <tr>
-                  <td>
-                    {% if insumo_item.imagen %}
-                      <img src="{{ insumo_item.imagen.url }}" alt="{{ insumo_item.descripcion }}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 3px; margin-right: 5px;">
-                    {% endif %}
-                    {{ insumo_item.descripcion|truncatechars:40 }}
-                  </td>
-                  <td>{{ insumo_item.categoria.nombre|default_if_none:"N/A" }}</td>
-                  <td class="text-center fw-bold text-danger">{{ insumo_item.stock }}</td>
-                  <td class="text-center">
-                    {% if insumo_item.tiene_oc_borrador %}
-                      <button class="btn btn-sm btn-secondary" disabled>OC en borrador pendiente</button>
-                    {% else %}
-                      <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' insumo_item.id %}" 
-                         class="btn btn-sm btn-primary" 
-                         title="Seleccionar Proveedor para {{ insumo_item.descripcion }}">
-                        <i class="bi bi-people-fill"></i> Sel. Proveedor
-                      </a>
-                    {% endif %}
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  {% empty %}
-    <p>No hay insumos críticos para gestionar.</p>
-  {% endfor %}
+
+<div class="card mt-3">
+  <div class="card-header bg-primary text-white">
+    <strong>Insumos críticos globales</strong>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="color-thead">
+        <tr>
+          <th>Insumo</th>
+          <th>Categoría</th>
+          <th class="text-center">Stock Total</th>
+          <th class="text-center">Desglose por Depósito</th>
+          <th class="text-center">Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for insumo in insumos_criticos_globales %}
+        <tr>
+          <td>
+            {% if insumo.imagen %}
+              <img src="{{ insumo.imagen.url }}" alt="{{ insumo.descripcion }}" style="width: 30px; height: 30px; object-fit: cover; border-radius: 3px; margin-right: 5px;">
+            {% endif %}
+            {{ insumo.descripcion|truncatechars:40 }}
+          </td>
+          <td>{{ insumo.categoria.nombre|default_if_none:"N/A" }}</td>
+          <td class="text-center fw-bold text-danger">{{ insumo.stock_total }}</td>
+          <td class="text-center">
+            <button class="btn btn-link btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#desglose-{{ insumo.id }}" aria-expanded="false" aria-controls="desglose-{{ insumo.id }}">
+              Ver desglose
+            </button>
+            <div class="collapse mt-2" id="desglose-{{ insumo.id }}">
+              <table class="table table-bordered table-sm mb-0">
+                <thead>
+                  <tr>
+                    <th>Depósito</th>
+                    <th class="text-center">Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for d in insumo.desglose_depositos %}
+                  <tr>
+                    <td>{{ d.deposito }}</td>
+                    <td class="text-center">{{ d.stock }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </td>
+          <td class="text-center">
+            {% if insumo.tiene_oc_borrador %}
+              <button class="btn btn-sm btn-secondary" disabled>OC en borrador pendiente</button>
+            {% else %}
+              <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' insumo.id %}" 
+                 class="btn btn-sm btn-primary" 
+                 title="Seleccionar Proveedor para {{ insumo.descripcion }}">
+                <i class="bi bi-people-fill"></i> Sel. Proveedor
+              </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center">No hay insumos críticos para gestionar.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
-{% if not insumos_por_deposito|length %}
+{% if not insumos_criticos_globales|length %}
 <div class="alert alert-success mt-3" role="alert">
     <i class="bi bi-check-circle-fill"></i> No hay insumos críticos que requieran gestión de compra inmediata (stock ≥ {{ umbral_stock_bajo }} o ya tienen OC en proceso).
 </div>

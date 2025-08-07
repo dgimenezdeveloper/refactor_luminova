@@ -41,6 +41,52 @@
                             </button>
                         </div>
                     </form>
+
+                    {% if sugerencia_distribucion %}
+                        <div class="alert alert-info mt-3">
+                            <strong>Sugerencia global de compra para el insumo:</strong>
+                            <div class="table-responsive mt-2">
+                                <table class="table table-bordered table-sm mb-2">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Insumo</th>
+                                            <th class="text-center">Stock Total Actual</th>
+                                            <th class="text-center">Cantidad Total Sugerida</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>{{ sugerencia_distribucion.insumo.descripcion }}</td>
+                                            <td class="text-center">{{ sugerencia_distribucion.cantidad_total_actual }}</td>
+                                            <td class="text-center fw-bold {% if sugerencia_distribucion.cantidad_total_sugerida > 0 %}text-danger{% else %}text-success{% endif %}">{{ sugerencia_distribucion.cantidad_total_sugerida }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <span class="small text-muted">La cantidad sugerida es la suma necesaria para alcanzar el umbral global de stock mínimo ({{ umbral_stock_bajo|default:15000 }}) considerando todos los depósitos.</span>
+                                <div class="mt-2">
+                                    <strong>Desglose por depósito:</strong>
+                                    <table class="table table-bordered table-sm mt-1">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Depósito</th>
+                                                <th class="text-center">Stock Actual</th>
+                                                <th class="text-center">Cantidad Sugerida</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in sugerencia_distribucion.desglose_por_deposito %}
+                                            <tr>
+                                                <td>{{ item.deposito.nombre }}</td>
+                                                <td class="text-center">{{ item.stock_actual }}</td>
+                                                <td class="text-center fw-bold {% if item.cantidad_sugerida > 0 %}text-danger{% else %}text-success{% endif %}">{{ item.cantidad_sugerida }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
