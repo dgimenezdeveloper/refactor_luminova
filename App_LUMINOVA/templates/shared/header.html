@@ -177,7 +177,38 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
 
                         <div class="nav-item ms-3">
-                            <a class="btn btn-outline-primary btn-sm btn-CS" href="{% url 'App_LUMINOVA:logout' %}">Cerrar sesión</a>
+                            <a class="btn btn-outline-primary btn-sm btn-CS" href="#" id="logout-btn">Cerrar sesión</a>
+
+                            <!-- Modal Bootstrap para confirmar logout -->
+                            <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+                              <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                  <div class="modal-header">
+                                    <h5 class="modal-title" id="logoutModalLabel">Confirmar cierre de sesión</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                  </div>
+                                  <div class="modal-body">
+                                    ¿Está seguro que desea cerrar la sesión?
+                                  </div>
+                                  <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <a href="{% url 'App_LUMINOVA:logout' %}" class="btn btn-primary" id="confirm-logout-btn">Cerrar sesión</a>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var logoutBtn = document.getElementById('logout-btn');
+    var logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            logoutModal.show();
+        });
+    }
+});
+</script>
                         </div>
                         <style>
                         /* Badge de mensajes igual que notificaciones, con borde blanco y sombra */
