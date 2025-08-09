@@ -204,7 +204,7 @@ def planificacion_produccion_view(request):
     # --- LÓGICA GET MEJORADA ---
     # Obtener todas las OPs que no estén en un estado final
     estados_finales = ["Completada", "Cancelada"]
-    ops_para_planificar = (
+    ops_queryset = (
         OrdenProduccion.objects.exclude(estado_op__nombre__in=estados_finales)
         .select_related(
             "producto_a_producir",
@@ -212,13 +212,22 @@ def planificacion_produccion_view(request):
             "estado_op",
             "sector_asignado_op",
         )
-        .order_by("estado_op__id", "fecha_solicitud")
-    )  # Ordenar por estado y luego por fecha
+        .order_by("estado_op__nombre", "fecha_solicitud")
+    )
+
+    # Agrupar OPs por estado
+    from collections import OrderedDict
+    ops_por_estado = OrderedDict()
+    for op in ops_queryset:
+        estado = op.get_estado_op_display()
+        if estado not in ops_por_estado:
+            ops_por_estado[estado] = []
+        ops_por_estado[estado].append(op)
 
     sectores = SectorAsignado.objects.all().order_by("nombre")
 
     context = {
-        "ops_para_planificar_list": ops_para_planificar,
+        "ops_por_estado": ops_por_estado,
         "sectores_list": sectores,
         "titulo_seccion": "Planificación de Órdenes de Producción",
     }
