@@ -1,4 +1,4 @@
-from .models import Insumo, ProductoTerminado, StockInsumo, StockProductoTerminado
+from .models import Insumo, ProductoTerminado, StockInsumo, StockProductoTerminado, OrdenProduccion
 # Sincronizar StockInsumo al crear o actualizar un Insumo
 from django.db import transaction
 from django.db.models.signals import post_save
@@ -106,3 +106,33 @@ def registrar_creacion_reporte_en_historial_ov(sender, instance, created, **kwar
             tipo_evento="Reporte de Incidencia",
             realizado_por=instance.reportado_por,
         )
+
+
+# --- SEÑALES PARA SINCRONIZACIÓN DE ESTADOS OV-OP ---
+@receiver(post_save, sender=OrdenProduccion)
+def actualizar_estado_ov_por_cambio_op(sender, instance, **kwargs):
+    """
+    Actualiza automáticamente el estado de la OV cuando cambia el estado de una OP asociada.
+    """
+    if instance.orden_venta_origen:
+        try:
+            # Usar transaction para evitar problemas de concurrencia
+            with transaction.atomic():
+                instance.orden_venta_origen.actualizar_estado_por_ops()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error actualizando estado OV {instance.orden_venta_origen.numero_ov} "
+                        f"por cambio en OP {instance.numero_op}: {e}")
+
+
+def get_client_ip(request):
+    """
+    Obtiene la IP del cliente desde el request.
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip

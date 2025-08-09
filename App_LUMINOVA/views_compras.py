@@ -453,22 +453,32 @@ def compras_seguimiento_view(request):
     Muestra las Órdenes de Compra que ya fueron gestionadas y están
     en proceso de envío o recepción.
     """
-    estados_en_seguimiento = [
-        ("ENVIADA_PROVEEDOR", "Enviada al Proveedor"),
-        ("EN_TRANSITO", "En Tránsito"),
-        ("RECIBIDA_PARCIAL", "Recibida Parcialmente"),
-        ("RECIBIDA_TOTAL", "Recibida Totalmente"),
-        ("COMPLETADA", "Completada"),
+    # Agrupar dinámicamente por todos los estados presentes en OCs de seguimiento
+    from collections import OrderedDict
+    # Estados considerados "en seguimiento"
+    ESTADOS_SEGUIMIENTO = [
+        "ENVIADA_PROVEEDOR",
+        "EN_TRANSITO",
+        "RECIBIDA_PARCIAL",
+        "RECIBIDA_TOTAL",
+        "COMPLETADA",
     ]
-    estados_oc_tabs = []
-    for estado, nombre in estados_en_seguimiento:
-        ocs = (
-            Orden.objects.filter(tipo="compra", estado=estado)
-            .select_related("proveedor")
-            .order_by("-fecha_creacion")
-        )
-        estados_oc_tabs.append((estado, nombre, ocs))
-
+    # Buscar todos los estados realmente presentes en OCs de seguimiento
+    ocs_seguimiento = (
+        Orden.objects.filter(tipo="compra", estado__in=ESTADOS_SEGUIMIENTO)
+        .select_related("proveedor")
+        .order_by("-fecha_creacion")
+    )
+    # Agrupar por estado, usando el display del modelo para el nombre
+    estados_oc_dict = OrderedDict()
+    for oc in ocs_seguimiento:
+        estado = oc.estado
+        nombre = oc.get_estado_display()
+        if estado not in estados_oc_dict:
+            estados_oc_dict[estado] = {"nombre": nombre, "ocs": []}
+        estados_oc_dict[estado]["ocs"].append(oc)
+    # Convertir a lista de tuplas para la plantilla
+    estados_oc_tabs = [(estado, data["nombre"], data["ocs"]) for estado, data in estados_oc_dict.items()]
     context = {
         "estados_oc_tabs": estados_oc_tabs,
         "titulo_seccion": "Seguimiento de Órdenes de Compra",

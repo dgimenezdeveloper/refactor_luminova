@@ -225,6 +225,139 @@ class OrdenVenta(models.Model):
             self.total_ov = nuevo_total
             self.save(update_fields=["total_ov"])
 
+    def actualizar_estado_por_ops(self):
+        """
+        Actualiza el estado de una OV basado en el estado más avanzado de sus OPs asociadas.
+        
+        Lógica para estados mixtos:
+        - Si todas las OPs están completadas -> COMPLETADA
+        - Si hay OPs completadas y otras pendientes/en proceso -> Según el estado más avanzado
+        - Si hay OPs canceladas, se consideran en la evaluación pero no bloquean el progreso
+        - Si todas las OPs están canceladas -> CANCELADA
+        """
+        from collections import Counter
+        
+        # Mapeo de estados de OP a estados de OV y su prioridad
+        MAPEO_ESTADOS_OP_A_OV = {
+            "Completada": "COMPLETADA",
+            "En Proceso": "PRODUCCION_INICIADA", 
+            "Producción Iniciada": "PRODUCCION_INICIADA",
+            "Insumos Recibidos": "INSUMOS_SOLICITADOS",
+            "Insumos Solicitados": "INSUMOS_SOLICITADOS",
+            "Planificada": "CONFIRMADA",
+            "Pendiente": "PENDIENTE",
+            "Cancelada": "CANCELADA",
+        }
+        
+        ESTADOS_PRIORIDAD = {
+            "COMPLETADA": 6,
+            "LISTA_ENTREGA": 5,
+            "PRODUCCION_INICIADA": 4,
+            "INSUMOS_SOLICITADOS": 3,
+            "CONFIRMADA": 2,
+            "PENDIENTE": 1,
+            "CANCELADA": 0,
+        }
+
+        ops_asociadas = self.ops_generadas.all()
+        if not ops_asociadas.exists():
+            return  # No hay OPs asociadas, no se actualiza el estado
+
+        # Obtener todos los estados de las OPs y mapearlos a estados de OV
+        estados_ops = []
+        contador_estados = Counter()
+        
+        for op in ops_asociadas:
+            if op.estado_op and op.estado_op.nombre:
+                estado_op_nombre = op.estado_op.nombre
+                estado_ov_mapeado = MAPEO_ESTADOS_OP_A_OV.get(estado_op_nombre)
+                if estado_ov_mapeado:
+                    estados_ops.append(estado_ov_mapeado)
+                    contador_estados[estado_op_nombre] += 1
+        
+        if not estados_ops:
+            return  # No hay estados válidos para mapear
+
+        total_ops = len(estados_ops)
+        ops_completadas = contador_estados.get("Completada", 0)
+        ops_canceladas = contador_estados.get("Cancelada", 0)
+        ops_activas = total_ops - ops_canceladas  # OPs que no están canceladas
+
+        # Lógica especial para estados mixtos
+        nuevo_estado = None
+        
+        # Caso 1: Todas las OPs están canceladas
+        if ops_canceladas == total_ops:
+            nuevo_estado = "CANCELADA"
+        
+        # Caso 2: Todas las OPs activas están completadas
+        elif ops_completadas == ops_activas and ops_activas > 0:
+            nuevo_estado = "LISTA_ENTREGA"  # Listo para entrega
+        
+        # Caso 3: Hay OPs completadas y otras en proceso (estado mixto)
+        elif ops_completadas > 0 and ops_activas > ops_completadas:
+            # En estados mixtos, NO permitir COMPLETADA hasta que todas estén listas
+            # Obtener el estado más avanzado de las OPs no completadas
+            estados_no_completados = [
+                estado for estado in estados_ops 
+                if estado not in ["COMPLETADA", "CANCELADA"]
+            ]
+            if estados_no_completados:
+                estado_mas_avanzado_activo = max(
+                    estados_no_completados,
+                    key=lambda estado: ESTADOS_PRIORIDAD.get(estado, 0),
+                )
+                # En estado mixto, usar el estado más avanzado pero NO permitir degradación
+                # Si ya está en COMPLETADA y hay OPs pendientes, mantener COMPLETADA pero registrar inconsistencia
+                if self.estado == "COMPLETADA":
+                    print(f"⚠️  INCONSISTENCIA: OV {self.numero_ov} está COMPLETADA pero tiene OPs pendientes")
+                    nuevo_estado = None  # No cambiar estado para evitar degradación
+                else:
+                    nuevo_estado = estado_mas_avanzado_activo
+            else:
+                nuevo_estado = "PRODUCCION_INICIADA"  # Fallback
+        
+        # Caso 4: Ninguna OP completada, usar el estado más avanzado
+        else:
+            nuevo_estado = max(
+                estados_ops,
+                key=lambda estado: ESTADOS_PRIORIDAD.get(estado, 0),
+            )
+
+        # Solo actualizar si el estado cambió y no degrada el progreso
+        if (nuevo_estado and 
+            nuevo_estado != self.estado and 
+            ESTADOS_PRIORIDAD.get(nuevo_estado, 0) >= ESTADOS_PRIORIDAD.get(self.estado, 0)):
+            
+            self.estado = nuevo_estado
+            self.save(update_fields=["estado"])
+            
+            # Log para debug
+            print(f"OV {self.numero_ov}: Estado actualizado de {self.estado} a {nuevo_estado}")
+            print(f"  - OPs completadas: {ops_completadas}/{ops_activas}")
+            print(f"  - OPs canceladas: {ops_canceladas}")
+
+    def get_resumen_estados_ops(self):
+        """
+        Retorna un resumen del estado de las OPs asociadas para mostrar en la interfaz.
+        """
+        from collections import Counter
+        
+        ops_asociadas = self.ops_generadas.all()
+        if not ops_asociadas.exists():
+            return "Sin OPs asociadas"
+        
+        contador = Counter()
+        for op in ops_asociadas:
+            if op.estado_op:
+                contador[op.estado_op.nombre] += 1
+        
+        resumen_partes = []
+        for estado, cantidad in contador.most_common():
+            resumen_partes.append(f"{cantidad} {estado}")
+        
+        return " | ".join(resumen_partes)
+
 
 class ItemOrdenVenta(models.Model):
     orden_venta = models.ForeignKey(
