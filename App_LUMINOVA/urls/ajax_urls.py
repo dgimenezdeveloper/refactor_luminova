@@ -15,6 +15,10 @@ from ..views import (
     get_oferta_proveedor_ajax,
 )
 
+from ..views_ventas import (
+    ajax_get_producto_stock_info,
+)
+
 from ..views_usuario_deposito import (
     actualizar_permisos_deposito_ajax,
 )
@@ -36,4 +40,7 @@ urlpatterns = [
     # Rutas para otras funcionalidades (Compras)
     path('proveedores/get-for-insumo/', ajax_get_proveedores_for_insumo, name='ajax_get_proveedores_for_insumo'),
     path('ofertas/get-proveedor/', get_oferta_proveedor_ajax, name='ajax_get_oferta_proveedor'),
+    
+    # Rutas para Ventas
+    path('productos/get-stock-info/', ajax_get_producto_stock_info, name='ajax_get_producto_stock_info'),
 ]

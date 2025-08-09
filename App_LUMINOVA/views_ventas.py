@@ -2,16 +2,17 @@ import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 
 # Django Contrib Imports
 from django.db import IntegrityError as DjangoIntegrityError
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Sum
 
 # Django Core Imports
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 # Local Application Imports (Forms)
 from .forms import (
@@ -30,7 +31,9 @@ from .models import (
     ItemOrdenVenta,
     OrdenProduccion,
     OrdenVenta,
+    ProductoTerminado,
     Reportes,
+    StockProductoTerminado,
 )
 from .signals import get_client_ip
 
@@ -526,7 +529,10 @@ def ventas_editar_ov_view(request, ov_id):
         if form_ov.is_valid():
             if puede_editar_items_y_ops:
                 formset_items = ItemOrdenVentaFormSet(
-                    request.POST, instance=orden_venta, prefix="items"
+                    request.POST, 
+                    instance=orden_venta, 
+                    prefix="items",
+                    
                 )
                 if formset_items.is_valid():
                     try:
@@ -614,16 +620,25 @@ def ventas_editar_ov_view(request, ov_id):
             )
             if puede_editar_items_y_ops:
                 formset_items = ItemOrdenVentaFormSet(
-                    request.POST, instance=orden_venta, prefix="items"
+                    request.POST, 
+                    instance=orden_venta, 
+                    prefix="items",
+                    
                 )
             else:
                 formset_items = ItemOrdenVentaFormSet(
-                    instance=orden_venta, prefix="items"
+                    instance=orden_venta, 
+                    prefix="items",
+                    
                 )
 
     else:  # GET request
         form_ov = OrdenVentaForm(instance=orden_venta, prefix="ov")
-        formset_items = ItemOrdenVentaFormSet(instance=orden_venta, prefix="items")
+        formset_items = ItemOrdenVentaFormSet(
+            instance=orden_venta, 
+            prefix="items",
+            
+        )
 
     context = {
         "form_ov": form_ov,
@@ -736,3 +751,49 @@ def ventas_ver_factura_pdf_view(request, factura_id):
 
     # Llamamos a nuestro servicio y retornamos directamente su respuesta
     return generar_pdf_factura(factura)
+
+
+# --- AJAX VIEWS ---
+@login_required
+@require_GET
+@login_required
+@require_GET
+def ajax_get_producto_stock_info(request):
+    """
+    Vista AJAX que devuelve información de stock de un producto específico
+    basado en los depósitos asignados al usuario.
+    """
+    producto_id = request.GET.get('producto_id')
+    if not producto_id:
+        return JsonResponse({'error': 'ID de producto requerido'}, status=400)
+    
+    try:
+        producto = ProductoTerminado.objects.get(id=producto_id)
+    except ProductoTerminado.DoesNotExist:
+        return JsonResponse({'error': 'Producto no encontrado'}, status=404)
+    
+    try:
+        # Obtener stock total del producto
+        stock_info = StockProductoTerminado.objects.filter(
+            producto=producto
+        ).select_related('deposito').values(
+            'deposito__nombre',
+            'cantidad'
+        )
+        
+        stock_total = sum(item['cantidad'] for item in stock_info)
+        stock_por_deposito = list(stock_info)
+        
+        return JsonResponse({
+            'producto_id': producto.id,
+            'producto_descripcion': producto.descripcion,
+            'precio_unitario': float(producto.precio_unitario),
+            'stock_total': stock_total,
+            'stock_por_deposito': stock_por_deposito,
+            'success': True
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': f'Error al obtener información del producto: {str(e)}'
+        }, status=500)

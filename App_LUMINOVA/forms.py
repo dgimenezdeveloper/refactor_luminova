@@ -143,15 +143,35 @@ class ItemOrdenVentaForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        usuario = kwargs.pop('usuario', None)
         super().__init__(*args, **kwargs)
+        
+        # Eliminar productos duplicados por descripción
+        # Obtener una lista de descripciones únicas
+        descripciones_unicas = ProductoTerminado.objects.values_list(
+            'descripcion', flat=True
+        ).distinct().order_by('descripcion')
+        
+        # Para cada descripción única, obtener el primer producto
+        productos_unicos = []
+        for descripcion in descripciones_unicas:
+            producto = ProductoTerminado.objects.filter(
+                descripcion=descripcion
+            ).first()
+            if producto:
+                productos_unicos.append(producto.id)
+        
+        # Configurar el queryset con productos únicos
         self.fields["producto_terminado"].queryset = (
-            ProductoTerminado.objects.all().order_by("descripcion")
+            ProductoTerminado.objects.filter(id__in=productos_unicos)
+            .order_by("descripcion")
         )
+        
         self.fields["producto_terminado"].empty_label = "Seleccionar Producto..."
-        # Mostrar precio y stock en el dropdown del producto para ayudar al usuario
         self.fields["producto_terminado"].label_from_instance = (
-            lambda obj: f"{obj.descripcion} (Stock: {obj.stock} | P.U: ${obj.precio_unitario})"
+            lambda obj: f"{obj.descripcion} (P.U: ${obj.precio_unitario})"
         )
+        
         # El precio unitario se llenará con JS al seleccionar el producto.
 
 
@@ -161,9 +181,9 @@ ItemOrdenVentaFormSet = forms.inlineformset_factory(
     ItemOrdenVenta,
     form=ItemOrdenVentaForm,
     fields=["producto_terminado", "cantidad", "precio_unitario_venta"],
-    extra=0,  # Empieza con 1 form para ítem
-    can_delete=True,  # Permite marcar para eliminar ítems existentes
-    can_delete_extra=True,  # Permite eliminar forms "extra" añadidos por JS antes de guardar
+    extra=0,
+    can_delete=True,
+    can_delete_extra=True,
 )
 
 # FormSet para la vista de CREACIÓN (con 1 formulario extra por defecto)
