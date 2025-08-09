@@ -204,7 +204,7 @@ def planificacion_produccion_view(request):
     # --- LÓGICA GET MEJORADA ---
     # Obtener todas las OPs que no estén en un estado final
     estados_finales = ["Completada", "Cancelada"]
-    ops_para_planificar = (
+    ops_queryset = (
         OrdenProduccion.objects.exclude(estado_op__nombre__in=estados_finales)
         .select_related(
             "producto_a_producir",
@@ -212,13 +212,22 @@ def planificacion_produccion_view(request):
             "estado_op",
             "sector_asignado_op",
         )
-        .order_by("estado_op__id", "fecha_solicitud")
-    )  # Ordenar por estado y luego por fecha
+        .order_by("estado_op__nombre", "fecha_solicitud")
+    )
+
+    # Agrupar OPs por estado
+    from collections import OrderedDict
+    ops_por_estado = OrderedDict()
+    for op in ops_queryset:
+        estado = op.get_estado_op_display()
+        if estado not in ops_por_estado:
+            ops_por_estado[estado] = []
+        ops_por_estado[estado].append(op)
 
     sectores = SectorAsignado.objects.all().order_by("nombre")
 
     context = {
-        "ops_para_planificar_list": ops_para_planificar,
+        "ops_por_estado": ops_por_estado,
         "sectores_list": sectores,
         "titulo_seccion": "Planificación de Órdenes de Producción",
     }
@@ -446,21 +455,24 @@ def produccion_detalle_op_view(request, op_id):
 
             op_actualizada = form_update.save(commit=False)
             se_esta_completando_op_ahora = False
-            if (
-                nuevo_estado_op_obj
-                and nuevo_estado_op_obj.nombre.lower() == ESTADO_OP_COMPLETADA_LOWER
-            ):
+            se_esta_iniciando_produccion_ahora = False
+            if nuevo_estado_op_obj and nuevo_estado_op_obj.nombre.lower() == ESTADO_OP_COMPLETADA_LOWER:
                 if (
                     not estado_op_anterior_obj
-                    or estado_op_anterior_obj.nombre.lower()
-                    != ESTADO_OP_COMPLETADA_LOWER
+                    or estado_op_anterior_obj.nombre.lower() != ESTADO_OP_COMPLETADA_LOWER
                 ):
                     se_esta_completando_op_ahora = True
                     op_actualizada.fecha_fin_real = (
-                        timezone.now()
-                        if not op_actualizada.fecha_fin_real
-                        else op_actualizada.fecha_fin_real
+                        timezone.now() if not op_actualizada.fecha_fin_real else op_actualizada.fecha_fin_real
                     )
+
+            # Detectar si se está iniciando producción ahora
+            if nuevo_estado_op_obj and nuevo_estado_op_obj.nombre.lower() == ESTADO_OP_PRODUCCION_INICIADA_LOWER:
+                if (
+                    not estado_op_anterior_obj
+                    or estado_op_anterior_obj.nombre.lower() != ESTADO_OP_PRODUCCION_INICIADA_LOWER
+                ):
+                    se_esta_iniciando_produccion_ahora = True
 
             if se_esta_completando_op_ahora:
                 producto_terminado_obj = op_actualizada.producto_a_producir
@@ -537,6 +549,35 @@ def produccion_detalle_op_view(request, op_id):
                 f"Orden de Producción {op_actualizada.numero_op} actualizada a '{op_actualizada.get_estado_op_display()}'.",
             )
 
+            # --- Sincronizar estado de OV a PRODUCCION_INICIADA si corresponde ---
+            if se_esta_iniciando_produccion_ahora and op_actualizada.orden_venta_origen:
+                try:
+                    orden_venta_asociada = op_actualizada.orden_venta_origen
+                    # Solo actualizar si la OV está en un estado anterior
+                    estados_anteriores = ["PENDIENTE", "CONFIRMADA", "INSUMOS_SOLICITADOS"]
+                    if orden_venta_asociada.estado in estados_anteriores:
+                        estado_ov_anterior_str = orden_venta_asociada.get_estado_display()
+                        orden_venta_asociada.estado = "PRODUCCION_INICIADA"
+                        orden_venta_asociada.save(update_fields=["estado"])
+                        descripcion_ov = f"Estado de la OV cambió de '{estado_ov_anterior_str}' a 'Producción Iniciada'."
+                        HistorialOV.objects.create(
+                            orden_venta=orden_venta_asociada,
+                            descripcion=descripcion_ov,
+                            tipo_evento="Cambio Estado OV",
+                            realizado_por=request.user,
+                        )
+                        messages.info(
+                            request,
+                            f"Estado de OV {orden_venta_asociada.numero_ov} actualizado a 'Producción Iniciada'.",
+                        )
+                except Exception as e:
+                    logger.error(f"Error al actualizar estado de OV asociada a OP {op_actualizada.numero_op}: {e}")
+                    messages.warning(
+                        request,
+                        "OP actualizada correctamente, pero hubo un problema al actualizar el estado de la OV asociada.",
+                    )
+
+            # --- Lógica existente para pasar OV a LISTA_ENTREGA si todas las OPs están finalizadas ---
             if op_actualizada.orden_venta_origen:
                 try:
                     orden_venta_asociada = op_actualizada.orden_venta_origen

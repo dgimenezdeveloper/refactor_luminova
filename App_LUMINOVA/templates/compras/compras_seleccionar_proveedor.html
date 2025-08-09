@@ -93,6 +93,33 @@
                 Por favor, <a href="{% url 'admin:App_LUMINOVA_ofertaproveedor_add' %}?insumo={{ insumo_objetivo.id }}" target="_blank" class="alert-link">agregue ofertas en el panel de administración</a> o <a href="{% url 'admin:App_LUMINOVA_proveedor_add' %}" target="_blank" class="alert-link">agregue proveedores</a>.
             </div>
             {% endif %}
+
+            {% if sugerencia_distribucion %}
+                <div class="alert alert-info mt-3">
+                    <strong>Sugerencia de distribución por depósito:</strong>
+                    <div class="table-responsive mt-2">
+                        <table class="table table-bordered table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Depósito</th>
+                                    <th class="text-center">Stock Actual</th>
+                                    <th class="text-center">Cantidad Sugerida</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in sugerencia_distribucion %}
+                                <tr>
+                                    <td>{{ item.deposito.nombre }}</td>
+                                    <td class="text-center">{{ item.stock_actual }}</td>
+                                    <td class="text-center fw-bold {% if item.cantidad_sugerida > 0 %}text-danger{% else %}text-success{% endif %}">{{ item.cantidad_sugerida }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <span class="small text-muted">La cantidad sugerida es la necesaria para alcanzar el umbral de stock mínimo en cada depósito.</span>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>

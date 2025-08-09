@@ -12,19 +12,29 @@
     <h1 class="h2 fw-bold text-primary">Seguimiento de Órdenes de Compra</h1>
 </div>
 
-<div class="table-responsive mt-3">
-    <table class="table table-hover table-sm align-middle">
-        <thead class="color-thead" >
-          <tr>
-            <th class="align-middle" style="background-color: #014BAC;">N° OC</th>
-            <th class="align-middle" style="background-color: #014BAC;">Estado de OC</th>
-            <th class="align-middle" style="background-color: #014BAC;">Proveedor</th>
-            <th class="align-middle" style="background-color: #014BAC;">Fecha Estimada de Entrega</th>
-            <th class="align-middle" style="background-color: #014BAC;">N° Tracking</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for oc in ordenes_en_seguimiento %}
+<ul class="nav nav-tabs" id="ocTabs" role="tablist">
+  {% for estado, nombre, ocs in estados_oc_tabs %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ estado }}" data-bs-toggle="tab" data-bs-target="#tab-content-{{ estado }}" type="button" role="tab" aria-controls="tab-content-{{ estado }}" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">{{ nombre }}</button>
+    </li>
+  {% endfor %}
+</ul>
+<div class="tab-content mt-3" id="ocTabsContent">
+  {% for estado, nombre, ocs in estados_oc_tabs %}
+    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="tab-content-{{ estado }}" role="tabpanel" aria-labelledby="tab-{{ estado }}">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="color-thead">
+            <tr>
+              <th class="align-middle">N° OC</th>
+              <th class="align-middle">Estado de OC</th>
+              <th class="align-middle">Proveedor</th>
+              <th class="align-middle">Fecha Estimada de Entrega</th>
+              <th class="align-middle">N° Tracking</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for oc in ocs %}
             <tr>
               <td class="align-middle">
                   <a href="{% url 'App_LUMINOVA:compras_detalle_oc' oc.id %}">{{ oc.numero_orden }}</a>
@@ -46,12 +56,15 @@
                 {% endif %}
               </td>
             </tr>
-          {% empty %}
+            {% empty %}
             <tr>
-              <td colspan="5" class="text-center fst-italic text-muted py-3">No hay órdenes en seguimiento en este momento.</td>
+              <td colspan="5" class="text-center fst-italic text-muted py-3">No hay órdenes en este estado.</td>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endfor %}
 </div>
 {% endblock %}

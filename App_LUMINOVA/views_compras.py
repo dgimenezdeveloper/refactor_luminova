@@ -269,29 +269,36 @@ def compras_lista_oc_view(request):
 
     # Filtrar órdenes de tipo 'compra'
     # Asumiendo que tu modelo Orden tiene un campo 'tipo' y 'proveedor'
+    # Agrupar OCs por estado para las pestañas
+    from collections import OrderedDict
+    ESTADOS_OC = OrderedDict([
+        ("BORRADOR", "Borrador"),
+        ("APROBADA", "Aprobada"),
+        ("ENVIADA_PROVEEDOR", "Enviada a Proveedor"),
+        ("EN_TRANSITO", "En Tránsito"),
+        ("RECIBIDA_PARCIAL", "Recibida Parcial"),
+        ("RECIBIDA_TOTAL", "Recibida Total"),
+        ("COMPLETADA", "Completada"),
+        ("CANCELADA", "Cancelada"),
+    ])
     ordenes_compra = (
         Orden.objects.filter(tipo="compra")
-        .select_related(
-            "proveedor",  # Si el campo se llama 'proveedor' en el modelo Orden
-            "insumo_principal",  # Si el campo se llama 'insumo' en el modelo Orden
-        )
+        .select_related("proveedor", "insumo_principal")
         .order_by("-fecha_creacion")
     )
-
-    # Para un futuro modal de creación de OC
-    # from .forms import OrdenCompraForm # Necesitarás crear este formulario
-    # form_oc = OrdenCompraForm()
-    # oc_count = Orden.objects.filter(tipo='compra').count()
-    # next_oc_number = f"OC-{str(oc_count + 1).zfill(4)}"
-    # form_oc.fields['numero_orden'].initial = next_oc_number
-
+    ordenes_por_estado = {estado: [] for estado in ESTADOS_OC.keys()}
+    for oc in ordenes_compra:
+        if oc.estado in ordenes_por_estado:
+            ordenes_por_estado[oc.estado].append(oc)
+    # Preparar lista de tuplas para la plantilla: (estado, nombre, ocs)
+    estados_oc_tabs = []
+    for estado, nombre in ESTADOS_OC.items():
+        ocs = ordenes_por_estado.get(estado, [])
+        estados_oc_tabs.append((estado, nombre, ocs))
     context = {
-        "ordenes_list": ordenes_compra,  # Nombre genérico para la plantilla
+        "estados_oc_tabs": estados_oc_tabs,
         "titulo_seccion": "Listado de Órdenes de Compra",
-        # 'form_orden': form_oc, # Para el modal de creación
-        # 'tipo_orden_actual': 'compra',
     }
-    # Necesitarás una plantilla para esto, ej. 'compras/compras_lista_oc.html'
     return render(request, "compras/compras_lista_oc.html", context)
 
 
@@ -387,27 +394,44 @@ def compras_desglose_view(request):
 
     # 2. Buscamos insumos críticos, EXCLUYENDO los que ya están gestionados.
     #    La lista resultante solo contendrá insumos sin OC o con OC en 'BORRADOR'.
-    # Agrupar insumos por depósito
+    # Agrupar insumos globalmente y sumar stock/desglose por depósito
     from collections import defaultdict
-    insumos_criticos = (
+    insumos_criticos_qs = (
         Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
         .exclude(id__in=insumos_ya_gestionados_ids)
         .select_related("categoria", "deposito")
-        .order_by("deposito__nombre", "categoria__nombre", "stock", "descripcion")
+        .order_by("descripcion")
     )
-    insumos_por_deposito = defaultdict(list)
-    for insumo in insumos_criticos:
+    insumos_dict = {}
+    for insumo in insumos_criticos_qs:
+        key = (insumo.descripcion, insumo.categoria_id)
+        if key not in insumos_dict:
+            insumos_dict[key] = {
+                "id": insumo.id,
+                "descripcion": insumo.descripcion,
+                "categoria": insumo.categoria,
+                "imagen": getattr(insumo, "imagen", None),
+                "stock_total": 0,
+                "desglose_depositos": [],
+                "tiene_oc_borrador": False,
+            }
+        insumos_dict[key]["stock_total"] += insumo.stock
+        insumos_dict[key]["desglose_depositos"].append({
+            "deposito": insumo.deposito.nombre if insumo.deposito else "Sin depósito",
+            "stock": insumo.stock,
+        })
+        # Si algún depósito tiene OC en borrador, marcarlo
         tiene_oc_borrador = Orden.objects.filter(
             tipo="compra",
             estado="BORRADOR",
             insumo_principal=insumo,
             deposito=insumo.deposito
         ).exists()
-        insumo.tiene_oc_borrador = tiene_oc_borrador
-        insumos_por_deposito[insumo.deposito.nombre if insumo.deposito else "Sin depósito"].append(insumo)
-    
+        if tiene_oc_borrador:
+            insumos_dict[key]["tiene_oc_borrador"] = True
+    insumos_criticos_globales = list(insumos_dict.values())
     context = {
-        "insumos_por_deposito": dict(insumos_por_deposito),
+        "insumos_criticos_globales": insumos_criticos_globales,
         "notificaciones_stock_bajo": notificaciones_stock_bajo,
         "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
         "titulo_seccion": "Gestionar Compra por Stock Bajo",
@@ -429,15 +453,34 @@ def compras_seguimiento_view(request):
     Muestra las Órdenes de Compra que ya fueron gestionadas y están
     en proceso de envío o recepción.
     """
-    estados_en_seguimiento = ["ENVIADA_PROVEEDOR", "EN_TRANSITO", "RECIBIDA_PARCIAL"]
-    ordenes = (
-        Orden.objects.filter(tipo="compra", estado__in=estados_en_seguimiento)
+    # Agrupar dinámicamente por todos los estados presentes en OCs de seguimiento
+    from collections import OrderedDict
+    # Estados considerados "en seguimiento"
+    ESTADOS_SEGUIMIENTO = [
+        "ENVIADA_PROVEEDOR",
+        "EN_TRANSITO",
+        "RECIBIDA_PARCIAL",
+        "RECIBIDA_TOTAL",
+        "COMPLETADA",
+    ]
+    # Buscar todos los estados realmente presentes en OCs de seguimiento
+    ocs_seguimiento = (
+        Orden.objects.filter(tipo="compra", estado__in=ESTADOS_SEGUIMIENTO)
         .select_related("proveedor")
         .order_by("-fecha_creacion")
     )
-
+    # Agrupar por estado, usando el display del modelo para el nombre
+    estados_oc_dict = OrderedDict()
+    for oc in ocs_seguimiento:
+        estado = oc.estado
+        nombre = oc.get_estado_display()
+        if estado not in estados_oc_dict:
+            estados_oc_dict[estado] = {"nombre": nombre, "ocs": []}
+        estados_oc_dict[estado]["ocs"].append(oc)
+    # Convertir a lista de tuplas para la plantilla
+    estados_oc_tabs = [(estado, data["nombre"], data["ocs"]) for estado, data in estados_oc_dict.items()]
     context = {
-        "ordenes_en_seguimiento": ordenes,
+        "estados_oc_tabs": estados_oc_tabs,
         "titulo_seccion": "Seguimiento de Órdenes de Compra",
     }
     return render(request, "compras/seguimiento.html", context)
@@ -546,12 +589,28 @@ def compras_seleccionar_proveedor_para_insumo_view(request, insumo_id):
         proveedores_fallback = Proveedor.objects.all().order_by("nombre")[:5]
 
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
+
+    # --- Sugerencia de distribución por depósito ---
+    from App_LUMINOVA.models import StockInsumo, Deposito
+    depositos = Deposito.objects.all().order_by("nombre")
+    sugerencia_distribucion = []
+    for deposito in depositos:
+        stock_deposito = StockInsumo.objects.filter(insumo=insumo_objetivo, deposito=deposito).first()
+        cantidad_actual = stock_deposito.cantidad if stock_deposito else 0
+        cantidad_sugerida = max(0, UMBRAL_STOCK_BAJO_INSUMOS - cantidad_actual)
+        sugerencia_distribucion.append({
+            "deposito": deposito,
+            "stock_actual": cantidad_actual,
+            "cantidad_sugerida": cantidad_sugerida,
+        })
+
     context = {
         "insumo_objetivo": insumo_objetivo,
         "ofertas_proveedores": ofertas,
         "proveedores_fallback": proveedores_fallback,
         "titulo_seccion": f"Seleccionar Oferta para: {insumo_objetivo.descripcion}",
         "umbral_stock_bajo": UMBRAL_STOCK_BAJO_INSUMOS,
+        "sugerencia_distribucion": sugerencia_distribucion,
     }
     return render(request, "compras/compras_seleccionar_proveedor.html", context)
 
@@ -591,9 +650,16 @@ def compras_crear_oc_view(request, insumo_id=None, proveedor_id=None):
         initial_data['insumo_principal'] = insumo_preseleccionado_obj
         form_kwargs['insumo_fijado'] = insumo_preseleccionado_obj
 
-        UMBRAL_STOCK_BAJO = 15000
-        cantidad_sugerida = max(10, UMBRAL_STOCK_BAJO - insumo_preseleccionado_obj.stock)
-        initial_data['cantidad_principal'] = cantidad_sugerida
+        # Calcular la cantidad sugerida global sumando la sugerencia de todos los depósitos
+        from App_LUMINOVA.models import StockInsumo, Deposito
+        depositos = list(Deposito.objects.all().order_by("nombre"))
+        cantidad_total_sugerida = 0
+        for deposito in depositos:
+            stock_deposito = StockInsumo.objects.filter(insumo=insumo_preseleccionado_obj, deposito=deposito).first()
+            cantidad_actual = stock_deposito.cantidad if stock_deposito else 0
+            cantidad_sugerida = max(0, 15000 - cantidad_actual)
+            cantidad_total_sugerida += cantidad_sugerida
+        initial_data['cantidad_principal'] = max(10, cantidad_total_sugerida)
 
         if proveedor_id:
             proveedor_preseleccionado_obj = get_object_or_404(Proveedor, id=proveedor_id)
@@ -649,10 +715,44 @@ def compras_crear_oc_view(request, insumo_id=None, proveedor_id=None):
     else: # GET
         form = OrdenCompraForm(initial=initial_data, **form_kwargs)
 
+    # --- Sugerencia de distribución global por insumo (desglose por depósito) ---
+    sugerencia_distribucion = None
+    if insumo_preseleccionado_obj:
+        from App_LUMINOVA.models import StockInsumo, Deposito
+        depositos = list(Deposito.objects.all().order_by("nombre"))
+        # Obtener el stock en todos los depósitos para este insumo
+        stock_por_deposito = {}
+        cantidad_total_actual = 0
+        cantidad_total_sugerida = 0
+        desglose = []
+        for deposito in depositos:
+            stock_deposito = StockInsumo.objects.filter(insumo=insumo_preseleccionado_obj, deposito=deposito).first()
+            cantidad_actual = stock_deposito.cantidad if stock_deposito else 0
+            cantidad_sugerida = max(0, 15000 - cantidad_actual)
+            stock_por_deposito[deposito.nombre] = {
+                "deposito": deposito,
+                "stock_actual": cantidad_actual,
+                "cantidad_sugerida": cantidad_sugerida,
+            }
+            cantidad_total_actual += cantidad_actual
+            cantidad_total_sugerida += cantidad_sugerida
+            desglose.append({
+                "deposito": deposito,
+                "stock_actual": cantidad_actual,
+                "cantidad_sugerida": cantidad_sugerida,
+            })
+        sugerencia_distribucion = {
+            "insumo": insumo_preseleccionado_obj,
+            "cantidad_total_actual": cantidad_total_actual,
+            "cantidad_total_sugerida": cantidad_total_sugerida,
+            "desglose_por_deposito": desglose,
+        }
+
     context = {
         'form_oc': form,
         'titulo_seccion': 'Crear Orden de Compra',
         'insumo_preseleccionado': insumo_preseleccionado_obj,
+        'sugerencia_distribucion': sugerencia_distribucion,
     }
     return render(request, 'compras/compras_crear_editar_oc.html', context)
 

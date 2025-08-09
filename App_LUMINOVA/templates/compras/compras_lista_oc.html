@@ -4,6 +4,7 @@
 
 {% block title %}{{ titulo_seccion|default:"Órdenes de Compra" }}{% endblock %}
 
+
 {% block sidebar_content %}
     {% include 'compras/compras_sidebar.html' %}
 {% endblock %}
@@ -18,100 +19,100 @@
     </div>
 </div>
 
-<div class="table-responsive mt-3">
-    <table class="table table-hover table-sm align-middle"> {# table-sm para más compacidad #}
-        <thead class="color-thead"> {# Tu clase CSS para el encabezado #}
+
+<ul class="nav nav-tabs" id="ocTabs" role="tablist">
+  {% for estado, nombre, ocs in estados_oc_tabs %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ estado }}" data-bs-toggle="tab" data-bs-target="#tab-content-{{ estado }}" type="button" role="tab" aria-controls="tab-content-{{ estado }}" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">{{ nombre }}</button>
+    </li>
+  {% endfor %}
+</ul>
+<div class="tab-content mt-3" id="ocTabsContent">
+  {% for estado, nombre, ocs in estados_oc_tabs %}
+    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="tab-content-{{ estado }}" role="tabpanel" aria-labelledby="tab-{{ estado }}">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+          <thead class="color-thead">
             <tr>
-                <th class="text-center">N° OC</th>
-                <th>Fecha Creación</th>
-                <th>Proveedor</th>
-                <th>Insumo Principal</th>
-                <th>Depósito</th>
-                <th class="text-center">Cantidad</th>
-                <th class="text-end">Total ($)</th>
-                <th class="text-center">Estado</th>
-                <th class="text-center">Tracking</th>
-                <th class="text-center" style="min-width: 120px;">Acciones</th> {# Ancho mínimo para botones #}
+              <th class="text-center">N° OC</th>
+              <th>Fecha Creación</th>
+              <th>Proveedor</th>
+              <th>Insumo Principal</th>
+              <th>Depósito</th>
+              <th class="text-center">Cantidad</th>
+              <th class="text-end">Total ($)</th>
+              <th class="text-center">Estado</th>
+              <th class="text-center">Tracking</th>
+              <th class="text-center" style="min-width: 120px;">Acciones</th>
             </tr>
-        </thead>
-        <tbody>
-            {% for oc in ordenes_list %}
+          </thead>
+          <tbody>
+            {% for oc in ocs %}
             <tr>
-                <td class="text-center">
-                    <a href="{% url 'App_LUMINOVA:compras_detalle_oc' oc.id %}">{{ oc.numero_orden }}</a>
-                </td>
-                <td>{{ oc.fecha_creacion|date:"d/m/Y H:i" }}</td>
-                <td>{{ oc.proveedor.nombre|default_if_none:"N/A" }}</td>
-                <td>{{ oc.insumo_principal.descripcion|default_if_none:"N/A"|truncatechars:30 }}</td>
-                <td>{{ oc.deposito.nombre|default_if_none:"N/A" }}</td>
-                <td class="text-center">{{ oc.cantidad_principal|default_if_none:"-" }}</td>
-                <td class="text-end">{{ oc.total_orden_compra|floatformat:2|default:"0.00" }}</td>
-                <td class="text-center">
-                    <span class="badge fs-6
-                        {% if oc.estado == 'BORRADOR' %}bg-dark
-                        {% elif oc.estado == 'PENDIENTE_APROBACION' %}bg-warning text-dark
-                        {% elif oc.estado == 'APROBADA' %}bg-secondary
-                        {% elif oc.estado == 'ENVIADA_PROVEEDOR' %}bg-primary
-                        {% elif oc.estado == 'CONFIRMADA_PROVEEDOR' %}bg-primary-subtle text-primary-emphasis border border-primary-subtle
-                        {% elif oc.estado == 'EN_TRANSITO' %}bg-info-subtle text-info-emphasis border border-info-subtle
-                        {% elif oc.estado == 'RECIBIDA_PARCIAL' %}bg-success-subtle text-success-emphasis border border-success-subtle
-                        {% elif oc.estado == 'RECIBIDA_TOTAL' %}bg-success
-                        {% elif oc.estado == 'COMPLETADA' %}bg-success
-                        {% elif oc.estado == 'CANCELADA' %}bg-dark
-                        {% else %}bg-light text-dark{% endif %}">
-                        {{ oc.get_estado_display }}
-                    </span>
-                </td>
-                <td class="text-center">
-                    {% if oc.numero_tracking %}
-                        <a href="{% url 'App_LUMINOVA:compras_tracking_pedido' oc.id %}" class="fw-bold" title="Ver seguimiento de {{ oc.numero_orden }}">
-                            {{ oc.numero_tracking }}
-                        </a>
-                    {% else %}
-                        N/A
-                    {% endif %}
-                </td>
-                <td class="text-center">
-                    <a href="{% url 'App_LUMINOVA:compras_detalle_oc' oc.id %}" class="btn btn-sm btn-outline-info me-1" title="Ver Detalles de OC {{ oc.numero_orden }}">
-                        <i class="bi bi-eye-fill"></i>
-                    </a>
-
-                    {% if oc.estado == 'BORRADOR' %}
-                        {# Enlace para Editar (sigue siendo GET, lleva a un formulario) #}
-                        <form method="post" action="{% url 'App_LUMINOVA:compras_aprobar_oc_directamente' oc.id %}" style="display: inline;"> {# Nueva URL #}
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-success me-1" title="Aprobar OC {{ oc.numero_orden }}">
-                                <i class="bi bi-check2-circle"></i> Aprobar
-                            </button>
-                        </form>
-
-                        {# Aquí podrías tener el botón para Cancelar/Eliminar Borrador si lo implementas #}
-
-                        <!-- <form method="post" action="#" style="display: inline;" onsubmit="return confirm('¿Está seguro de que desea eliminar este borrador de OC?');">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar Borrador OC {{ oc.numero_orden }}">
-                                <i class="bi bi-trash3-fill"></i>
-                            </button>
-                        </form>  -->
-
-                    {% elif oc.estado == 'PENDIENTE_APROBACION' %}
-                       {# ... (tus botones para Aprobar/Rechazar irían aquí, también como forms POST) ... #}
-                         <a href="{% url 'App_LUMINOVA:compras_editar_oc' oc.id %}" class="btn btn-sm btn-outline-primary me-1" title="Editar OC (si permitido en este estado)">
-                            <i class="bi bi-pencil-square"></i>
-                        </a>
-                    {# ... otros elif para diferentes estados ... #}
-                    {% endif %}
-                </td>
+              <td class="text-center">
+                <a href="{% url 'App_LUMINOVA:compras_detalle_oc' oc.id %}">{{ oc.numero_orden }}</a>
+              </td>
+              <td>{{ oc.fecha_creacion|date:"d/m/Y H:i" }}</td>
+              <td>{{ oc.proveedor.nombre|default_if_none:"N/A" }}</td>
+              <td>{{ oc.insumo_principal.descripcion|default_if_none:"N/A"|truncatechars:30 }}</td>
+              <td>{{ oc.deposito.nombre|default_if_none:"N/A" }}</td>
+              <td class="text-center">{{ oc.cantidad_principal|default_if_none:"-" }}</td>
+              <td class="text-end">{{ oc.total_orden_compra|floatformat:2|default:"0.00" }}</td>
+              <td class="text-center">
+                <span class="badge fs-6
+                  {% if oc.estado == 'BORRADOR' %}bg-dark
+                  {% elif oc.estado == 'PENDIENTE_APROBACION' %}bg-warning text-dark
+                  {% elif oc.estado == 'APROBADA' %}bg-secondary
+                  {% elif oc.estado == 'ENVIADA_PROVEEDOR' %}bg-primary
+                  {% elif oc.estado == 'CONFIRMADA_PROVEEDOR' %}bg-primary-subtle text-primary-emphasis border border-primary-subtle
+                  {% elif oc.estado == 'EN_TRANSITO' %}bg-info-subtle text-info-emphasis border border-info-subtle
+                  {% elif oc.estado == 'RECIBIDA_PARCIAL' %}bg-success-subtle text-success-emphasis border border-success-subtle
+                  {% elif oc.estado == 'RECIBIDA_TOTAL' %}bg-success
+                  {% elif oc.estado == 'COMPLETADA' %}bg-success
+                  {% elif oc.estado == 'CANCELADA' %}bg-dark
+                  {% else %}bg-light text-dark{% endif %}">
+                  {{ oc.get_estado_display }}
+                </span>
+              </td>
+              <td class="text-center">
+                {% if oc.numero_tracking %}
+                  <a href="{% url 'App_LUMINOVA:compras_tracking_pedido' oc.id %}" class="fw-bold" title="Ver seguimiento de {{ oc.numero_orden }}">
+                    {{ oc.numero_tracking }}
+                  </a>
+                {% else %}
+                  N/A
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <a href="{% url 'App_LUMINOVA:compras_detalle_oc' oc.id %}" class="btn btn-sm btn-outline-info me-1" title="Ver Detalles de OC {{ oc.numero_orden }}">
+                  <i class="bi bi-eye-fill"></i>
+                </a>
+                {% if oc.estado == 'BORRADOR' %}
+                  <form method="post" action="{% url 'App_LUMINOVA:compras_aprobar_oc_directamente' oc.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-success me-1" title="Aprobar OC {{ oc.numero_orden }}">
+                      <i class="bi bi-check2-circle"></i> Aprobar
+                    </button>
+                  </form>
+                {% elif oc.estado == 'PENDIENTE_APROBACION' %}
+                  <a href="{% url 'App_LUMINOVA:compras_editar_oc' oc.id %}" class="btn btn-sm btn-outline-primary me-1" title="Editar OC (si permitido en este estado)">
+                    <i class="bi bi-pencil-square"></i>
+                  </a>
+                {% endif %}
+              </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9" class="text-center fst-italic text-muted py-3">
-                    No hay órdenes de compra registradas. Puede <a href="{% url 'App_LUMINOVA:compras_crear_oc' %}">crear una nueva</a>.
-                </td>
+              <td colspan="10" class="text-center fst-italic text-muted py-3">
+                No hay órdenes de compra en este estado.
+              </td>
             </tr>
             {% endfor %}
-        </tbody>
-    </table>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endfor %}
 </div>
 
 {# MODALES (EJEMPLO PARA CANCELAR OC) #}

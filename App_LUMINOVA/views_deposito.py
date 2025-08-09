@@ -220,18 +220,17 @@ def transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cant
     )
 
     # Copiar ofertas de proveedor si corresponde
-    if hasattr(insumo, 'ofertas'):
-        for oferta in insumo.ofertas.all():
-            OfertaProveedor.objects.get_or_create(
-                proveedor=oferta.proveedor,
-                insumo=insumo_destino,
-                defaults={
-                    'precio_unitario': oferta.precio_unitario,
-                    'cantidad_minima': oferta.cantidad_minima,
-                    'tiempo_entrega': oferta.tiempo_entrega,
-                    'activa': oferta.activa,
-                }
-            )
+    ofertas_origen = OfertaProveedor.objects.filter(insumo=insumo)
+    for oferta in ofertas_origen:
+        OfertaProveedor.objects.get_or_create(
+            proveedor=oferta.proveedor,
+            insumo=insumo_destino,
+            defaults={
+                'precio_unitario_compra': oferta.precio_unitario_compra,
+                'tiempo_entrega_estimado_dias': oferta.tiempo_entrega_estimado_dias,
+                'fecha_actualizacion_precio': oferta.fecha_actualizacion_precio,
+            }
+        )
 
     # Actualizar stocks
     stock_origen.cantidad -= cantidad

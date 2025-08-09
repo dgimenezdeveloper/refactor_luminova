@@ -145,6 +145,17 @@ def eliminar_cliente_view(request, cliente_id):
 
 @login_required
 def ventas_lista_ov_view(request):
+    from collections import OrderedDict
+    ESTADOS_OV = OrderedDict([
+        ("PENDIENTE", "Pendiente Confirmación"),
+        ("CONFIRMADA", "Confirmada (Esperando Producción)"),
+        ("INSUMOS_SOLICITADOS", "Insumos Solicitados"),
+        ("PRODUCCION_INICIADA", "Producción Iniciada"),
+        ("PRODUCCION_CON_PROBLEMAS", "Producción con Problemas"),
+        ("LISTA_ENTREGA", "Lista para Entrega"),
+        ("COMPLETADA", "Completada/Entregada"),
+        ("CANCELADA", "Cancelada"),
+    ])
     ordenes_de_venta_query = (
         OrdenVenta.objects.select_related("cliente")
         .prefetch_related(
@@ -163,29 +174,32 @@ def ventas_lista_ov_view(request):
                     )
                 )
                 .order_by("numero_op"),
-                to_attr="lista_ops_con_reportes_y_estado",  # Usamos un nombre claro para el resultado del prefetch
+                to_attr="lista_ops_con_reportes_y_estado",
             ),
         )
         .order_by("-fecha_creacion")
     )
 
-    # Procesar para añadir la bandera
-    ordenes_list_con_info_reporte = []
+    # Actualizar estados de OV basado en sus OPs asociadas usando el método centralizado
     for ov in ordenes_de_venta_query:
-        ov.tiene_algun_reporte_asociado = False  # Inicializar bandera
-        if hasattr(
-            ov, "lista_ops_con_reportes_y_estado"
-        ):  # Verificar que el prefetch funcionó
-            for op in ov.lista_ops_con_reportes_y_estado:
-                if (
-                    op.reportes_incidencia.all().exists()
-                ):  # Si alguna de las OPs de esta OV tiene reportes...
-                    ov.tiene_algun_reporte_asociado = True
-                    break  # Salimos del bucle interior, ya sabemos que hay al menos un reporte.
-        ordenes_list_con_info_reporte.append(ov)
+        ov.actualizar_estado_por_ops()
 
+    ordenes_por_estado = {estado: [] for estado in ESTADOS_OV.keys()}
+    for ov in ordenes_de_venta_query:
+        ov.tiene_algun_reporte_asociado = False
+        if hasattr(ov, "lista_ops_con_reportes_y_estado"):
+            for op in ov.lista_ops_con_reportes_y_estado:
+                if op.reportes_incidencia.all().exists():
+                    ov.tiene_algun_reporte_asociado = True
+                    break
+        if ov.estado in ordenes_por_estado:
+            ordenes_por_estado[ov.estado].append(ov)
+    estados_ov_tabs = []
+    for estado, nombre in ESTADOS_OV.items():
+        ovs = ordenes_por_estado.get(estado, [])
+        estados_ov_tabs.append((estado, nombre, ovs))
     context = {
-        "ordenes_list": ordenes_list_con_info_reporte,  # Pasamos la lista procesada a la plantilla
+        "estados_ov_tabs": estados_ov_tabs,
         "titulo_seccion": "Órdenes de Venta",
     }
     return render(request, "ventas/ventas_lista_ov.html", context)
@@ -650,24 +664,45 @@ def ventas_cancelar_ov_view(request, ov_id):
         return redirect("App_LUMINOVA:ventas_detalle_ov", ov_id=ov_id)
 
     ops_asociadas = orden_venta.ops_generadas.all()
+    ops_canceladas_count = 0
+    ops_ya_completadas = 0
+    
     for op in ops_asociadas:
         if (
             op.estado_op != estado_op_completada
         ):  # No cancelar OPs que ya se completaron
             op.estado_op = estado_op_cancelada
             op.save(update_fields=["estado_op"])
+            ops_canceladas_count += 1
             messages.info(
                 request,
                 f"Orden de Producción {op.numero_op} asociada ha sido cancelada.",
             )
         else:
+            ops_ya_completadas += 1
             messages.warning(
                 request,
                 f"Orden de Producción {op.numero_op} ya está completada y no se cancelará.",
             )
 
+    # Actualizar estado de la OV usando el método centralizado
+    # En caso de cancelación manual, forzamos el estado a CANCELADA
     orden_venta.estado = "CANCELADA"
     orden_venta.save(update_fields=["estado"])
+    
+    # Registrar en historial
+    try:
+        from .models import HistorialOV
+        HistorialOV.objects.create(
+            orden_venta=orden_venta,
+            descripcion=f"OV cancelada por {request.user.get_full_name() or request.user.username}. "
+                        f"OPs canceladas: {ops_canceladas_count}, OPs completadas (no canceladas): {ops_ya_completadas}",
+            tipo_evento="Cancelación",
+            realizado_por=request.user,
+        )
+    except Exception as e:
+        logger.warning(f"No se pudo registrar en historial la cancelación de OV {orden_venta.numero_ov}: {e}")
+    
     messages.success(
         request, f"Orden de Venta {orden_venta.numero_ov} ha sido cancelada."
     )
