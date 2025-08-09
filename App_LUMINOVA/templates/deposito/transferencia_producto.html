@@ -62,12 +62,13 @@
                             </div>
                         {% endif %}
 
-                        <div class="d-flex gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary flex-fill">
-                                <i class="bi bi-arrow-right-circle-fill me-2"></i>Realizar Transferencia
-                            </button>
-                            <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-left me-2"></i>Cancelar
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <div>
+                                <button type="submit" class="btn btn-primary px-4">Transferir</button>
+                                <a href="{% url 'App_LUMINOVA:deposito_view' %}" class="btn btn-secondary ms-2">Cancelar</a>
+                            </div>
+                            <a href="{% url 'App_LUMINOVA:historial_transferencias' %}" class="btn btn-outline-primary">
+                                <i class="bi bi-clock-history me-1"></i> Ver historial de transferencias
                             </a>
                         </div>
                     </form>
