@@ -94,17 +94,15 @@ def custom_logout_view(request):
 
 
 @login_required
+
 def dashboard_view(request):
     # --- 1. Tarjeta: Acciones Urgentes ---
-    # Contamos OPs cuyo estado refleje un problema o pausa por incidencia
-    # estados_problematicos_op = ['Producción con Problemas', 'Pausada']
     ops_con_problemas_reportados_count = (
         Reportes.objects.filter(resuelto=False, orden_produccion_asociada__isnull=False)
         .values("orden_produccion_asociada_id")
         .distinct()
         .count()
     )
-
     solicitudes_insumos_pendientes = OrdenProduccion.objects.filter(
         estado_op__nombre__iexact="Insumos Solicitados"
     ).count()
@@ -112,19 +110,39 @@ def dashboard_view(request):
 
     # --- 2. Tarjeta: Stock Crítico ---
     UMBRAL_STOCK_BAJO = 15000
+    # Solo mostrar insumos críticos que NO tengan OC activa (aprobada, enviada, en tránsito, etc.)
+    ESTADOS_OC_ACTIVA = [
+        "APROBADA",
+        "ENVIADA_PROVEEDOR",
+        "EN_TRANSITO",
+        "RECIBIDA_PARCIAL",
+        "RECIBIDA_TOTAL",
+        "COMPLETADA",
+    ]
     insumos_criticos_query = Insumo.objects.filter(
         stock__lt=UMBRAL_STOCK_BAJO
-    ).order_by("stock")[:5]
-    insumos_criticos_con_porcentaje = []
+    ).order_by("stock")
+    insumos_criticos_filtrados = []
     for insumo in insumos_criticos_query:
-        porcentaje_stock = (
-            int((insumo.stock / UMBRAL_STOCK_BAJO) * 100)
-            if UMBRAL_STOCK_BAJO > 0
-            else 0
-        )
-        insumos_criticos_con_porcentaje.append(
-            {"insumo": insumo, "porcentaje_stock": min(100, porcentaje_stock)}
-        )
+        tiene_oc_activa = Orden.objects.filter(
+            tipo="compra",
+            estado__in=ESTADOS_OC_ACTIVA,
+            insumo_principal=insumo
+        ).exists()
+        if not tiene_oc_activa:
+            porcentaje_stock = (
+                int((insumo.stock / UMBRAL_STOCK_BAJO) * 100)
+                if UMBRAL_STOCK_BAJO > 0
+                else 0
+            )
+            insumos_criticos_filtrados.append(
+                {
+                    "insumo": insumo,
+                    "porcentaje_stock": min(100, porcentaje_stock),
+                    "notificado": getattr(insumo, "notificado_a_compras", False),
+                }
+            )
+    insumos_criticos_con_porcentaje = insumos_criticos_filtrados
 
     # --- 3. Tarjeta: Rendimiento de Producción ---
     hace_30_dias = timezone.now() - timedelta(days=30)

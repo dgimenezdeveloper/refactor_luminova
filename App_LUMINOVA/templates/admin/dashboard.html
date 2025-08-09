@@ -123,8 +123,15 @@
                     {% for item_data in insumos_criticos_list %}
                     <li class="list-group-item px-0 py-2">
                         <a href="{% url 'App_LUMINOVA:compras_seleccionar_proveedor_para_insumo' item_data.insumo.id %}" class="text-decoration-none d-block" title="Iniciar compra para {{ item.insumo.descripcion }}">
-                            <div class="d-flex justify-content-between">
-                                <span>{{ item_data.insumo.descripcion|truncatechars:25 }}</span>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>
+                                    {{ item_data.insumo.descripcion|truncatechars:25 }}
+                                    {% if item_data.notificado %}
+                                        <i class="bi bi-bell-fill text-info ms-1" title="Ya notificado a compras"></i>
+                                    {% else %}
+                                        <i class="bi bi-bell-slash text-secondary ms-1" title="No notificado a compras"></i>
+                                    {% endif %}
+                                </span>
                                 <span class="fw-bold text-danger">{{ item_data.insumo.stock|intcomma }}</span>
                             </div>
                             <div class="stock-progress-bar mt-1">
@@ -136,6 +143,11 @@
                     <li class="list-group-item px-0 text-success"><i class="bi bi-check-circle-fill"></i> No hay insumos críticos.</li>
                     {% endfor %}
                 </ul>
+                <div class="mt-2 small">
+                    <strong>Glosario de íconos:</strong>
+                    <span class="ms-2"><i class="bi bi-bell-fill text-info"></i> Notificado a compras</span>
+                    <span class="ms-3"><i class="bi bi-bell-slash text-secondary"></i> No notificado a compras</span>
+                </div>
             </div>
         </div>
     </div>
