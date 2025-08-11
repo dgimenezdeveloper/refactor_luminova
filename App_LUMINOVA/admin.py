@@ -56,11 +56,51 @@ class ComponenteProductoInline(admin.TabularInline):
 
 @admin.register(ProductoTerminado)
 class ProductoTerminadoAdmin(admin.ModelAdmin):
-    list_display = ("descripcion", "categoria", "stock", "precio_unitario", "modelo")
-    list_filter = ("categoria",)
+    list_display = (
+        "descripcion", 
+        "categoria", 
+        "stock", 
+        "stock_minimo", 
+        "stock_objetivo", 
+        "produccion_habilitada",
+        "estado_stock",
+        "precio_unitario", 
+        "modelo",
+        "deposito"
+    )
+    list_filter = ("categoria", "produccion_habilitada", "deposito")
     search_fields = ("descripcion", "modelo")
     inlines = [ComponenteProductoInline]
-    autocomplete_fields = ["categoria"]
+    autocomplete_fields = ["categoria", "deposito"]
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('descripcion', 'categoria', 'modelo', 'precio_unitario', 'deposito')
+        }),
+        ('Características', {
+            'fields': ('potencia', 'acabado', 'color_luz', 'material', 'imagen'),
+            'classes': ('collapse',)
+        }),
+        ('Gestión de Stock', {
+            'fields': ('stock', 'stock_minimo', 'stock_objetivo', 'produccion_habilitada'),
+            'description': 'Configure los niveles de stock para producción automática'
+        }),
+    )
+    
+    def estado_stock(self, obj):
+        """Muestra el estado del stock del producto"""
+        if obj.stock == 0:
+            return "🔴 Sin Stock"
+        elif obj.necesita_reposicion:
+            return "🟡 Stock Bajo"
+        elif obj.stock > obj.stock_objetivo:
+            return "🔵 Sobre Stock"
+        else:
+            return "🟢 Normal"
+    estado_stock.short_description = "Estado Stock"
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('categoria', 'deposito')
 
 
 @admin.register(Insumo)
@@ -128,18 +168,19 @@ class OrdenVentaAdmin(admin.ModelAdmin):
 class OrdenProduccionAdmin(admin.ModelAdmin):
     list_display = (
         "numero_op",
+        "tipo_orden",
         "producto_a_producir",
         "cantidad_a_producir",
         "get_estado_op_nombre",
         "get_sector_asignado_nombre",
+        "get_origen_display",
         "fecha_solicitud",
     )
-    list_filter = ("estado_op", "sector_asignado_op", "fecha_solicitud")
+    list_filter = ("tipo_orden", "estado_op", "sector_asignado_op", "fecha_solicitud")
     search_fields = (
         "numero_op",
         "producto_a_producir__descripcion",
         "orden_venta_origen__numero_ov",
-        "cliente_final__nombre",
     )
     autocomplete_fields = [
         "producto_a_producir",
@@ -148,6 +189,24 @@ class OrdenProduccionAdmin(admin.ModelAdmin):
         "sector_asignado_op",
     ]
     readonly_fields = ("fecha_solicitud",)
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('numero_op', 'tipo_orden', 'producto_a_producir', 'cantidad_a_producir')
+        }),
+        ('Origen y Estado', {
+            'fields': ('orden_venta_origen', 'estado_op', 'sector_asignado_op'),
+            'description': 'Para órdenes MTO (bajo demanda) debe seleccionar una Orden de Venta origen. Para órdenes MTS (para stock) deje este campo vacío.'
+        }),
+        ('Planificación', {
+            'fields': ('fecha_inicio_planificada', 'fecha_fin_planificada', 'fecha_inicio_real', 'fecha_fin_real'),
+            'classes': ('collapse',)
+        }),
+        ('Notas', {
+            'fields': ('notas',),
+            'classes': ('collapse',)
+        }),
+    )
 
     @admin.display(description="Estado")
     def get_estado_op_nombre(self, obj):
@@ -156,6 +215,20 @@ class OrdenProduccionAdmin(admin.ModelAdmin):
     @admin.display(description="Sector Asignado")
     def get_sector_asignado_nombre(self, obj):
         return obj.sector_asignado_op.nombre if obj.sector_asignado_op else "-"
+    
+    @admin.display(description="Origen")
+    def get_origen_display(self, obj):
+        if obj.tipo_orden == 'MTO' and obj.orden_venta_origen:
+            return f"OV: {obj.orden_venta_origen.numero_ov}"
+        elif obj.tipo_orden == 'MTS':
+            return "Para Stock"
+        else:
+            return "-"
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'producto_a_producir', 'orden_venta_origen', 'estado_op', 'sector_asignado_op'
+        )
 
 
 @admin.register(Cliente)
