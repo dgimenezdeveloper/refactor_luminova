@@ -1,4 +1,3 @@
-
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout as auth_logout_function
 from django.contrib import messages
@@ -73,7 +72,7 @@ def custom_logout_view(request):
     """
     Gestiona el cierre de sesión y registra el evento en la auditoría ANTES de desloguear.
     """
-    user = request.user
+    user = request.user if request.user.is_authenticated else None
 
     # Registrar el evento de cierre de sesión con toda la información disponible
     AuditoriaAcceso.objects.create(
@@ -86,7 +85,7 @@ def custom_logout_view(request):
     # Llamar a la función de logout de Django para limpiar la sesión
     auth_logout_function(request)
 
-    # Opcional: mostrar un mensaje de que cerró sesión correctamente
+    # Opcional: mostrar un mensaje de que cerró sesión exitosamente
     messages.info(request, "Has cerrado sesión exitosamente.")
 
     # Redirigir a la página de login
