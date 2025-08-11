@@ -38,6 +38,22 @@ class ProductoTerminado(models.Model):
     )
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     stock = models.IntegerField(default=0)
+    # Campos para gestión de stock
+    stock_minimo = models.IntegerField(
+        default=0, 
+        verbose_name="Stock Mínimo",
+        help_text="Nivel mínimo de stock que debe mantenerse (punto de reorden)"
+    )
+    stock_objetivo = models.IntegerField(
+        default=0,
+        verbose_name="Stock Objetivo", 
+        help_text="Nivel deseado de stock después de reabastecer"
+    )
+    produccion_habilitada = models.BooleanField(
+        default=True,
+        verbose_name="Habilitado para Producción",
+        help_text="Indica si este producto puede ser producido para stock"
+    )
     modelo = models.CharField(max_length=50, blank=True, null=True)
     potencia = models.IntegerField(blank=True, null=True)
     acabado = models.CharField(max_length=50, blank=True, null=True)
@@ -55,6 +71,34 @@ class ProductoTerminado(models.Model):
 
     def __str__(self):
         return f"{self.descripcion} (Modelo: {self.modelo or 'N/A'})"
+    
+    @property
+    def necesita_reposicion(self):
+        """Indica si el producto necesita reposición de stock"""
+        return self.stock <= self.stock_minimo
+    
+    @property
+    def necesita_reposicion_stock(self):
+        """Indica si el producto necesita reposición urgente (alias para compatibilidad)"""
+        return self.stock <= self.stock_minimo and self.stock_minimo > 0
+    
+    @property
+    def cantidad_reposicion_sugerida(self):
+        """Calcula la cantidad sugerida para reposición"""
+        if self.necesita_reposicion:
+            return max(0, self.stock_objetivo - self.stock)
+        return 0
+    
+    @property
+    def porcentaje_stock(self):
+        """Calcula el porcentaje de stock actual respecto al objetivo"""
+        if self.stock_objetivo > 0:
+            return (self.stock / self.stock_objetivo) * 100
+        return 0
+    
+    def puede_producir_para_stock(self):
+        """Verifica si el producto puede ser producido para stock"""
+        return self.produccion_habilitada and self.stock_objetivo > 0
 
 
 class CategoriaInsumo(models.Model):
@@ -393,8 +437,20 @@ class SectorAsignado(models.Model):
 
 
 class OrdenProduccion(models.Model):
+    TIPO_OP_CHOICES = [
+        ('MTO', 'Make to Order (Bajo Demanda)'),
+        ('MTS', 'Make to Stock (Para Stock)'),
+    ]
+    
     numero_op = models.CharField(
         max_length=20, unique=True, verbose_name="N° Orden de Producción"
+    )
+    tipo_orden = models.CharField(
+        max_length=3,
+        choices=TIPO_OP_CHOICES,
+        default='MTO',
+        verbose_name="Tipo de Orden",
+        help_text="MTO: Producción bajo demanda vinculada a una OV, MTS: Producción para stock"
     )
     orden_venta_origen = models.ForeignKey(
         OrdenVenta,
@@ -402,6 +458,7 @@ class OrdenProduccion(models.Model):
         null=True,
         blank=True,
         related_name="ops_generadas",
+        help_text="Solo para órdenes MTO (Make to Order)"
     )
 
     producto_a_producir = models.ForeignKey(
@@ -430,13 +487,32 @@ class OrdenProduccion(models.Model):
     )
     notas = models.TextField(null=True, blank=True, verbose_name="Notas")
 
+    def clean(self):
+        """Validaciones personalizadas del modelo"""
+        super().clean()
+        if self.tipo_orden == 'MTO' and not self.orden_venta_origen:
+            raise ValidationError("Las órdenes MTO (Make to Order) deben tener una Orden de Venta origen")
+        if self.tipo_orden == 'MTS' and self.orden_venta_origen:
+            raise ValidationError("Las órdenes MTS (Make to Stock) no deben tener una Orden de Venta origen")
+
     def get_estado_op_display(self):
         if self.estado_op:
             return self.estado_op.nombre
         return "Sin Estado Asignado"
+    
+    @property
+    def es_para_stock(self):
+        """Indica si esta orden es para producción de stock"""
+        return self.tipo_orden == 'MTS'
+    
+    @property
+    def es_bajo_demanda(self):
+        """Indica si esta orden es bajo demanda"""
+        return self.tipo_orden == 'MTO'
 
     def __str__(self):
-        return f"OP: {self.numero_op} - {self.cantidad_a_producir} x {self.producto_a_producir.descripcion}"
+        tipo_display = "STOCK" if self.es_para_stock else "DEMANDA"
+        return f"OP: {self.numero_op} ({tipo_display}) - {self.cantidad_a_producir} x {self.producto_a_producir.descripcion}"
 
 
 class Reportes(models.Model):
