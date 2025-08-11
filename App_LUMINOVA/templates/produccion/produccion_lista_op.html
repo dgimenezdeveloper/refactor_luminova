@@ -36,6 +36,7 @@
             <thead class="color-thead">
                 <tr>
                     <th style="background-color: #014BAC; color: white;">N° OP</th>
+                    <th style="background-color: #014BAC; color: white;">Tipo</th>
                     <th style="background-color: #014BAC; color: white;">OV Origen</th>
                     <th style="background-color: #014BAC; color: white;">Producto</th>
                     <th class="text-center" style="background-color: #014BAC; color: white;">Cant.</th>
@@ -48,10 +49,35 @@
                 {% for op in ops_activas_list %}
                 <tr class="{% if op.estado_op.nombre|lower == 'insumos recibidos' %}table-info-light{% endif %}">
                     <td><a href="{% url 'App_LUMINOVA:produccion_detalle_op' op.id %}">{{ op.numero_op }}</a></td>
-                    <td>{% if op.orden_venta_origen %}<a href="{% url 'App_LUMINOVA:ventas_detalle_ov' op.orden_venta_origen.id %}">{{ op.orden_venta_origen.numero_ov }}</a>{% else %}N/A{% endif %}</td>
+                    <td>
+                        {% if op.tipo_orden == 'MTO' %}
+                            <span class="badge bg-info" title="Make to Order - Bajo Demanda">MTO</span>
+                        {% elif op.tipo_orden == 'MTS' %}
+                            <span class="badge bg-success" title="Make to Stock - Para Stock">MTS</span>
+                        {% else %}
+                            <span class="badge bg-secondary">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if op.orden_venta_origen %}
+                            <a href="{% url 'App_LUMINOVA:ventas_detalle_ov' op.orden_venta_origen.id %}">{{ op.orden_venta_origen.numero_ov }}</a>
+                        {% elif op.tipo_orden == 'MTS' %}
+                            <span class="text-muted">Para Stock</span>
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
                     <td>{{ op.producto_a_producir.descripcion|truncatechars:30 }}</td>
                     <td class="text-center">{{ op.cantidad_a_producir }}</td>
-                    <td>{{ op.orden_venta_origen.cliente.nombre|default_if_none:"N/A" }}</td>
+                    <td>
+                        {% if op.orden_venta_origen and op.orden_venta_origen.cliente %}
+                            {{ op.orden_venta_origen.cliente.nombre }}
+                        {% elif op.tipo_orden == 'MTS' %}
+                            <span class="text-muted">Producción para Stock</span>
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
                     <td>
                         <span class="badge {% if op.estado_op.nombre|lower == 'pausada' %}bg-dark{% elif op.estado_op.nombre|lower == 'producción con problemas' %}bg-danger{% elif op.estado_op.nombre|lower == 'pendiente' or op.estado_op.nombre|lower == 'planificada' %}bg-warning text-dark{% elif op.estado_op.nombre|lower == 'insumos solicitados' %}bg-info text-dark{% else %}bg-primary{% endif %}">{{ op.get_estado_op_display }}</span>
                         {% if op.reportes_abiertos %}

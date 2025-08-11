@@ -1,0 +1,246 @@
+{% extends 'padre.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ titulo_seccion|default:"Sugerencias de Producción" }}{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'produccion/produccion_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2 fw-bold text-primary">{{ titulo_seccion|default:"Sugerencias de Producción para Stock" }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'App_LUMINOVA:crear_op_stock' %}" class="btn btn-success me-2">
+            <i class="bi bi-plus-circle"></i> Crear OP Stock
+        </a>
+        <a href="{% url 'App_LUMINOVA:produccion_stock_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left-circle"></i> Volver al Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="alert alert-info" role="alert">
+    <i class="bi bi-lightbulb"></i>
+    <strong>Sugerencias Automáticas:</strong> 
+    Este panel muestra los productos que necesitan reposición de stock basándose en los niveles mínimos configurados. 
+    Las sugerencias están ordenadas por urgencia, mostrando primero los productos más críticos.
+</div>
+
+{% if sugerencias %}
+<div class="card shadow-sm">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0">
+            <i class="bi bi-exclamation-triangle"></i> 
+            Productos que Requieren Atención ({{ sugerencias|length }} productos)
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Urgencia</th>
+                        <th>Producto</th>
+                        <th>Stock Actual</th>
+                        <th>Stock Mínimo</th>
+                        <th>Stock Objetivo</th>
+                        <th>Cantidad Sugerida</th>
+                        <th>OPs Activas</th>
+                        <th>Stock Proyectado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sugerencia in sugerencias %}
+                    <tr class="{% if sugerencia.urgente %}table-danger{% else %}table-warning{% endif %}">
+                        <td>
+                            {% if sugerencia.stock_actual == 0 %}
+                                <span class="badge bg-danger">
+                                    <i class="bi bi-exclamation-octagon"></i> CRÍTICO
+                                </span>
+                            {% elif sugerencia.urgente %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-exclamation-triangle"></i> URGENTE
+                                </span>
+                            {% else %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-info-circle"></i> NORMAL
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ sugerencia.producto.descripcion|truncatechars:40 }}</strong>
+                            <br>
+                            <small class="text-muted">
+                                {{ sugerencia.producto.categoria.nombre }}
+                                {% if sugerencia.producto.deposito %}
+                                    - {{ sugerencia.producto.deposito.nombre }}
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td>
+                            <span class="badge {% if sugerencia.stock_actual == 0 %}bg-danger{% elif sugerencia.stock_actual <= sugerencia.stock_minimo %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                {{ sugerencia.stock_actual|intcomma }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ sugerencia.stock_minimo|intcomma }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ sugerencia.stock_objetivo|intcomma }}</span>
+                        </td>
+                        <td>
+                            <strong class="text-success">{{ sugerencia.cantidad_sugerida|intcomma }}</strong>
+                            <small class="text-muted d-block">unidades</small>
+                        </td>
+                        <td>
+                            {% if sugerencia.ops_activas > 0 %}
+                                <span class="badge bg-secondary">
+                                    {{ sugerencia.ops_activas }} OP{{ sugerencia.ops_activas|pluralize }}
+                                </span>
+                                <small class="text-muted d-block">
+                                    {{ sugerencia.cantidad_en_produccion|intcomma }} en producción
+                                </small>
+                            {% else %}
+                                <span class="text-muted">Sin OPs activas</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {% if sugerencia.stock_proyectado <= sugerencia.stock_minimo %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                {{ sugerencia.stock_proyectado|intcomma }}
+                            </span>
+                            <small class="text-muted d-block">
+                                (actual + en producción)
+                            </small>
+                        </td>
+                        <td>
+                            <div class="btn-group-vertical btn-group-sm" role="group">
+                                <a href="{% url 'App_LUMINOVA:crear_op_stock' %}?producto={{ sugerencia.producto.id }}&cantidad={{ sugerencia.cantidad_sugerida }}" 
+                                   class="btn btn-outline-success btn-sm" 
+                                   title="Crear OP con cantidad sugerida">
+                                    <i class="bi bi-plus-circle"></i> Crear OP
+                                </a>
+                                {% if sugerencia.ops_activas > 0 %}
+                                <a href="{% url 'App_LUMINOVA:produccion_lista_op' %}?producto={{ sugerencia.producto.id }}" 
+                                   class="btn btn-outline-info btn-sm" 
+                                   title="Ver OPs activas">
+                                    <i class="bi bi-eye"></i> Ver OPs
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer">
+        <div class="row">
+            <div class="col-md-6">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i>
+                    Las cantidades sugeridas se calculan para alcanzar el stock objetivo configurado.
+                </small>
+            </div>
+            <div class="col-md-6 text-end">
+                <small class="text-muted">
+                    Última actualización: {{ "now"|date:"d/m/Y H:i" }}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Panel de acciones masivas -->
+<div class="card mt-4">
+    <div class="card-header bg-secondary text-white">
+        <h6 class="mb-0">
+            <i class="bi bi-lightning"></i> Acciones Rápidas
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 mb-2">
+                <button type="button" class="btn btn-outline-success w-100" id="btnCrearOPsUrgentes">
+                    <i class="bi bi-exclamation-triangle"></i><br>
+                    Crear OPs Urgentes
+                    <br><small>({{ sugerencias|length }} productos)</small>
+                </button>
+            </div>
+            <div class="col-md-3 mb-2">
+                <a href="{% url 'App_LUMINOVA:configurar_stock_productos' %}" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-gear"></i><br>
+                    Configurar Niveles
+                    <br><small>Ajustar stock mínimo/objetivo</small>
+                </a>
+            </div>
+            <div class="col-md-3 mb-2">
+                <a href="{% url 'App_LUMINOVA:produccion_lista_op' %}?tipo=MTS" class="btn btn-outline-info w-100">
+                    <i class="bi bi-list-ul"></i><br>
+                    Ver OPs Stock
+                    <br><small>Todas las OPs para stock</small>
+                </a>
+            </div>
+            <div class="col-md-3 mb-2">
+                <button type="button" class="btn btn-outline-warning w-100" onclick="window.location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i><br>
+                    Actualizar
+                    <br><small>Refrescar sugerencias</small>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Estado sin sugerencias -->
+<div class="text-center py-5">
+    <div class="mb-4">
+        <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+    </div>
+    <h3 class="text-success">¡Excelente!</h3>
+    <p class="lead text-muted">
+        Todos los productos están dentro de los niveles normales de stock.
+        No hay sugerencias de producción en este momento.
+    </p>
+    
+    <div class="mt-4">
+        <a href="{% url 'App_LUMINOVA:configurar_stock_productos' %}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-gear"></i> Configurar Niveles de Stock
+        </a>
+        <a href="{% url 'App_LUMINOVA:crear_op_stock' %}" class="btn btn-outline-success">
+            <i class="bi bi-plus-circle"></i> Crear OP Manual
+        </a>
+    </div>
+    
+    <div class="alert alert-info mt-4 d-inline-block" role="alert">
+        <i class="bi bi-info-circle"></i>
+        Las sugerencias aparecerán cuando algún producto tenga un stock igual o menor a su nivel mínimo configurado.
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnCrearOPsUrgentes = document.getElementById('btnCrearOPsUrgentes');
+    
+    if (btnCrearOPsUrgentes) {
+        btnCrearOPsUrgentes.addEventListener('click', function() {
+            if (confirm('¿Está seguro de que desea crear órdenes de producción para todos los productos urgentes?\n\nEsto creará {{ sugerencias|length }} orden(es) de producción.')) {
+                // Aquí se podría implementar una funcionalidad para crear múltiples OPs
+                // Por ahora, redirigimos a la página de crear OP
+                window.location.href = "{% url 'App_LUMINOVA:crear_op_stock' %}";
+            }
+        });
+    }
+    
+    // Actualización automática cada 5 minutos
+    setTimeout(function() {
+        window.location.reload();
+    }, 300000); // 5 minutos
+});
+</script>
+{% endblock %}

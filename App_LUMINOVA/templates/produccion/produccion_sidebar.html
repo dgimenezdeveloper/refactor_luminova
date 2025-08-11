@@ -4,6 +4,10 @@
 {% url 'App_LUMINOVA:produccion_lista_op' as url_produccion_lista_op %}
 {% url 'App_LUMINOVA:planificacion_produccion' as url_planificacion %} {# Asumiendo que este es el nombre correcto #}
 {% url 'App_LUMINOVA:reportes_produccion' as url_reportes %}       {# Asumiendo que este es el nombre correcto #}
+{% url 'App_LUMINOVA:produccion_stock_dashboard' as url_stock_dashboard %}
+{% url 'App_LUMINOVA:crear_op_stock' as url_crear_op_stock %}
+{% url 'App_LUMINOVA:configurar_stock_productos' as url_configurar_stock %}
+{% url 'App_LUMINOVA:sugerencias_produccion' as url_sugerencias %}
 
 <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-primary sidebar collapse border-end vh-100" style="border-top-left-radius: 25px; border-top-right-radius: 25px;">
     <div class="position-sticky pt-4">
@@ -33,6 +37,45 @@
                     <i class="bi bi-flag-fill fs-5 me-2"></i> <span class="ms-2">Reportes</span>
                 </a>
             </li>
+            
+            <!-- Separador para Producción para Stock -->
+            <li class="nav-item mt-3">
+                <hr class="text-white-50 mx-3">
+                <small class="text-white-50 px-3">Producción para Stock</small>
+            </li>
+            
+            <li class="nav-item mt-2">
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center 
+                   {% if request.resolver_match.url_name == 'produccion_stock_dashboard' %}active{% endif %}" 
+                   href="{{ url_stock_dashboard }}">
+                    <i class="bi bi-speedometer2 fs-5 me-2"></i> <span class="ms-2">Dashboard Stock</span>
+                </a>
+            </li>
+            
+            <li class="nav-item mt-2">
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center 
+                   {% if request.resolver_match.url_name == 'crear_op_stock' %}active{% endif %}" 
+                   href="{{ url_crear_op_stock }}">
+                    <i class="bi bi-plus-circle fs-5 me-2"></i> <span class="ms-2">Crear OP Stock</span>
+                </a>
+            </li>
+            
+            <li class="nav-item mt-2">
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center 
+                   {% if request.resolver_match.url_name == 'sugerencias_produccion' %}active{% endif %}" 
+                   href="{{ url_sugerencias }}">
+                    <i class="bi bi-lightbulb fs-5 me-2"></i> <span class="ms-2">Sugerencias</span>
+                </a>
+            </li>
+            
+            <li class="nav-item mt-2">
+                <a class="nav-link sidebar-link text-white fw-bold custom-active-button d-flex align-items-center 
+                   {% if request.resolver_match.url_name == 'configurar_stock_productos' %}active{% endif %}" 
+                   href="{{ url_configurar_stock }}">
+                    <i class="bi bi-gear fs-5 me-2"></i> <span class="ms-2">Configurar Stock</span>
+                </a>
+            </li>
+
 <style>
     .sidebar-link i {
         transition: color 0.2s, transform 0.2s;
