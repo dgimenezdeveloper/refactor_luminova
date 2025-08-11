@@ -262,6 +262,86 @@ class OrdenVentaForm(forms.ModelForm):
             self.fields["estado"].empty_label = None
 
 
+# Formulario para crear órdenes de producción para stock
+class OrdenProduccionStockForm(forms.ModelForm):
+    class Meta:
+        model = OrdenProduccion
+        fields = [
+            'producto_a_producir',
+            'cantidad_a_producir',
+            'fecha_inicio_planificada',
+            'fecha_fin_planificada',
+            'sector_asignado_op',
+            'notas'
+        ]
+        widgets = {
+            'producto_a_producir': forms.Select(attrs={'class': 'form-select'}),
+            'cantidad_a_producir': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '1',
+                'placeholder': 'Cantidad a producir'
+            }),
+            'fecha_inicio_planificada': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control'
+            }),
+            'fecha_fin_planificada': forms.DateInput(attrs={
+                'type': 'date', 
+                'class': 'form-control'
+            }),
+            'sector_asignado_op': forms.Select(attrs={'class': 'form-select'}),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Notas adicionales...'
+            })
+        }
+        labels = {
+            'producto_a_producir': 'Producto a Producir',
+            'cantidad_a_producir': 'Cantidad',
+            'fecha_inicio_planificada': 'Fecha Inicio Planificada',
+            'fecha_fin_planificada': 'Fecha Fin Planificada',
+            'sector_asignado_op': 'Sector Asignado',
+            'notas': 'Notas'
+        }
+
+    def __init__(self, *args, **kwargs):
+        deposito_id = kwargs.pop('deposito_id', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar solo productos habilitados para producción
+        queryset = ProductoTerminado.objects.filter(produccion_habilitada=True)
+        if deposito_id:
+            queryset = queryset.filter(deposito_id=deposito_id)
+        
+        self.fields['producto_a_producir'].queryset = queryset
+        self.fields['producto_a_producir'].empty_label = "Seleccione un producto"
+        
+        # Configurar estado inicial como "Planificada"
+        try:
+            estado_planificada = EstadoOrden.objects.get(nombre__iexact="Planificada")
+            self.initial['estado_op'] = estado_planificada
+        except EstadoOrden.DoesNotExist:
+            pass
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.tipo_orden = 'MTS'  # Forzar tipo MTS para stock
+        instance.orden_venta_origen = None  # Sin OV origen
+        
+        # Asignar estado inicial si no tiene
+        if not instance.estado_op:
+            try:
+                estado_planificada = EstadoOrden.objects.get(nombre__iexact="Planificada")
+                instance.estado_op = estado_planificada
+            except EstadoOrden.DoesNotExist:
+                pass
+        
+        if commit:
+            instance.save()
+        return instance
+
+
 # Formulario para actualizar una OP (usado en la vista de detalle de OP)
 class OrdenProduccionUpdateForm(forms.ModelForm):
     class Meta:
@@ -944,3 +1024,52 @@ class DepositoForm(forms.ModelForm):
             'ubicacion': forms.TextInput(attrs={'class': 'form-control'}),
             'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
+
+
+# Formulario para configurar niveles de stock de productos
+class ConfiguracionStockForm(forms.ModelForm):
+    class Meta:
+        model = ProductoTerminado
+        fields = [
+            'stock_minimo',
+            'stock_objetivo', 
+            'produccion_habilitada'
+        ]
+        widgets = {
+            'stock_minimo': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'placeholder': 'Stock mínimo'
+            }),
+            'stock_objetivo': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '0',
+                'placeholder': 'Stock objetivo'
+            }),
+            'produccion_habilitada': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+        labels = {
+            'stock_minimo': 'Stock Mínimo (Punto de Reorden)',
+            'stock_objetivo': 'Stock Objetivo',
+            'produccion_habilitada': 'Habilitado para Producción de Stock'
+        }
+        help_texts = {
+            'stock_minimo': 'Cuando el stock llegue a este nivel, se sugerirá crear una OP para stock',
+            'stock_objetivo': 'Nivel deseado de stock después de producir',
+            'produccion_habilitada': 'Permite que este producto sea incluido en órdenes de producción para stock'
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        stock_minimo = cleaned_data.get('stock_minimo')
+        stock_objetivo = cleaned_data.get('stock_objetivo')
+        
+        if stock_minimo is not None and stock_objetivo is not None:
+            if stock_objetivo <= stock_minimo:
+                raise forms.ValidationError(
+                    "El stock objetivo debe ser mayor que el stock mínimo."
+                )
+        
+        return cleaned_data
