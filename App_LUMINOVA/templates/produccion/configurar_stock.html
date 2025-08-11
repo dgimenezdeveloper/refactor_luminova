@@ -1,0 +1,267 @@
+{% extends 'padre.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ titulo_seccion|default:"Configurar Niveles de Stock" }}{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'produccion/produccion_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2 fw-bold text-primary">{{ titulo_seccion|default:"Configurar Niveles de Stock" }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'App_LUMINOVA:produccion_stock_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left-circle"></i> Volver al Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="alert alert-info" role="alert">
+    <i class="bi bi-info-circle"></i>
+    <strong>Configuración de Niveles de Stock:</strong> 
+    Configure los niveles mínimos y objetivos para cada producto. Cuando el stock actual sea igual o menor al stock mínimo, 
+    el sistema sugerirá crear una orden de producción para alcanzar el stock objetivo.
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+            <i class="bi bi-gear"></i> Productos y Configuración de Stock
+        </h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Producto</th>
+                        <th>Categoría</th>
+                        <th>Depósito</th>
+                        <th>Stock Actual</th>
+                        <th>Stock Mínimo</th>
+                        <th>Stock Objetivo</th>
+                        <th>Habilitado</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for producto in productos %}
+                    <tr class="{% if producto.necesita_reposicion %}table-warning{% endif %}">
+                        <td>
+                            <strong>{{ producto.descripcion|truncatechars:50 }}</strong>
+                            {% if producto.modelo %}
+                                <br><small class="text-muted">Modelo: {{ producto.modelo }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ producto.categoria.nombre }}</span>
+                        </td>
+                        <td>
+                            {% if producto.deposito %}
+                                {{ producto.deposito.nombre }}
+                            {% else %}
+                                <span class="text-muted">Sin asignar</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {% if producto.stock == 0 %}bg-danger{% elif producto.necesita_reposicion %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                                {{ producto.stock|intcomma }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ producto.stock_minimo|intcomma }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ producto.stock_objetivo|intcomma }}</span>
+                        </td>
+                        <td>
+                            {% if producto.produccion_habilitada %}
+                                <i class="bi bi-check-circle-fill text-success" title="Habilitado para producción"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill text-danger" title="No habilitado para producción"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if producto.necesita_reposicion %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-exclamation-triangle"></i> Necesita Reposición
+                                </span>
+                            {% elif producto.stock > producto.stock_objetivo %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-arrow-up"></i> Sobre Stock
+                                </span>
+                            {% else %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Normal
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#configModal"
+                                    data-producto-id="{{ producto.id }}"
+                                    data-producto-nombre="{{ producto.descripcion }}"
+                                    data-stock-minimo="{{ producto.stock_minimo }}"
+                                    data-stock-objetivo="{{ producto.stock_objetivo }}"
+                                    data-produccion-habilitada="{{ producto.produccion_habilitada|yesno:'true,false' }}">
+                                <i class="bi bi-gear"></i> Configurar
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No hay productos disponibles para configurar.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para configurar stock -->
+<div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="configModalLabel">
+                    <i class="bi bi-gear"></i> Configurar Niveles de Stock
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" id="configForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <input type="hidden" name="producto_id" id="modalProductoId">
+                    
+                    <div class="mb-3">
+                        <h6 id="modalProductoNombre" class="text-primary"></h6>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="modalStockMinimo" class="form-label">
+                                    Stock Mínimo (Punto de Reorden) <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control" id="modalStockMinimo" 
+                                       name="stock_minimo" min="0" required>
+                                <div class="form-text">
+                                    Cuando el stock llegue a este nivel, se sugerirá crear una OP
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="modalStockObjetivo" class="form-label">
+                                    Stock Objetivo <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control" id="modalStockObjetivo" 
+                                       name="stock_objetivo" min="0" required>
+                                <div class="form-text">
+                                    Nivel deseado de stock después de producir
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="modalProduccionHabilitada" 
+                                   name="produccion_habilitada">
+                            <label class="form-check-label" for="modalProduccionHabilitada">
+                                Habilitado para Producción de Stock
+                            </label>
+                            <div class="form-text">
+                                Permite que este producto sea incluido en órdenes de producción para stock
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <small>
+                            <strong>Importante:</strong> El stock objetivo debe ser mayor que el stock mínimo.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Guardar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const configModal = document.getElementById('configModal');
+    const configForm = document.getElementById('configForm');
+    
+    configModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        
+        // Obtener datos del botón
+        const productoId = button.getAttribute('data-producto-id');
+        const productoNombre = button.getAttribute('data-producto-nombre');
+        const stockMinimo = button.getAttribute('data-stock-minimo');
+        const stockObjetivo = button.getAttribute('data-stock-objetivo');
+        const produccionHabilitada = button.getAttribute('data-produccion-habilitada') === 'true';
+        
+        // Llenar el modal con los datos
+        document.getElementById('modalProductoId').value = productoId;
+        document.getElementById('modalProductoNombre').textContent = productoNombre;
+        document.getElementById('modalStockMinimo').value = stockMinimo;
+        document.getElementById('modalStockObjetivo').value = stockObjetivo;
+        document.getElementById('modalProduccionHabilitada').checked = produccionHabilitada;
+    });
+    
+    // Validación del formulario
+    configForm.addEventListener('submit', function(event) {
+        const stockMinimo = parseInt(document.getElementById('modalStockMinimo').value);
+        const stockObjetivo = parseInt(document.getElementById('modalStockObjetivo').value);
+        
+        if (stockObjetivo <= stockMinimo) {
+            event.preventDefault();
+            alert('El stock objetivo debe ser mayor que el stock mínimo.');
+            return false;
+        }
+    });
+    
+    // Validación en tiempo real
+    document.getElementById('modalStockObjetivo').addEventListener('input', function() {
+        const stockMinimo = parseInt(document.getElementById('modalStockMinimo').value) || 0;
+        const stockObjetivo = parseInt(this.value) || 0;
+        
+        if (stockObjetivo > 0 && stockObjetivo <= stockMinimo) {
+            this.setCustomValidity('El stock objetivo debe ser mayor que el stock mínimo');
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+    
+    document.getElementById('modalStockMinimo').addEventListener('input', function() {
+        const stockMinimo = parseInt(this.value) || 0;
+        const stockObjetivo = parseInt(document.getElementById('modalStockObjetivo').value) || 0;
+        
+        if (stockObjetivo > 0 && stockObjetivo <= stockMinimo) {
+            document.getElementById('modalStockObjetivo').setCustomValidity('El stock objetivo debe ser mayor que el stock mínimo');
+        } else {
+            document.getElementById('modalStockObjetivo').setCustomValidity('');
+        }
+    });
+});
+</script>
+{% endblock %}
