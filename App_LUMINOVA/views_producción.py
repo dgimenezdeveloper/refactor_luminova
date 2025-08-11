@@ -42,10 +42,12 @@ from Proyecto_LUMINOVA import settings
 # Local Application Imports (Forms)
 from .forms import (
     ClienteForm,
+    ConfiguracionStockForm,
     FacturaForm,
     ItemOrdenVentaFormSet,
     ItemOrdenVentaFormSetCreacion,
     OrdenCompraForm,
+    OrdenProduccionStockForm,
     OrdenProduccionUpdateForm,
     OrdenVentaForm,
     PermisosRolForm,
@@ -779,3 +781,297 @@ def crear_reporte_produccion_view(request, op_id):
     }
     return render(request, "produccion/crear_reporte.html", context)
 
+
+# --- VISTAS PARA PRODUCCIÓN PARA STOCK ---
+
+@login_required
+def produccion_stock_dashboard_view(request):
+    """
+    Dashboard principal para gestión de producción para stock
+    """
+    from .forms import ConfiguracionStockForm, OrdenProduccionStockForm
+    
+    # Verificar permisos
+    if not es_admin_o_rol(request.user, ["produccion", "administrador"]):
+        messages.error(request, "No tienes permisos para acceder a esta sección.")
+        return redirect("App_LUMINOVA:dashboard")
+    
+    # Obtener depósito del usuario si aplica
+    deposito_user = None
+    deposito_id = request.session.get("deposito_seleccionado")
+    if deposito_id and deposito_id != "-1":
+        from .models import Deposito
+        try:
+            deposito_user = Deposito.objects.get(id=deposito_id)
+        except Deposito.DoesNotExist:
+            pass
+    
+    # Filtrar productos según depósito
+    productos_queryset = ProductoTerminado.objects.filter(produccion_habilitada=True)
+    if deposito_user:
+        productos_queryset = productos_queryset.filter(deposito=deposito_user)
+    
+    # Productos que necesitan reposición (stock <= stock_minimo)
+    productos_con_stock_bajo = productos_queryset.filter(
+        stock__lte=F('stock_minimo'),
+        stock_minimo__gt=0
+    ).select_related('categoria', 'deposito')
+    
+    # Métricas generales
+    total_productos = productos_queryset.count()
+    productos_necesitan_reposicion = productos_con_stock_bajo.count()
+    
+    # OPs de stock activas (no completadas)
+    ops_stock_activas = OrdenProduccion.objects.filter(
+        tipo_orden='MTS'
+    ).exclude(
+        estado_op__nombre__iexact='Completada'
+    ).select_related('producto_a_producir', 'estado_op')
+    
+    if deposito_user:
+        ops_stock_activas = ops_stock_activas.filter(
+            producto_a_producir__deposito=deposito_user
+        )
+    
+    # Datos para gráficos y análisis
+    productos_criticos = []
+    productos_con_tendencia = []
+    categorias_data = {}
+    
+    for producto in productos_con_stock_bajo:
+        producto_info = {
+            'id': producto.id,
+            'descripcion': producto.descripcion,
+            'stock_actual': producto.stock,
+            'stock_minimo': producto.stock_minimo,
+            'stock_objetivo': producto.stock_objetivo,
+            'porcentaje_stock': producto.porcentaje_stock,
+            'cantidad_sugerida': producto.cantidad_reposicion_sugerida,
+            'deposito': producto.deposito.nombre if producto.deposito else 'N/A',
+            'categoria': producto.categoria.nombre if producto.categoria else 'N/A',
+            'diferencia_stock': max(0, producto.stock_minimo - producto.stock)
+        }
+        productos_criticos.append(producto_info)
+        
+        # Agrupar por categoría
+        categoria_nombre = producto_info['categoria']
+        if categoria_nombre not in categorias_data:
+            categorias_data[categoria_nombre] = {
+                'productos_criticos': 0,
+                'total_productos': 0
+            }
+        categorias_data[categoria_nombre]['productos_criticos'] += 1
+    
+    # Calcular totales por categoría
+    for categoria in categorias_data:
+        if deposito_user:
+            total_cat = productos_queryset.filter(categoria__nombre=categoria).count()
+        else:
+            total_cat = ProductoTerminado.objects.filter(categoria__nombre=categoria).count()
+        categorias_data[categoria]['total_productos'] = total_cat
+    
+    # Crear formulario vacío para filtros (simplificado)
+    class SimpleFiltroForm:
+        def __init__(self):
+            self.filtro = type('obj', (object,), {'value': lambda: None})()
+            self.buscar = type('obj', (object,), {'value': lambda: None})()
+        def is_valid(self):
+            return True
+    
+    form = SimpleFiltroForm()
+    
+    context = {
+        'productos_con_stock_bajo': productos_necesitan_reposicion,
+        'productos_necesitan_reposicion': productos_necesitan_reposicion,
+        'ops_stock_activas': ops_stock_activas,
+        'deposito_user': deposito_user,
+        'titulo_seccion': 'Dashboard Producción para Stock',
+        'total_productos': total_productos,
+        'productos': productos_queryset.select_related('categoria', 'deposito')[:50],  # Limitamos para performance
+        'form': form,
+        # Datos para interactividad ERP
+        'categorias_data': categorias_data,
+        'productos_criticos': productos_criticos,
+        'productos_con_tendencia': productos_con_tendencia[:20],  # Top 20 con tendencias
+        'porcentaje_stock_bajo': round((productos_necesitan_reposicion / max(total_productos, 1)) * 100, 1),
+        'porcentaje_necesitan_reposicion': round((productos_necesitan_reposicion / max(total_productos, 1)) * 100, 1),
+    }
+    
+    # DEBUG: Imprimir información para debugging
+    print(f"DEBUG - Total productos en context: {len(productos_criticos)}")
+    print(f"DEBUG - Productos necesitan reposición (stat): {productos_necesitan_reposicion}")
+    
+    return render(request, 'produccion/stock_dashboard_simple.html', context)
+
+
+@login_required
+def crear_op_stock_view(request):
+    """
+    Vista para crear una nueva orden de producción para stock
+    """
+    from .forms import OrdenProduccionStockForm
+    
+    if not es_admin_o_rol(request.user, ["produccion", "administrador"]):
+        messages.error(request, "No tienes permisos para crear órdenes de producción.")
+        return redirect("App_LUMINOVA:dashboard")
+    
+    # Obtener depósito del usuario
+    deposito_id = request.session.get("deposito_seleccionado")
+    
+    if request.method == 'POST':
+        form = OrdenProduccionStockForm(request.POST, deposito_id=deposito_id)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    op = form.save(commit=False)
+                    
+                    # Generar número de OP
+                    op.numero_op = generar_siguiente_numero_documento('OP')
+                    
+                    # Asignar estado inicial si no tiene
+                    if not op.estado_op:
+                        try:
+                            estado_planificada = EstadoOrden.objects.get(nombre__iexact="Planificada")
+                            op.estado_op = estado_planificada
+                        except EstadoOrden.DoesNotExist:
+                            pass
+                    
+                    op.save()
+                    
+                    messages.success(
+                        request, 
+                        f"Orden de Producción para Stock {op.numero_op} creada exitosamente."
+                    )
+                    return redirect('App_LUMINOVA:produccion_detalle_op', op_id=op.id)
+                    
+            except Exception as e:
+                logger.error(f"Error al crear OP para stock: {e}")
+                messages.error(request, f"Error al crear la orden de producción: {e}")
+    else:
+        form = OrdenProduccionStockForm(deposito_id=deposito_id)
+    
+    context = {
+        'form': form,
+        'titulo_seccion': 'Crear Orden de Producción para Stock',
+    }
+    return render(request, 'produccion/crear_op_stock_simple.html', context)
+
+
+@login_required 
+def configurar_stock_productos_view(request):
+    """
+    Vista para configurar niveles de stock de productos
+    """
+    from .forms import ConfiguracionStockForm
+    
+    if not es_admin_o_rol(request.user, ["produccion", "administrador"]):
+        messages.error(request, "No tienes permisos para configurar niveles de stock.")
+        return redirect("App_LUMINOVA:dashboard")
+    
+    # Obtener depósito del usuario
+    deposito_id = request.session.get("deposito_seleccionado")
+    
+    # Filtrar productos según depósito
+    productos_queryset = ProductoTerminado.objects.all()
+    if deposito_id and deposito_id != "-1":
+        from .models import Deposito
+        try:
+            deposito = Deposito.objects.get(id=deposito_id)
+            productos_queryset = productos_queryset.filter(deposito=deposito)
+        except Deposito.DoesNotExist:
+            pass
+    
+    productos = productos_queryset.select_related('categoria', 'deposito').order_by('categoria__nombre', 'descripcion')
+    
+    if request.method == 'POST':
+        producto_id = request.POST.get('producto_id')
+        if producto_id:
+            try:
+                producto = get_object_or_404(ProductoTerminado, id=producto_id)
+                form = ConfiguracionStockForm(request.POST, instance=producto)
+                if form.is_valid():
+                    form.save()
+                    messages.success(
+                        request, 
+                        f"Configuración de stock actualizada para {producto.descripcion}"
+                    )
+                else:
+                    for error in form.errors.values():
+                        messages.error(request, error)
+            except Exception as e:
+                logger.error(f"Error al actualizar configuración de stock: {e}")
+                messages.error(request, f"Error al actualizar la configuración: {e}")
+    
+    context = {
+        'productos': productos,
+        'titulo_seccion': 'Configurar Niveles de Stock',
+    }
+    return render(request, 'produccion/configurar_stock_simple.html', context)
+
+
+@login_required
+def sugerencias_produccion_view(request):
+    """
+    Vista que muestra sugerencias automáticas de producción basadas en niveles de stock
+    """
+    if not es_admin_o_rol(request.user, ["produccion", "administrador"]):
+        messages.error(request, "No tienes permisos para ver sugerencias de producción.")
+        return redirect("App_LUMINOVA:dashboard")
+    
+    # Obtener depósito del usuario
+    deposito_id = request.session.get("deposito_seleccionado")
+    
+    # Filtrar productos según depósito
+    productos_queryset = ProductoTerminado.objects.all()
+    if deposito_id and deposito_id != "-1":
+        from .models import Deposito
+        try:
+            deposito = Deposito.objects.get(id=deposito_id)
+            productos_queryset = productos_queryset.filter(deposito=deposito)
+        except Deposito.DoesNotExist:
+            pass
+    
+    # Productos que necesitan reposición
+    productos_necesitan_reposicion = productos_queryset.filter(
+        stock__lte=F('stock_minimo'),
+        produccion_habilitada=True,
+        stock_minimo__gt=0
+    ).select_related('categoria', 'deposito')
+    
+    # Verificar si ya hay OPs activas para estos productos
+    sugerencias = []
+    for producto in productos_necesitan_reposicion:
+        # Verificar OPs activas para este producto
+        ops_activas = OrdenProduccion.objects.filter(
+            producto_a_producir=producto,
+            tipo_orden='MTS'
+        ).exclude(
+            estado_op__nombre__iexact='Completada'
+        ).exclude(
+            estado_op__nombre__iexact='Cancelada'
+        )
+        
+        cantidad_en_produccion = sum(op.cantidad_a_producir for op in ops_activas)
+        stock_proyectado = producto.stock + cantidad_en_produccion
+        
+        sugerencia = {
+            'producto': producto,
+            'stock_actual': producto.stock,
+            'stock_minimo': producto.stock_minimo,
+            'stock_objetivo': producto.stock_objetivo,
+            'cantidad_sugerida': producto.cantidad_reposicion_sugerida,
+            'ops_activas': ops_activas.count(),
+            'cantidad_en_produccion': cantidad_en_produccion,
+            'stock_proyectado': stock_proyectado,
+            'urgente': stock_proyectado <= producto.stock_minimo,
+        }
+        sugerencias.append(sugerencia)
+    
+    # Ordenar por urgencia (más urgentes primero)
+    sugerencias.sort(key=lambda x: (not x['urgente'], x['stock_actual']))
+    
+    context = {
+        'sugerencias': sugerencias,
+        'titulo_seccion': 'Sugerencias de Producción para Stock',
+    }
+    return render(request, 'produccion/sugerencias_produccion.html', context)
