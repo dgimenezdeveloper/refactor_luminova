@@ -8,7 +8,14 @@ from ..views import (
     crear_reporte_produccion_view,
 )
 
-# Rutas de Ventas
+from ..views_producción import (
+    produccion_stock_dashboard_view,
+    crear_op_stock_view,
+    configurar_stock_productos_view,
+    sugerencias_produccion_view,
+)
+
+# Rutas de Producción
 urlpatterns = [
     path("produccion/", produccion_lista_op_view, name="produccion_principal"),
     # path('produccion/vista-general/', produccion_view, name='produccion_vista_general'), # Si necesitas una página "marco" separada
@@ -39,5 +46,27 @@ urlpatterns = [
         reportes_produccion_view,
         {"resolver": True},
         name="produccion_resolver_reporte",
+    ),
+    
+    # URLs para Producción para Stock
+    path(
+        "produccion/stock/dashboard/",
+        produccion_stock_dashboard_view,
+        name="produccion_stock_dashboard",
+    ),
+    path(
+        "produccion/stock/crear-op/",
+        crear_op_stock_view,
+        name="crear_op_stock",
+    ),
+    path(
+        "produccion/stock/configurar/",
+        configurar_stock_productos_view,
+        name="configurar_stock_productos",
+    ),
+    path(
+        "produccion/stock/sugerencias/",
+        sugerencias_produccion_view,
+        name="sugerencias_produccion",
     ),
 ]
