@@ -54,7 +54,7 @@
             <button type="button" class="btn btn-success" id="generar-ops-automaticas">
                 <i class="bi bi-magic"></i> Generar OPs Automáticas
             </button>
-            <a href="{% url 'App_LUMINOVA:produccion_lista_op' %}" class="btn btn-outline-primary">
+            <a href="{% url 'App_LUMINOVA:ops_stock_lista' %}" class="btn btn-outline-primary">
                 <i class="bi bi-list-ul"></i> Ver todas las OPs
             </a>
         </div>
@@ -177,16 +177,10 @@
         <form method="get" class="row g-3" id="filtros-form">
             {% csrf_token %}
             <div class="col-md-5">
-                <label class="form-label">Filtro</label>
-                <select name="filtro" class="form-select">
-                    <option value="todos">Todos los productos</option>
-                    <option value="stock_bajo">Stock bajo</option>
-                    <option value="necesita_reposicion">Necesita reposición</option>
-                </select>
+                {% bootstrap_field form.filtro %}
             </div>
             <div class="col-md-4">
-                <label class="form-label">Búsqueda</label>
-                <input type="text" name="buscar" class="form-control" placeholder="Buscar producto...">
+                {% bootstrap_field form.buscar %}
             </div>
             <div class="col-md-3">
                 <label class="form-label">&nbsp;</label>
@@ -212,6 +206,15 @@
         <span class="badge bg-secondary" id="productos-contador">{{ productos|length }} productos</span>
     </div>
     <div class="card-body">
+        <!-- DEBUG INFO -->
+        <div class="alert alert-info">
+            <strong>DEBUG:</strong> 
+            Productos en lista: {{ productos|length }} | 
+            Form válido: {{ form.is_valid }} |
+            Filtro: {{ form.filtro.value|default:"none" }} |
+            Buscar: "{{ form.buscar.value|default:"empty" }}"
+        </div>
+        
         {% if productos %}
             <div class="table-responsive">
                 <table class="table table-striped table-hover" id="productos-table">
@@ -269,7 +272,7 @@
                                         <i class="bi bi-plus"></i> Nueva OP
                                     </a>
                                 {% endif %}
-                                <a href="{% url 'App_LUMINOVA:configurar_stock_productos' %}?producto={{ producto.id }}" 
+                                <a href="{% url 'App_LUMINOVA:configurar_niveles_stock' producto.id %}" 
                                    class="btn btn-sm btn-outline-secondary ms-1">
                                     <i class="bi bi-gear"></i>
                                 </a>
@@ -353,7 +356,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 button.disabled = true;
                 
                 // Realizar petición AJAX
-                fetch('/produccion/produccion/stock/generar-ops-masivo/', {
+                fetch('{% url "App_LUMINOVA:generar_ops_automaticas_masivo" %}', {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
