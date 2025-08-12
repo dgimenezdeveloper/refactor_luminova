@@ -948,7 +948,21 @@ def crear_op_stock_view(request):
                 logger.error(f"Error al crear OP para stock: {e}")
                 messages.error(request, f"Error al crear la orden de producción: {e}")
     else:
-        form = OrdenProduccionStockForm(deposito_id=deposito_id)
+        producto_id = request.GET.get("producto")
+        initial = {}
+        if producto_id:
+            initial["producto_a_producir"] = producto_id
+            # Sugerir cantidad necesaria para llegar al stock objetivo
+            from App_LUMINOVA.models import ProductoTerminado
+            try:
+                producto = ProductoTerminado.objects.get(id=producto_id)
+                objetivo = max(producto.stock_minimo, producto.stock_objetivo)
+                cantidad_sugerida = max(0, objetivo - producto.stock)
+                if cantidad_sugerida > 0:
+                    initial["cantidad_a_producir"] = cantidad_sugerida
+            except ProductoTerminado.DoesNotExist:
+                pass
+        form = OrdenProduccionStockForm(deposito_id=deposito_id, initial=initial)
     
     context = {
         'form': form,
