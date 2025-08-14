@@ -308,6 +308,11 @@ class OrdenProduccionStockForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         deposito_id = kwargs.pop('deposito_id', None)
         super().__init__(*args, **kwargs)
+        # Asegurar que la instancia se valide como MTS (sin OV) antes de form.is_valid()
+        # para que model.clean() no exija una Orden de Venta (regla solo aplica a MTO)
+        if self.instance:
+            self.instance.tipo_orden = 'MTS'
+            self.instance.orden_venta_origen = None
         
         # Filtrar solo productos habilitados para producción
         queryset = ProductoTerminado.objects.filter(produccion_habilitada=True)

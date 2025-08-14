@@ -9,14 +9,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2 fw-bold text-primary">{{ titulo_seccion|default:"Configurar Niveles de Stock" }}</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <a href="{% url 'App_LUMINOVA:produccion_stock_dashboard' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left-circle"></i> Volver al Dashboard
-        </a>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2 fw-bold text-primary">{{ titulo_seccion|default:"Configurar Niveles de Stock" }}</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <a href="{% url 'App_LUMINOVA:produccion_stock_dashboard' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left-circle"></i> Volver al Dashboard
+            </a>
+        </div>
     </div>
-</div>
 
 <div class="alert alert-info" role="alert">
     <i class="bi bi-info-circle"></i>

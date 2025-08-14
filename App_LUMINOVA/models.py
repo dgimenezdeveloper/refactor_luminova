@@ -492,8 +492,7 @@ class OrdenProduccion(models.Model):
         super().clean()
         if self.tipo_orden == 'MTO' and not self.orden_venta_origen:
             raise ValidationError("Las órdenes MTO (Make to Order) deben tener una Orden de Venta origen")
-        if self.tipo_orden == 'MTS' and self.orden_venta_origen:
-            raise ValidationError("Las órdenes MTS (Make to Stock) no deben tener una Orden de Venta origen")
+        
 
     def get_estado_op_display(self):
         if self.estado_op:

@@ -12,7 +12,6 @@ from ..views_producción import (
     produccion_stock_dashboard_view,
     crear_op_stock_view,
     configurar_stock_productos_view,
-    sugerencias_produccion_view,
 )
 
 # Rutas de Producción
@@ -63,10 +62,5 @@ urlpatterns = [
         "produccion/stock/configurar/",
         configurar_stock_productos_view,
         name="configurar_stock_productos",
-    ),
-    path(
-        "produccion/stock/sugerencias/",
-        sugerencias_produccion_view,
-        name="sugerencias_produccion",
     ),
 ]

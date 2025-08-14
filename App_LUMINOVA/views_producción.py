@@ -305,7 +305,12 @@ def solicitar_insumos_op_view(request, op_id):
                     request,
                     f"Estado de OV {orden_venta_asociada.numero_ov} actualizado.",
                 )
-
+        else:
+            # Permitir órdenes MTS sin OV
+            messages.info(
+                request,
+                "Orden de Producción MTS creada sin necesidad de una Orden de Venta.",
+            )
     except EstadoOrden.DoesNotExist:
         messages.error(
             request,
@@ -806,8 +811,33 @@ def produccion_stock_dashboard_view(request):
         except Deposito.DoesNotExist:
             pass
     
+    # Obtener parámetros de filtrado
+    filtro = request.GET.get('filtro', 'todos')
+    buscar = request.GET.get('buscar', '')
+    
     # Filtrar productos según depósito
     productos_queryset = ProductoTerminado.objects.filter(produccion_habilitada=True)
+    
+    # Aplicar filtros de búsqueda
+    if buscar:
+        productos_queryset = productos_queryset.filter(
+            Q(descripcion__icontains=buscar) | 
+            Q(modelo__icontains=buscar) | 
+            Q(categoria__nombre__icontains=buscar)
+        )
+    
+    # Aplicar filtros específicos
+    if filtro == 'stock_bajo':
+        productos_queryset = productos_queryset.filter(
+            stock__lte=F('stock_minimo'),
+            stock_minimo__gt=0
+        )
+    elif filtro == 'necesita_reposicion':
+        productos_queryset = productos_queryset.filter(
+            stock__lte=(F('stock_minimo') * 0.5),
+            stock_minimo__gt=0
+        )
+    
     if deposito_user:
         productos_queryset = productos_queryset.filter(deposito=deposito_user)
     
@@ -833,6 +863,19 @@ def produccion_stock_dashboard_view(request):
             producto_a_producir__deposito=deposito_user
         )
     
+    # Mapear cantidad de OPs activas y cantidad total en producción por producto
+    ops_por_producto = {}
+    for op in ops_stock_activas:
+        pid = op.producto_a_producir_id
+        if pid not in ops_por_producto:
+            ops_por_producto[pid] = {'ops_count': 0, 'cantidad_total': 0}
+        ops_por_producto[pid]['ops_count'] += 1
+        try:
+            cant = int(op.cantidad_a_producir or 0)
+        except (TypeError, ValueError):
+            cant = 0
+        ops_por_producto[pid]['cantidad_total'] += cant
+    
     # Datos para gráficos y análisis
     productos_criticos = []
     productos_con_tendencia = []
@@ -849,7 +892,9 @@ def produccion_stock_dashboard_view(request):
             'cantidad_sugerida': producto.cantidad_reposicion_sugerida,
             'deposito': producto.deposito.nombre if producto.deposito else 'N/A',
             'categoria': producto.categoria.nombre if producto.categoria else 'N/A',
-            'diferencia_stock': max(0, producto.stock_minimo - producto.stock)
+            'diferencia_stock': max(0, producto.stock_minimo - producto.stock),
+            'ops_activas': ops_por_producto.get(producto.id, {}).get('ops_count', 0),
+            'cantidad_en_produccion': ops_por_producto.get(producto.id, {}).get('cantidad_total', 0)
         }
         productos_criticos.append(producto_info)
         
@@ -901,7 +946,13 @@ def produccion_stock_dashboard_view(request):
     print(f"DEBUG - Total productos en context: {len(productos_criticos)}")
     print(f"DEBUG - Productos necesitan reposición (stat): {productos_necesitan_reposicion}")
     
-    return render(request, 'produccion/stock_dashboard_simple.html', context)
+    # Añadimos flag de debug para mostrar la sección de información de depuración
+    context['debug'] = True
+    
+    return render(request, 'produccion/stock_dashboard.html', context)
+
+
+## Vista generar_ops_stock_masivo_view eliminada según solicitud (se dejó este comentario para trazabilidad)
 
 
 @login_required
@@ -924,10 +975,12 @@ def crear_op_stock_view(request):
             try:
                 with transaction.atomic():
                     op = form.save(commit=False)
-                    
+                    # Forzar tipo de orden y desvincular OV
+                    op.tipo_orden = 'MTS'
+                    op.orden_venta_origen = None
                     # Generar número de OP
-                    op.numero_op = generar_siguiente_numero_documento('OP')
-                    
+                    from .models import OrdenProduccion
+                    op.numero_op = generar_siguiente_numero_documento(OrdenProduccion, 'OP', 'numero_op')
                     # Asignar estado inicial si no tiene
                     if not op.estado_op:
                         try:
@@ -935,40 +988,47 @@ def crear_op_stock_view(request):
                             op.estado_op = estado_planificada
                         except EstadoOrden.DoesNotExist:
                             pass
-                    
                     op.save()
-                    
+                    # Limpiar mensajes de error antiguos relacionados con OV/MTO
+                    storage = messages.get_messages(request)
+                    storage.used = True
                     messages.success(
                         request, 
                         f"Orden de Producción para Stock {op.numero_op} creada exitosamente."
                     )
                     return redirect('App_LUMINOVA:produccion_detalle_op', op_id=op.id)
-                    
             except Exception as e:
                 logger.error(f"Error al crear OP para stock: {e}")
-                messages.error(request, f"Error al crear la orden de producción: {e}")
+                # Filtrar mensaje de error de OV/MTO si aparece
+                if "Make to Order" in str(e) or "Orden de Venta origen" in str(e):
+                    messages.error(request, "Error inesperado. No se requiere OV para OP de stock.")
+                else:
+                    messages.error(request, f"Error al crear la orden de producción: {e}")
+
     else:
         producto_id = request.GET.get("producto")
         initial = {}
+        producto = None
         if producto_id:
             initial["producto_a_producir"] = producto_id
             # Sugerir cantidad necesaria para llegar al stock objetivo
             from App_LUMINOVA.models import ProductoTerminado
             try:
-                producto = ProductoTerminado.objects.get(id=producto_id)
+                producto = ProductoTerminado.objects.select_related('categoria', 'deposito').get(id=producto_id)
                 objetivo = max(producto.stock_minimo, producto.stock_objetivo)
                 cantidad_sugerida = max(0, objetivo - producto.stock)
                 if cantidad_sugerida > 0:
                     initial["cantidad_a_producir"] = cantidad_sugerida
             except ProductoTerminado.DoesNotExist:
-                pass
+                producto = None
         form = OrdenProduccionStockForm(deposito_id=deposito_id, initial=initial)
-    
+
     context = {
         'form': form,
         'titulo_seccion': 'Crear Orden de Producción para Stock',
+        'producto_seleccionado': producto if 'producto' in locals() else None,
     }
-    return render(request, 'produccion/crear_op_stock_simple.html', context)
+    return render(request, 'produccion/crear_op_stock.html', context)
 
 
 @login_required 
@@ -1020,72 +1080,7 @@ def configurar_stock_productos_view(request):
         'productos': productos,
         'titulo_seccion': 'Configurar Niveles de Stock',
     }
-    return render(request, 'produccion/configurar_stock_simple.html', context)
+    return render(request, 'produccion/configurar_stock.html', context)
 
 
-@login_required
-def sugerencias_produccion_view(request):
-    """
-    Vista que muestra sugerencias automáticas de producción basadas en niveles de stock
-    """
-    if not es_admin_o_rol(request.user, ["produccion", "administrador"]):
-        messages.error(request, "No tienes permisos para ver sugerencias de producción.")
-        return redirect("App_LUMINOVA:dashboard")
-    
-    # Obtener depósito del usuario
-    deposito_id = request.session.get("deposito_seleccionado")
-    
-    # Filtrar productos según depósito
-    productos_queryset = ProductoTerminado.objects.all()
-    if deposito_id and deposito_id != "-1":
-        from .models import Deposito
-        try:
-            deposito = Deposito.objects.get(id=deposito_id)
-            productos_queryset = productos_queryset.filter(deposito=deposito)
-        except Deposito.DoesNotExist:
-            pass
-    
-    # Productos que necesitan reposición
-    productos_necesitan_reposicion = productos_queryset.filter(
-        stock__lte=F('stock_minimo'),
-        produccion_habilitada=True,
-        stock_minimo__gt=0
-    ).select_related('categoria', 'deposito')
-    
-    # Verificar si ya hay OPs activas para estos productos
-    sugerencias = []
-    for producto in productos_necesitan_reposicion:
-        # Verificar OPs activas para este producto
-        ops_activas = OrdenProduccion.objects.filter(
-            producto_a_producir=producto,
-            tipo_orden='MTS'
-        ).exclude(
-            estado_op__nombre__iexact='Completada'
-        ).exclude(
-            estado_op__nombre__iexact='Cancelada'
-        )
-        
-        cantidad_en_produccion = sum(op.cantidad_a_producir for op in ops_activas)
-        stock_proyectado = producto.stock + cantidad_en_produccion
-        
-        sugerencia = {
-            'producto': producto,
-            'stock_actual': producto.stock,
-            'stock_minimo': producto.stock_minimo,
-            'stock_objetivo': producto.stock_objetivo,
-            'cantidad_sugerida': producto.cantidad_reposicion_sugerida,
-            'ops_activas': ops_activas.count(),
-            'cantidad_en_produccion': cantidad_en_produccion,
-            'stock_proyectado': stock_proyectado,
-            'urgente': stock_proyectado <= producto.stock_minimo,
-        }
-        sugerencias.append(sugerencia)
-    
-    # Ordenar por urgencia (más urgentes primero)
-    sugerencias.sort(key=lambda x: (not x['urgente'], x['stock_actual']))
-    
-    context = {
-        'sugerencias': sugerencias,
-        'titulo_seccion': 'Sugerencias de Producción para Stock',
-    }
-    return render(request, 'produccion/sugerencias_produccion.html', context)
+## Vista sugerencias fusionada en dashboard (eliminada)
