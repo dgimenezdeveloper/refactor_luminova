@@ -77,18 +77,45 @@ TEMPLATES = [
     },
 ]
 
+
 WSGI_APPLICATION = "Proyecto_LUMINOVA.wsgi.application"
+
+# Cargar variables de entorno desde .env
+import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+
+# Configuración dinámica de base de datos
+db_engine = os.environ.get("DB_ENGINE")
+db_name = os.environ.get("DB_NAME")
+db_user = os.environ.get("DB_USER")
+db_password = os.environ.get("DB_PASSWORD")
+db_host = os.environ.get("DB_HOST")
+db_port = os.environ.get("DB_PORT")
+
+if db_engine and db_name and db_user and db_password and db_host and db_port:
+    DATABASES = {
+        "default": {
+            "ENGINE": db_engine,
+            "NAME": db_name,
+            "USER": db_user,
+            "PASSWORD": db_password,
+            "HOST": db_host,
+            "PORT": db_port,
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation

@@ -5,4 +5,5 @@ _EV_LUMINOVA/
 env/
 __pycache__/
 migrations/__pycache__/
-staticfiles/
+staticfiles/db.sqlite3
+.env
