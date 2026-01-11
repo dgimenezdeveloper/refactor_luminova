@@ -54,6 +54,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "App_LUMINOVA.middleware.PasswordChangeMiddleware",
+    "App_LUMINOVA.middleware.EmpresaMiddleware",  # Nuevo middleware de empresa
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -72,6 +73,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "App_LUMINOVA.context_processors.notificaciones_context",
                 "App_LUMINOVA.context_processors.puede_ver_deposito_sidebar",
+                "App_LUMINOVA.context_processors.empresa_actual_context",  # Nuevo context processor
             ],
         },
     },

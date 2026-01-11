@@ -2,6 +2,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 
 from .models import PasswordChangeRequired
+from .threadlocals import set_current_empresa
 
 
 class PasswordChangeMiddleware:
@@ -37,4 +38,47 @@ class PasswordChangeMiddleware:
             return redirect("App_LUMINOVA:change_password")
 
         # Si no se cumple ninguna de las condiciones de redirección, devolvemos la respuesta original.
+        return response
+
+
+class EmpresaMiddleware:
+    """
+    Middleware para gestionar la empresa actual del usuario.
+    Agrega request.empresa_actual para acceso fácil en vistas.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from .models import Empresa, PerfilUsuario
+        
+        request.empresa_actual = None
+        
+        if request.user.is_authenticated:
+            # Obtener empresa desde sesión o perfil del usuario
+            empresa_id = request.session.get('empresa_actual_id')
+            
+            if empresa_id:
+                try:
+                    request.empresa_actual = Empresa.objects.get(id=empresa_id, activa=True)
+                except Empresa.DoesNotExist:
+                    empresa_id = None
+            
+            # Si no hay empresa en sesión, obtener del perfil del usuario
+            if not empresa_id:
+                try:
+                    perfil = PerfilUsuario.objects.select_related('empresa').get(user=request.user)
+                    request.empresa_actual = perfil.empresa
+                    request.session['empresa_actual_id'] = perfil.empresa.id
+                except PerfilUsuario.DoesNotExist:
+                    # Si el usuario no tiene perfil, asignar empresa por defecto
+                    empresa_default = Empresa.objects.filter(activa=True).first()
+                    if empresa_default:
+                        request.empresa_actual = empresa_default
+                        request.session['empresa_actual_id'] = empresa_default.id
+        set_current_empresa(request.empresa_actual)
+        try:
+            response = self.get_response(request)
+        finally:
+            set_current_empresa(None)
         return response

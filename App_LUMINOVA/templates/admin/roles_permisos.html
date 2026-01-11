@@ -24,31 +24,25 @@
                 {# Estas columnas eran más descriptivas que funcionales, puedes mantenerlas o quitarlas #}
                 {# <th>Módulos Asignados</th> #}
                 {# <th>Nivel de Acceso</th> #}
-                <th class="align-middle color-thead" style="width: 150px; background-color: #014BAC; color: white;">Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for rol in roles %}
-            <tr id="rol-row-{{ rol.id }}">
-                <td>{{ rol.id }}</td>
-                <td class="rol-name">{{ rol.name|capfirst }}</td>
-                <td class="rol-description">
-                    {% if rol.descripcion_extendida %}
-                        {{ rol.descripcion_extendida.descripcion|default:"-" }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-secondary btn-ver-permisos" data-rol-id="{{ rol.id }}" data-rol-name="{{ rol.name|capfirst }}">
-                        <i class="bi bi-shield-check"></i> Ver/Editar
-                    </button>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-info btn-editar-rol" data-rol-id="{{ rol.id }}">
-                        <i class="bi bi-pencil-fill"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger btn-eliminar-rol" data-rol-id="{{ rol.id }}" data-rol-name="{{ rol.name|capfirst }}">
+                {% for rol in roles_empresa %}
+                <tr id="rol-row-{{ rol.id }}">
+                    <td>{{ rol.id }}</td>
+                    <td class="rol-name">{{ rol.nombre|capfirst }}</td>
+                    <td class="rol-description">{{ rol.descripcion|default:"-" }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-secondary btn-ver-permisos" data-group-id="{{ rol.group.id }}" data-rol-nombre="{{ rol.nombre|capfirst }}">
+                            <i class="bi bi-shield-check"></i> Ver/Editar
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info btn-editar-rol" data-rol-id="{{ rol.id }}" data-group-id="{{ rol.group.id }}" data-rol-nombre="{{ rol.nombre }}" data-rol-descripcion="{{ rol.descripcion|default:'' }}">
+                            <i class="bi bi-pencil-fill"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger btn-eliminar-rol" data-rol-id="{{ rol.id }}" data-group-id="{{ rol.group.id }}" data-rol-name="{{ rol.nombre|capfirst }}">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </td>
+                </tr>
                         <i class="bi bi-trash-fill"></i>
                     </button>
                 </td>

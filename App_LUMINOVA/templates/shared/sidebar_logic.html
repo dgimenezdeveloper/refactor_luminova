@@ -11,7 +11,7 @@
 {% url 'App_LUMINOVA:compras_lista_oc' as compras_url %}
 
 {% if request.resolver_match.app_name == 'App_LUMINOVA' %}
-    {% if request.path == dashboard_url or request.path == usuarios_url or request.path == roles_url or request.path == auditoria_url %}
+    {% if request.path == dashboard_url or request.path == usuarios_url or request.path == roles_url or request.path == auditoria_url or '/importacion/' in request.path or '/empresas/admin' in request.path %}
          {% include 'admin/admin_sidebar.html' %} {# Crea este archivo #}
     {% elif request.path == ventas_url or request.path == clientes_url or '/ventas/orden/crear/' in request.path %}
          {% include 'ventas/ventas_sidebar.html' %}

@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.db.models import Sum, F
 from datetime import timedelta
 
-from .models import AuditoriaAcceso, Reportes, OrdenProduccion, Orden, Insumo, OrdenVenta
+from .models import AuditoriaAcceso, Reportes, OrdenProduccion, Orden, Insumo, OrdenVenta, Deposito
 
 def get_client_ip(request):
     """Obtener la IP del cliente desde el request."""
@@ -93,19 +93,37 @@ def custom_logout_view(request):
 
 
 @login_required
-
 def dashboard_view(request):
+    # Obtener empresa actual del usuario
+    empresa_actual = request.empresa_actual
+    
+    # Filtrar depósitos por empresa
+    if empresa_actual:
+        depositos_empresa = Deposito.objects.filter(empresa=empresa_actual)
+    else:
+        depositos_empresa = Deposito.objects.none()
+    
     # --- 1. Tarjeta: Acciones Urgentes ---
+    # Filtrar por depósitos de la empresa
     ops_con_problemas_reportados_count = (
-        Reportes.objects.filter(resuelto=False, orden_produccion_asociada__isnull=False)
+        Reportes.objects.filter(
+            resuelto=False, 
+            orden_produccion_asociada__isnull=False,
+            orden_produccion_asociada__producto_a_producir__deposito__in=depositos_empresa
+        )
         .values("orden_produccion_asociada_id")
         .distinct()
         .count()
     )
     solicitudes_insumos_pendientes = OrdenProduccion.objects.filter(
-        estado_op__nombre__iexact="Insumos Solicitados"
+        estado_op__nombre__iexact="Insumos Solicitados",
+        producto_a_producir__deposito__in=depositos_empresa
     ).count()
-    ocs_para_aprobar = Orden.objects.filter(tipo="compra", estado="BORRADOR").count()
+    ocs_para_aprobar = Orden.objects.filter(
+        tipo="compra", 
+        estado="BORRADOR",
+        deposito__in=depositos_empresa
+    ).count()
 
     # --- 2. Tarjeta: Stock Crítico ---
     UMBRAL_STOCK_BAJO = 15000
@@ -119,7 +137,8 @@ def dashboard_view(request):
         "COMPLETADA",
     ]
     insumos_criticos_query = Insumo.objects.filter(
-        stock__lt=UMBRAL_STOCK_BAJO
+        stock__lt=UMBRAL_STOCK_BAJO,
+        deposito__in=depositos_empresa  # Filtrar por empresa
     ).order_by("stock")
     insumos_criticos_filtrados = []
     for insumo in insumos_criticos_query:
@@ -146,7 +165,9 @@ def dashboard_view(request):
     # --- 3. Tarjeta: Rendimiento de Producción ---
     hace_30_dias = timezone.now() - timedelta(days=30)
     ops_completadas_recientemente = OrdenProduccion.objects.filter(
-        estado_op__nombre__iexact="Completada", fecha_fin_real__gte=hace_30_dias
+        estado_op__nombre__iexact="Completada", 
+        fecha_fin_real__gte=hace_30_dias,
+        producto_a_producir__deposito__in=depositos_empresa  # Filtrar por empresa
     )
     total_luminarias_ensambladas = (
         ops_completadas_recientemente.aggregate(total=Sum("cantidad_a_producir"))[
@@ -165,17 +186,23 @@ def dashboard_view(request):
 
     # --- 4. Tarjeta: Actividad Reciente ---
     try:
-        ultima_ov = OrdenVenta.objects.latest("fecha_creacion")
+        # Filtrar OVs por productos de la empresa
+        ultima_ov = OrdenVenta.objects.filter(
+            items_ov__producto_terminado__deposito__in=depositos_empresa
+        ).distinct().latest("fecha_creacion")
     except OrdenVenta.DoesNotExist:
         ultima_ov = None
     try:
         ultima_op_completada = OrdenProduccion.objects.filter(
-            estado_op__nombre__iexact="Completada"
+            estado_op__nombre__iexact="Completada",
+            producto_a_producir__deposito__in=depositos_empresa
         ).latest("fecha_fin_real")
     except OrdenProduccion.DoesNotExist:
         ultima_op_completada = None
     try:
-        ultimo_reporte = Reportes.objects.latest("fecha")
+        ultimo_reporte = Reportes.objects.filter(
+            orden_produccion_asociada__producto_a_producir__deposito__in=depositos_empresa
+        ).latest("fecha")
     except Reportes.DoesNotExist:
         ultimo_reporte = None
 

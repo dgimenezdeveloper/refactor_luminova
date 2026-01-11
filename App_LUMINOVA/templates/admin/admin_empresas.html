@@ -1,0 +1,182 @@
+{% extends 'padre.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_seccion }}{% endblock %}
+
+{% block sidebar_content %}
+    {% include 'admin/admin_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2 fw-bold text-primary">
+            <i class="bi bi-building"></i> {{ titulo_seccion }}
+        </h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalCrearEmpresa">
+                <i class="bi bi-plus-circle"></i> Nueva Empresa
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de Empresas -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Estado</th>
+                            <th>Nombre</th>
+                            <th>Razón Social</th>
+                            <th>CUIT</th>
+                            <th>Depósitos</th>
+                            <th>Usuarios</th>
+                            <th>Fecha Creación</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for empresa in empresas %}
+                        <tr>
+                            <td>
+                                {% if empresa.activa %}
+                                    <span class="badge bg-success">Activa</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inactiva</span>
+                                {% endif %}
+                            </td>
+                            <td><strong>{{ empresa.nombre }}</strong></td>
+                            <td>{{ empresa.razon_social|default:"-" }}</td>
+                            <td>{{ empresa.cuit|default:"-" }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ empresa.depositos.count }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ empresa.usuarios.count }}</span>
+                            </td>
+                            <td>{{ empresa.fecha_creacion|date:"d/m/Y" }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'App_LUMINOVA:admin_detalle_empresa' empresa.id %}" 
+                                       class="btn btn-outline-info" title="Ver Detalle">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-outline-primary" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#modalEditarEmpresa{{ empresa.id }}"
+                                            title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <a href="{% url 'App_LUMINOVA:admin_toggle_empresa' empresa.id %}" 
+                                       class="btn btn-outline-{% if empresa.activa %}danger{% else %}success{% endif %}"
+                                       onclick="return confirm('¿Está seguro de {% if empresa.activa %}desactivar{% else %}activar{% endif %} esta empresa?')"
+                                       title="{% if empresa.activa %}Desactivar{% else %}Activar{% endif %}">
+                                        <i class="bi bi-{% if empresa.activa %}x-circle{% else %}check-circle{% endif %}"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Modal Editar Empresa -->
+                        <div class="modal fade" id="modalEditarEmpresa{{ empresa.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <form method="POST" action="{% url 'App_LUMINOVA:admin_editar_empresa' empresa.id %}">
+                                        {% csrf_token %}
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Editar Empresa</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">Nombre *</label>
+                                                <input type="text" class="form-control" name="nombre" value="{{ empresa.nombre }}" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Razón Social</label>
+                                                <input type="text" class="form-control" name="razon_social" value="{{ empresa.razon_social }}">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">CUIT</label>
+                                                <input type="text" class="form-control" name="cuit" value="{{ empresa.cuit }}">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Dirección</label>
+                                                <input type="text" class="form-control" name="direccion" value="{{ empresa.direccion }}">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Teléfono</label>
+                                                <input type="text" class="form-control" name="telefono" value="{{ empresa.telefono }}">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Email</label>
+                                                <input type="email" class="form-control" name="email" value="{{ empresa.email }}">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">No hay empresas registradas</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Crear Empresa -->
+<div class="modal fade" id="modalCrearEmpresa" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{% url 'App_LUMINOVA:admin_crear_empresa' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Nueva Empresa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre *</label>
+                        <input type="text" class="form-control" name="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Razón Social</label>
+                        <input type="text" class="form-control" name="razon_social">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">CUIT</label>
+                        <input type="text" class="form-control" name="cuit">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dirección</label>
+                        <input type="text" class="form-control" name="direccion">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Teléfono</label>
+                        <input type="text" class="form-control" name="telefono">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Empresa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

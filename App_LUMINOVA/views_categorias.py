@@ -84,6 +84,11 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from .empresa_filters import (
+    get_depositos_empresa,
+    filter_categorias_insumos_por_empresa,
+    filter_categorias_productos_por_empresa
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +101,10 @@ class Categoria_IListView(ListView):
     context_object_name = (
         "categorias_I"  # Para diferenciar en el template deposito.html
     )
+    
+    def get_queryset(self):
+        # FILTRO POR EMPRESA: Solo categorías de insumos de la empresa
+        return filter_categorias_insumos_por_empresa(self.request)
 
 
 class Categoria_IDetailView(DetailView):
@@ -179,6 +188,10 @@ class Categoria_PTListView(ListView):
     model = CategoriaProductoTerminado
     template_name = "deposito/deposito.html"
     context_object_name = "categorias_PT"
+    
+    def get_queryset(self):
+        # FILTRO POR EMPRESA: Solo categorías de productos de la empresa
+        return filter_categorias_productos_por_empresa(self.request)
 
 
 class Categoria_PTDetailView(DetailView):

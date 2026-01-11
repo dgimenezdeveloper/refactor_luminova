@@ -1,18 +1,40 @@
 # TP_LUMINOVA-main/App_LUMINOVA/context_processors.py
+"""
+Context processors para LUMINOVA con soporte multi-tenancy.
+Todos los queries deben filtrar por empresa del usuario actual.
+"""
 from .models import Insumo, Orden, OrdenProduccion, Reportes, UsuarioDeposito
 
 
 def notificaciones_context(request):
+    """
+    Context processor para mostrar contadores de notificaciones en la UI.
+    Filtra todos los datos por la empresa actual del usuario.
+    """
     if not request.user.is_authenticated:
         return {}
-
-
+    
+    # Obtener empresa actual desde el middleware
+    empresa_actual = getattr(request, 'empresa_actual', None)
+    
     deposito_id = request.session.get("deposito_seleccionado")
     es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
 
-    # Notificaciones de OPs con problemas (no cambia, ya que depende de reportes, pero podría filtrarse por depósito si se requiere)
+    # Base querysets filtrados por empresa
+    base_reportes = Reportes.objects.all()
+    base_ops = OrdenProduccion.objects.all()
+    base_ordenes = Orden.objects.all()
+    base_insumos = Insumo.objects.all()
+    
+    if empresa_actual:
+        base_reportes = base_reportes.filter(empresa=empresa_actual)
+        base_ops = base_ops.filter(empresa=empresa_actual)
+        base_ordenes = base_ordenes.filter(empresa=empresa_actual)
+        base_insumos = base_insumos.filter(empresa=empresa_actual)
+
+    # Notificaciones de OPs con problemas
     ops_con_problemas_count = (
-        Reportes.objects.filter(resuelto=False, orden_produccion_asociada__isnull=False)
+        base_reportes.filter(resuelto=False, orden_produccion_asociada__isnull=False)
         .values("orden_produccion_asociada_id")
         .distinct()
         .count()
@@ -21,35 +43,41 @@ def notificaciones_context(request):
     # Solicitudes de insumos SOLO del depósito seleccionado
     if deposito_id and deposito_id != "-1":  # Si no es "todos los depósitos"
         try:
-            solicitudes_insumos_count = Orden.solicitudes_por_deposito(deposito_id).filter(
+            # Filtrar por depósito específico
+            solicitudes_insumos_count = base_ops.filter(
+                producto_a_producir__deposito_id=deposito_id,
                 estado_op__nombre__iexact="Insumos Solicitados"
             ).count()
-            ocs_para_aprobar_count = Orden.pedidos_por_deposito(deposito_id).filter(
-                tipo="compra", estado="BORRADOR"
+            ocs_para_aprobar_count = base_ordenes.filter(
+                insumo_principal__deposito_id=deposito_id,
+                tipo="compra", 
+                estado="BORRADOR"
             ).count()
-            ocs_en_transito_count = Orden.pedidos_por_deposito(deposito_id).filter(
-                tipo="compra", estado="EN_TRANSITO"
+            ocs_en_transito_count = base_ordenes.filter(
+                insumo_principal__deposito_id=deposito_id,
+                tipo="compra", 
+                estado="EN_TRANSITO"
             ).count()
         except (ValueError, TypeError):
-            # Si deposito_id no es válido, usar totales globales
-            solicitudes_insumos_count = OrdenProduccion.objects.filter(
+            # Si deposito_id no es válido, usar totales de la empresa
+            solicitudes_insumos_count = base_ops.filter(
                 estado_op__nombre__iexact="Insumos Solicitados"
             ).count()
-            ocs_para_aprobar_count = Orden.objects.filter(
+            ocs_para_aprobar_count = base_ordenes.filter(
                 tipo="compra", estado="BORRADOR"
             ).count()
-            ocs_en_transito_count = Orden.objects.filter(
+            ocs_en_transito_count = base_ordenes.filter(
                 tipo="compra", estado="EN_TRANSITO"
             ).count()
     else:
-        # Si no hay depósito seleccionado o es "todos", mostrar totales globales
-        solicitudes_insumos_count = OrdenProduccion.objects.filter(
+        # Si no hay depósito seleccionado o es "todos", mostrar totales de la empresa
+        solicitudes_insumos_count = base_ops.filter(
             estado_op__nombre__iexact="Insumos Solicitados"
         ).count()
-        ocs_para_aprobar_count = Orden.objects.filter(
+        ocs_para_aprobar_count = base_ordenes.filter(
             tipo="compra", estado="BORRADOR"
         ).count()
-        ocs_en_transito_count = Orden.objects.filter(
+        ocs_en_transito_count = base_ordenes.filter(
             tipo="compra", estado="EN_TRANSITO"
         ).count()
 
@@ -63,16 +91,16 @@ def notificaciones_context(request):
         "COMPLETADA",
     ]
 
-    # Excluimos los insumos que ya tienen una OC "en firme"
-    insumos_con_oc_en_firme = Orden.objects.filter(
+    # Excluimos los insumos que ya tienen una OC "en firme" (de la misma empresa)
+    insumos_con_oc_en_firme = base_ordenes.filter(
         tipo="compra", estado__in=ESTADOS_OC_EN_PROCESO
     ).values_list("insumo_principal_id", flat=True)
 
-    insumos_stock_bajo_count = (
-        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO)
-        .exclude(id__in=insumos_con_oc_en_firme)
-        .count()
-    )
+    # Filtrar insumos críticos por empresa
+    insumos_criticos_qs = base_insumos.filter(
+        stock__lt=UMBRAL_STOCK_BAJO
+    ).exclude(id__in=insumos_con_oc_en_firme)
+    insumos_stock_bajo_count = insumos_criticos_qs.count()
 
     total_notificaciones = (
         ops_con_problemas_count
@@ -101,12 +129,57 @@ def notificaciones_context(request):
     }
 
 def puede_ver_deposito_sidebar(request):
+    """
+    Context processor para determinar si el usuario puede ver el sidebar de depósito.
+    Filtra por empresa actual.
+    """
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
         return {'puede_ver_deposito_sidebar': False}
+    
     if user.is_superuser:
         return {'puede_ver_deposito_sidebar': True}
-    tiene_depositos = UsuarioDeposito.objects.filter(usuario=user).exists()
+    
+    # Obtener empresa actual
+    empresa_actual = getattr(request, 'empresa_actual', None)
+    
+    # Verificar si tiene depósitos asignados en la empresa actual
+    usuario_depositos = UsuarioDeposito.objects.filter(usuario=user)
+    if empresa_actual:
+        usuario_depositos = usuario_depositos.filter(empresa=empresa_actual)
+    
+    tiene_depositos = usuario_depositos.exists()
+    
     if user.groups.filter(name='Depósito').exists() and tiene_depositos:
         return {'puede_ver_deposito_sidebar': True}
+    
     return {'puede_ver_deposito_sidebar': False}
+
+
+def empresa_actual_context(request):
+    """
+    Context processor para agregar la empresa actual a todos los templates.
+    """
+    from .models import Empresa
+    
+    context = {
+        'empresa_actual': None,
+        'empresas_disponibles': [],
+        'es_multi_empresa': False,
+    }
+    
+    if request.user.is_authenticated:
+        # Empresa actual desde el middleware
+        context['empresa_actual'] = getattr(request, 'empresa_actual', None)
+        
+        # Si es superusuario, puede ver todas las empresas
+        if request.user.is_superuser:
+            empresas = Empresa.objects.filter(activa=True)
+            context['empresas_disponibles'] = list(empresas)
+            context['es_multi_empresa'] = empresas.count() > 1
+        else:
+            # Si tiene perfil, solo su empresa
+            if hasattr(request.user, 'perfil'):
+                context['empresas_disponibles'] = [request.user.perfil.empresa]
+    
+    return context

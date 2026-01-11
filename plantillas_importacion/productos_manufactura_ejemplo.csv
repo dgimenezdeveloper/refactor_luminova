@@ -1,0 +1,6 @@
+descripcion,categoria,precio_venta,codigo,stock,stock_minimo,precio_costo,produccion_habilitada
+"Mesa de Comedor Roble 6 Personas","Mesas",125000.00,"MES-001",8,3,85000.00,"Sí"
+"Silla de Roble Moderna","Sillas",18500.00,"SIL-001",24,10,12000.00,"Sí"
+"Biblioteca Clásica 5 Estantes","Bibliotecas",68000.00,"BIB-001",5,2,45000.00,"Sí"
+"Mesa Ratona Diseño Minimalista","Mesas Ratonas",42000.00,"MES-RAT-001",12,4,28000.00,"Sí"
+"Aparador Vintage con Puertas","Aparadores",95000.00,"APA-001",6,2,65000.00,"Sí"

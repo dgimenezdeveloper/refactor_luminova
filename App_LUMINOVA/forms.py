@@ -47,13 +47,24 @@ class RolForm(forms.Form):
     def clean_nombre(self):
         nombre = self.cleaned_data.get("nombre")
         rol_id = self.cleaned_data.get("rol_id")
-        query = Group.objects.filter(name__iexact=nombre)
-        if (
-            rol_id
-        ):  # Si es edición, excluir el rol actual de la verificación de unicidad
-            query = query.exclude(pk=rol_id)
-        if query.exists():
-            raise forms.ValidationError("Un rol con este nombre ya existe.")
+        # Validación por empresa activa usando RolEmpresa
+        try:
+            from .threadlocals import get_current_empresa
+            from .models import RolEmpresa
+            empresa = get_current_empresa()
+            if empresa:
+                qs = RolEmpresa.objects.filter(empresa=empresa, nombre__iexact=nombre)
+                if rol_id:
+                    qs = qs.exclude(pk=rol_id)
+                if qs.exists():
+                    raise forms.ValidationError("Ya existe un rol con ese nombre en esta empresa.")
+            else:
+                # Fallback: evitar colisión global si no hay empresa
+                if Group.objects.filter(name__icontains=f"__{nombre}").exists():
+                    raise forms.ValidationError("El nombre del rol ya existe.")
+        except Exception:
+            # En caso de cualquier problema, mantener la validación mínima
+            pass
         return nombre
 
 

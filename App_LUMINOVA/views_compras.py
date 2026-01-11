@@ -257,6 +257,12 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from .empresa_filters import (
+    get_depositos_empresa,
+    filter_ordenes_compra_por_empresa,
+    filter_insumos_por_empresa,
+    filter_proveedores_por_empresa
+)
 
 logger = logging.getLogger(__name__)
 
@@ -267,6 +273,7 @@ def compras_lista_oc_view(request):
     #     messages.error(request, "Acceso denegado.")
     #     return redirect('App_LUMINOVA:dashboard')
 
+    # FILTRO POR EMPRESA: Solo mostrar OCs de la empresa actual
     # Filtrar órdenes de tipo 'compra'
     # Asumiendo que tu modelo Orden tiene un campo 'tipo' y 'proveedor'
     # Agrupar OCs por estado para las pestañas
@@ -281,7 +288,10 @@ def compras_lista_oc_view(request):
         ("COMPLETADA", "Completada"),
         ("CANCELADA", "Cancelada"),
     ])
-    ordenes_compra = (
+    
+    # Aplicar filtro de empresa
+    ordenes_compra = filter_ordenes_compra_por_empresa(
+        request,
         Orden.objects.filter(tipo="compra")
         .select_related("proveedor", "insumo_principal")
         .order_by("-fecha_creacion")
@@ -311,6 +321,9 @@ def compras_desglose_view(request):
         return redirect("App_LUMINOVA:dashboard")
         
     logger.info("--- compras_desglose_view: INICIO ---")
+
+    # FILTRO POR EMPRESA: Obtener depósitos de la empresa
+    depositos_empresa = get_depositos_empresa(request)
 
     # Obtener notificaciones de stock bajo del depósito
     notificaciones_usuario = NotificationService.obtener_notificaciones_usuario(
@@ -343,7 +356,13 @@ def compras_desglose_view(request):
     from django.db.models import Sum
     insumos_con_oc_suficiente = []
     
-    for insumo in Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS):
+    # FILTRO POR EMPRESA: Solo evaluar insumos de la empresa
+    insumos_bajo_stock = filter_insumos_por_empresa(
+        request,
+        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    )
+    
+    for insumo in insumos_bajo_stock:
         # Calcular total en órdenes de compra activas para este insumo y su depósito
         from django.db.models import Q
         total_en_ocs = Orden.objects.filter(
@@ -363,8 +382,11 @@ def compras_desglose_view(request):
         f"IDs de insumos que ya tienen OC post-borrador con cantidad suficiente: {list(insumos_ya_gestionados_ids)}"
     )
 
-    # Debug detallado para verificar cada insumo
-    all_insumos_bajo_stock = Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    # Debug detallado para verificar cada insumo - FILTRADO POR EMPRESA
+    all_insumos_bajo_stock = filter_insumos_por_empresa(
+        request,
+        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    )
     logger.info(f"=== DEBUG DESGLOSE DE COMPRAS ===")
     logger.info(f"Umbral de stock bajo: {UMBRAL_STOCK_BAJO_INSUMOS}")
     if hasattr(all_insumos_bajo_stock, 'count'):
@@ -396,7 +418,10 @@ def compras_desglose_view(request):
     #    La lista resultante solo contendrá insumos sin OC o con OC en 'BORRADOR'.
     # Agrupar insumos globalmente y sumar stock/desglose por depósito
     from collections import defaultdict
-    insumos_criticos_qs = (
+    
+    # FILTRO POR EMPRESA: Solo insumos críticos de la empresa
+    insumos_criticos_qs = filter_insumos_por_empresa(
+        request,
         Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
         .exclude(id__in=insumos_ya_gestionados_ids)
         .select_related("categoria", "deposito")
@@ -463,8 +488,11 @@ def compras_seguimiento_view(request):
         "RECIBIDA_TOTAL",
         "COMPLETADA",
     ]
+    
+    # FILTRO POR EMPRESA: Solo OCs de seguimiento de la empresa
     # Buscar todos los estados realmente presentes en OCs de seguimiento
-    ocs_seguimiento = (
+    ocs_seguimiento = filter_ordenes_compra_por_empresa(
+        request,
         Orden.objects.filter(tipo="compra", estado__in=ESTADOS_SEGUIMIENTO)
         .select_related("proveedor")
         .order_by("-fecha_creacion")
@@ -586,7 +614,8 @@ def compras_seleccionar_proveedor_para_insumo_view(request, insumo_id):
 
     proveedores_fallback = []
     if not ofertas.exists():
-        proveedores_fallback = Proveedor.objects.all().order_by("nombre")[:5]
+        # FILTRO POR EMPRESA: Solo proveedores de la empresa
+        proveedores_fallback = filter_proveedores_por_empresa(request, Proveedor.objects.all()).order_by("nombre")[:5]
 
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
@@ -621,8 +650,12 @@ def compras_detalle_oc_view(request, oc_id):
     #     messages.error(request, "Acceso denegado.")
     #     return redirect('App_LUMINOVA:compras_lista_oc')
 
+    # FILTRO POR EMPRESA: Solo permitir ver OCs de la empresa
     orden_compra = get_object_or_404(
-        Orden.objects.select_related("proveedor", "insumo_principal__categoria"),
+        filter_ordenes_compra_por_empresa(
+            request,
+            Orden.objects.select_related("proveedor", "insumo_principal__categoria")
+        ),
         id=oc_id,
         tipo="compra",  # Asegurar que sea una OC
     )
@@ -645,14 +678,21 @@ def compras_crear_oc_view(request, insumo_id=None, proveedor_id=None):
     initial_data = {}
     form_kwargs = {}
 
+    # FILTRO POR EMPRESA: Obtener depósitos de la empresa
+    depositos_empresa = get_depositos_empresa(request)
+
     if insumo_id:
-        insumo_preseleccionado_obj = get_object_or_404(Insumo, id=insumo_id)
+        # FILTRO POR EMPRESA: Solo permitir crear OC para insumos de la empresa
+        insumo_preseleccionado_obj = get_object_or_404(
+            filter_insumos_por_empresa(request),
+            id=insumo_id
+        )
         initial_data['insumo_principal'] = insumo_preseleccionado_obj
         form_kwargs['insumo_fijado'] = insumo_preseleccionado_obj
 
-        # Calcular la cantidad sugerida global sumando la sugerencia de todos los depósitos
+        # Calcular la cantidad sugerida global sumando la sugerencia de todos los depósitos DE LA EMPRESA
         from App_LUMINOVA.models import StockInsumo, Deposito
-        depositos = list(Deposito.objects.all().order_by("nombre"))
+        depositos = list(depositos_empresa.order_by("nombre"))
         cantidad_total_sugerida = 0
         for deposito in depositos:
             stock_deposito = StockInsumo.objects.filter(insumo=insumo_preseleccionado_obj, deposito=deposito).first()

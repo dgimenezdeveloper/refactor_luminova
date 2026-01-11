@@ -84,6 +84,7 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from .empresa_filters import filter_fabricantes_por_empresa
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,10 @@ class FabricanteListView(ListView):
     model = Fabricante
     template_name = "ventas/fabricantes/fabricante_list.html"
     context_object_name = "fabricantes"
+    
+    def get_queryset(self):
+        # FILTRO POR EMPRESA: Solo fabricantes cuyos insumos están en la empresa
+        return filter_fabricantes_por_empresa(self.request)
 
 
 class FabricanteDetailView(DetailView):
@@ -103,14 +108,14 @@ class FabricanteDetailView(DetailView):
 class FabricanteCreateView(CreateView):
     model = Fabricante
     template_name = "ventas/fabricantes/fabricante_crear.html"
-    fields = "__all__"
+    fields = ["nombre", "contacto", "telefono", "email"]
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
 
 
 class FabricanteUpdateView(UpdateView):
     model = Fabricante
     template_name = "ventas/fabricantes/fabricante_editar.html"
-    fields = "__all__"
+    fields = ["nombre", "contacto", "telefono", "email"]
     context_object_name = "fabricante"
     success_url = reverse_lazy("App_LUMINOVA:deposito_view")
 

@@ -5,16 +5,22 @@ from .models import MovimientoStock, Deposito, Insumo, ProductoTerminado, Catego
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db import transaction  # Ensure this import is present
+from .empresa_filters import get_depositos_empresa, filter_insumos_por_empresa, filter_productos_por_empresa
 
 @login_required
 def historial_transferencias_view(request):
-    depositos = Deposito.objects.all()
+    # FILTRO POR EMPRESA: Obtener solo depósitos, insumos y productos de la empresa
+    depositos = get_depositos_empresa(request)
     usuarios = User.objects.all()
-    insumos = Insumo.objects.all()
-    productos = ProductoTerminado.objects.all()
+    insumos = filter_insumos_por_empresa(request)
+    productos = filter_productos_por_empresa(request)
     
-    # Obtener todas las transferencias (insumos y productos)
-    transferencias = MovimientoStock.objects.filter(tipo="transferencia").select_related(
+    # FILTRO POR EMPRESA: Solo transferencias entre depósitos de la empresa
+    # Obtener todas las transferencias (insumos y productos) filtradas por empresa
+    transferencias = MovimientoStock.objects.filter(
+        tipo="transferencia",
+        deposito_origen__in=depositos
+    ).select_related(
         "insumo", "producto", "deposito_origen", "deposito_destino", "usuario"
     ).order_by("-fecha")
 

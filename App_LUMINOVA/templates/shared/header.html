@@ -171,6 +171,34 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="vr mx-3 d-none d-lg-block"></div>
 
                         <div class="nav-item d-flex align-items-center">
+                            <!-- Selector de Empresa (solo para superusuarios o si hay múltiples empresas) -->
+                            {% if empresas_disponibles|length > 1 %}
+                            <div class="dropdown me-3">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="empresaDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Cambiar empresa">
+                                    <i class="bi bi-building"></i>
+                                    <span class="d-none d-lg-inline">{{ empresa_actual.nombre|truncatechars:20 }}</span>
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="empresaDropdown">
+                                    {% for empresa in empresas_disponibles %}
+                                    <li>
+                                        <a class="dropdown-item {% if empresa.id == empresa_actual.id %}active{% endif %}" 
+                                           href="{% url 'App_LUMINOVA:cambiar_empresa' empresa.id %}">
+                                            {{ empresa.nombre }}
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% elif empresa_actual %}
+                            <!-- Si solo hay una empresa, mostrarla sin dropdown -->
+                            <div class="me-3">
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-building"></i>
+                                    <span class="d-none d-lg-inline">{{ empresa_actual.nombre }}</span>
+                                </span>
+                            </div>
+                            {% endif %}
+                            
                             <!-- Se cambia a text-primary -->
                              <i class="bi bi-person-circle fs-5 text-primary"></i>
                              <span class="ms-2 fw-bold text-primary">{{ user.first_name|default:user.username|capfirst }}</span>

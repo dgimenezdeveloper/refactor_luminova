@@ -86,6 +86,11 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from .empresa_filters import (
+    get_depositos_empresa,
+    filter_ordenes_produccion_por_empresa,
+    filter_productos_por_empresa
+)
 
 logger = logging.getLogger(__name__)
 
@@ -128,20 +133,23 @@ def produccion_lista_op_view(request):
     # Estados que consideramos "finalizados" y que irán a la pestaña de historial.
     ESTADOS_FINALIZADOS = ["Completada", "Cancelada"]
 
-    # Creamos una consulta base para no repetir el código.
+    # FILTRO POR EMPRESA: Crear consulta base filtrada por empresa
     # Esta consulta ya incluye las optimizaciones de select_related y prefetch_related.
-    base_query = OrdenProduccion.objects.select_related(
-        "producto_a_producir__categoria",
-        "orden_venta_origen__cliente",
-        "estado_op",
-        "sector_asignado_op",
-    ).prefetch_related(
-        Prefetch(
-            "reportes_incidencia",
-            queryset=Reportes.objects.filter(resuelto=False).select_related(
-                "reportado_por", "sector_reporta"
-            ),
-            to_attr="reportes_abiertos",  # El resultado se guardará en op.reportes_abiertos
+    base_query = filter_ordenes_produccion_por_empresa(
+        request,
+        OrdenProduccion.objects.select_related(
+            "producto_a_producir__categoria",
+            "orden_venta_origen__cliente",
+            "estado_op",
+            "sector_asignado_op",
+        ).prefetch_related(
+            Prefetch(
+                "reportes_incidencia",
+                queryset=Reportes.objects.filter(resuelto=False).select_related(
+                    "reportado_por", "sector_reporta"
+                ),
+                to_attr="reportes_abiertos",  # El resultado se guardará en op.reportes_abiertos
+            )
         )
     )
 
@@ -325,15 +333,19 @@ def solicitar_insumos_op_view(request, op_id):
 @login_required
 @transaction.atomic
 def produccion_detalle_op_view(request, op_id):
+    # FILTRO POR EMPRESA: Solo permitir ver OPs de la empresa
     # Restaurar prefetch de componentes para que la vista funcione correctamente
     op = get_object_or_404(
-        OrdenProduccion.objects.select_related(
-            "producto_a_producir__categoria",
-            "orden_venta_origen__cliente",
-            "estado_op",
-            "sector_asignado_op",
-        ).prefetch_related(
-            "producto_a_producir__componentes_requeridos__insumo",
+        filter_ordenes_produccion_por_empresa(
+            request,
+            OrdenProduccion.objects.select_related(
+                "producto_a_producir__categoria",
+                "orden_venta_origen__cliente",
+                "estado_op",
+                "sector_asignado_op",
+            ).prefetch_related(
+                "producto_a_producir__componentes_requeridos__insumo",
+            )
         ),
         id=op_id,
     )
@@ -1046,7 +1058,8 @@ def configurar_stock_productos_view(request):
     deposito_id = request.session.get("deposito_seleccionado")
     
     # Filtrar productos según depósito
-    productos_queryset = ProductoTerminado.objects.all()
+    # FILTRO POR EMPRESA: Solo productos de la empresa
+    productos_queryset = filter_productos_por_empresa(request)
     if deposito_id and deposito_id != "-1":
         from .models import Deposito
         try:

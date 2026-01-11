@@ -84,6 +84,7 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from .empresa_filters import filter_proveedores_por_empresa
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,10 @@ class ProveedorListView(ListView):
     model = Proveedor
     template_name = "ventas/proveedores/proveedor_list.html"
     context_object_name = "proveedores"
+    
+    def get_queryset(self):
+        # FILTRO POR EMPRESA: Solo proveedores con OCs a la empresa
+        return filter_proveedores_por_empresa(self.request)
 
 
 class ProveedorDetailView(DetailView):
@@ -103,7 +108,7 @@ class ProveedorDetailView(DetailView):
 class ProveedorUpdateView(UpdateView):
     model = Proveedor
     template_name = "ventas/proveedores/proveedor_editar.html"
-    fields = "__all__"
+    form_class = ProveedorForm
     context_object_name = "proveedor"
     success_url = reverse_lazy("App_LUMINOVA:proveedor_list")
 

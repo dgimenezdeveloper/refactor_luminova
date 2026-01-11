@@ -8,6 +8,7 @@ from .models import Insumo, ProductoTerminado, UsuarioDeposito, Deposito, StockI
 from django.db.models import Q
 from django.http import HttpResponseForbidden
 from .services.notification_service import NotificationService
+from .empresa_filters import get_depositos_empresa, filter_ordenes_compra_por_empresa
 # --- TRANSFERENCIA DE INSUMOS ENTRE DEPÓSITOS ---
 from .utils import es_admin_o_rol, redirigir_segun_rol
 
@@ -662,7 +663,13 @@ logger = logging.getLogger(__name__)
 
 # --- SELECTOR DE DEPÓSITOS ---
 def seleccionar_deposito_view(request):
-    depositos = Deposito.objects.all()
+    # Filtrar depósitos por empresa actual del usuario
+    empresa_actual = request.empresa_actual
+    if empresa_actual:
+        depositos = Deposito.objects.filter(empresa=empresa_actual)
+    else:
+        depositos = Deposito.objects.none()
+    
     sin_permisos = False
     es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
     if not es_admin and not request.user.groups.filter(name='Depósito').exists():
@@ -673,10 +680,12 @@ def seleccionar_deposito_view(request):
         if deposito_id == "ALL" and es_admin:
             request.session["deposito_seleccionado"] = "-1"  # Usar -1 en lugar de ALL
         elif deposito_id and deposito_id.isdigit():
-            # Verificar que el depósito existe
-            if Deposito.objects.filter(id=deposito_id).exists():
+            # Verificar que el depósito existe Y pertenece a la empresa del usuario
+            deposito_existe = Deposito.objects.filter(id=deposito_id, empresa=empresa_actual).exists()
+            if deposito_existe or es_admin:  # Admin puede acceder a cualquiera
                 request.session["deposito_seleccionado"] = deposito_id
             else:
+                messages.error(request, "No tienes acceso a ese depósito")
                 return redirect("App_LUMINOVA:seleccionar_deposito")
         else:
             return redirect("App_LUMINOVA:seleccionar_deposito")
@@ -703,10 +712,16 @@ def deposito_dashboard_view(request):
         # Dashboard global para admin con información detallada de todos los depósitos
         from .models import EstadoOrden
         
-        # Información básica
-        insumos_count = Insumo.objects.count()
-        productos_count = ProductoTerminado.objects.count()
-        depositos_count = Deposito.objects.count()
+        # Obtener empresa actual
+        empresa_actual = request.empresa_actual
+        
+        # Información básica filtrada por empresa
+        if empresa_actual:
+            insumos_count = Insumo.objects.filter(empresa=empresa_actual).count()
+            productos_count = ProductoTerminado.objects.filter(empresa=empresa_actual).count()
+            depositos_count = Deposito.objects.filter(empresa=empresa_actual).count()
+        else:
+            insumos_count = productos_count = depositos_count = 0
         
         # OCs en tránsito (recepción pendiente)
         ocs_en_transito = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO").select_related("proveedor", "insumo_principal", "deposito")
@@ -724,7 +739,8 @@ def deposito_dashboard_view(request):
         # Stock crítico por depósito
         UMBRAL_STOCK_BAJO = 15000
         depositos_con_stock_critico = []
-        for deposito in Deposito.objects.all():
+        depositos_empresa = Deposito.objects.filter(empresa=empresa_actual) if empresa_actual else Deposito.objects.none()
+        for deposito in depositos_empresa:
             insumos_criticos = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO)
             if insumos_criticos.exists():
                 depositos_con_stock_critico.append({
@@ -739,7 +755,7 @@ def deposito_dashboard_view(request):
         
         # Resumen por depósito
         depositos_resumen = []
-        for deposito in Deposito.objects.all():
+        for deposito in depositos_empresa:
             # OCs en tránsito para este depósito
             ocs_deposito = ocs_en_transito.filter(deposito=deposito).count()
             # OPs solicitando insumos para este depósito
@@ -1038,12 +1054,15 @@ def deposito_solicitudes_insumos_view(request):
 def recepcion_pedidos_view(request):
     """
     Muestra una lista de Órdenes de Compra que están "En Tránsito" y listas para ser recibidas.
-    Solo muestra pedidos del depósito asignado al usuario.
+    Solo muestra pedidos del depósito asignado al usuario Y de la empresa actual.
     """
     # Validar permisos de acceso
     if not es_admin_o_rol(request.user, ['deposito', 'administrador']):
         return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
+    # FILTRO POR EMPRESA: Obtener depósitos de la empresa
+    depositos_empresa = get_depositos_empresa(request)
+    
     from .models import UsuarioDeposito
     deposito_id = request.session.get("deposito_seleccionado")
     deposito = None
@@ -1064,9 +1083,14 @@ def recepcion_pedidos_view(request):
         else:
             return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
-    qs = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO")
+    # FILTRO POR EMPRESA: Filtrar OCs en tránsito por empresa
+    qs = filter_ordenes_compra_por_empresa(
+        request,
+        Orden.objects.filter(tipo="compra", estado="EN_TRANSITO")
+    )
+    
     if mostrar_todos:
-        pass  # No filtrar por depósito
+        pass  # Ya está filtrado por empresa
     elif not es_admin and deposito:
         qs = qs.filter(deposito=deposito)
     elif es_admin and deposito_id and deposito_id != "-1":
@@ -1171,8 +1195,16 @@ def deposito_view(request):
         
         # Stock crítico por depósito
         UMBRAL_STOCK_BAJO = 15000
+        # Filtrar depósitos por empresa del usuario
+        empresa_usuario = None
+        if hasattr(request.user, 'perfil'):
+            empresa_usuario = request.user.perfil.empresa
+        depositos_empresa = Deposito.objects.all()
+        if empresa_usuario:
+            depositos_empresa = depositos_empresa.filter(empresa=empresa_usuario)
+
         depositos_con_stock_critico = []
-        for deposito in Deposito.objects.all():
+        for deposito in depositos_empresa:
             insumos_criticos = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO)
             if insumos_criticos.exists():
                 depositos_con_stock_critico.append({
@@ -1187,14 +1219,13 @@ def deposito_view(request):
         
         # Resumen por depósito
         depositos_resumen = []
-        for deposito in Deposito.objects.all():
+        for deposito in depositos_empresa:
             # OCs en tránsito para este depósito
             ocs_deposito = ocs_en_transito.filter(deposito=deposito).count()
             # OPs solicitando insumos para este depósito
             ops_deposito = ops_solicitudes.filter(producto_a_producir__deposito=deposito).count()
             # Insumos críticos en este depósito
             criticos_deposito = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO).count()
-            
             depositos_resumen.append({
                 'deposito': deposito,
                 'ocs_en_transito': ocs_deposito,

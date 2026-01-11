@@ -86,6 +86,7 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from .empresa_filters import filter_insumos_por_empresa, get_depositos_empresa
 
 logger = logging.getLogger(__name__)
 
@@ -97,8 +98,11 @@ class InsumosListView(ListView):
     context_object_name = "insumos"
 
     def get_queryset(self):
+        # FILTRO POR EMPRESA: Obtener solo insumos de la empresa actual
+        queryset = filter_insumos_por_empresa(self.request)
+        
+        # Filtro adicional por depósito seleccionado (si existe)
         deposito_id = self.request.session.get("deposito_seleccionado")
-        queryset = super().get_queryset()
         if deposito_id:
             queryset = queryset.filter(deposito_id=deposito_id)
         return queryset
@@ -106,7 +110,8 @@ class InsumosListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         from .models import Deposito
-        context["depositos"] = Deposito.objects.all()
+        # FILTRO POR EMPRESA: Solo mostrar depósitos de la empresa
+        context["depositos"] = get_depositos_empresa(self.request)
         context["deposito_seleccionado"] = self.request.GET.get("deposito", "")
         return context
 

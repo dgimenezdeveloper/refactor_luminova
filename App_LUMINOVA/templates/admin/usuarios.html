@@ -101,16 +101,13 @@
                             </div>
                         </div>
                         <div class="form-group row p-1">
-                            <label for="rol" class="col-sm-5 col-form-label">Rol:</label>
+                            <label for="rol_empresa" class="col-sm-5 col-form-label">Rol:</label>
                             <div class="col-sm-7">
-                                <select class="form-select" id="rol" name="rol" required>
+                                <select class="form-select" id="rol_empresa" name="rol_empresa" required>
                                     <option value="" selected disabled>Seleccionar...</option>
-                                    <option value="ventas">Ventas</option>
-                                    <option value="compras">Compras</option>
-                                    <option value="produccion">Producción</option>
-                                    <option value="deposito">Depósito</option>
-                                    <option value="control de calidad">Control de Calidad</option>
-                                    <option value="administrador">Administrador</option>
+                                    {% for rol in roles_empresa %}
+                                        <option value="{{ rol.id }}">{{ rol.group.name }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -174,16 +171,13 @@
                                 </div>
                             </div>
                             <div class="form-group row p-1">
-                                <label for="rol{{ usuario.id }}" class="col-sm-5 col-form-label">Rol:</label>
+                                <label for="rol_empresa{{ usuario.id }}" class="col-sm-5 col-form-label">Rol:</label>
                                 <div class="col-sm-7">
-                                    <select class="form-select" id="rol{{ usuario.id }}" name="rol" required data-rol-actual="{{ usuario.groups.first.name|default:''|lower|slugify }}">
+                                    <select class="form-select" id="rol_empresa{{ usuario.id }}" name="rol_empresa" required>
                                         <option value="" disabled>Seleccionar...</option>
-                                        <option value="ventas">Ventas</option>
-                                        <option value="compras">Compras</option>
-                                        <option value="produccion">Producción</option>
-                                        <option value="deposito">Depósito</option>
-                                        <option value="control de calidad">Control de Calidad</option>
-                                        <option value="administrador">Administrador</option>
+                                        {% for rol in roles_empresa %}
+                                            <option value="{{ rol.id }}" {% if usuario.groups.first and usuario.groups.first.id == rol.group.id %}selected{% endif %}>{{ rol.group.name }}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
                             </div>

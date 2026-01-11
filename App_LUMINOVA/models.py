@@ -1,3 +1,80 @@
+
+
+from django.conf import settings
+
+from django.contrib.auth.models import Group, User
+
+# Asegurar import de models antes de definir modelos personalizados
+from django.db import models
+class RolEmpresa(models.Model):
+    empresa = models.ForeignKey('Empresa', on_delete=models.CASCADE, related_name='roles_empresa')
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='roles_empresa')
+    nombre = models.CharField(max_length=150, blank=False, default="", help_text="Nombre lógico del rol visible en la UI")
+    descripcion = models.TextField("Descripción del rol", blank=True)
+
+    class Meta:
+        unique_together = ("empresa", "nombre")
+        verbose_name = "Rol de Empresa"
+        verbose_name_plural = "Roles de Empresa"
+
+    def __str__(self):
+        return f"{self.nombre} ({self.empresa.nombre})"
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils import timezone  # Importar timezone
+
+from .threadlocals import get_current_empresa
+
+# Perfil extendido para asociar usuario a empresa
+class PerfilUsuario(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="perfil")
+    empresa = models.ForeignKey('Empresa', on_delete=models.CASCADE, related_name="usuarios")
+    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.empresa.nombre})"
+
+
+class EmpresaScopedModel(models.Model):
+    """Base abstracta para modelos aislados por empresa."""
+
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.PROTECT,
+        related_name="%(app_label)s_%(class)s",
+        null=True,
+        blank=True,
+    )
+
+    # Campos relacionados desde los cuales podemos inferir la empresa.
+    EMPRESA_FALLBACK_FIELDS = ()
+
+    class Meta:
+        abstract = True
+
+    def _infer_empresa_from_relations(self):
+        for field_name in getattr(self, "EMPRESA_FALLBACK_FIELDS", ()):
+            related_obj = getattr(self, field_name, None)
+            if not related_obj:
+                continue
+            if hasattr(related_obj, "empresa") and related_obj.empresa_id:
+                return related_obj.empresa
+        return None
+
+    def ensure_empresa(self):
+        if self.empresa_id:
+            return
+        inferred = self._infer_empresa_from_relations()
+        if inferred:
+            self.empresa = inferred
+            return
+        current = get_current_empresa()
+        if current:
+            self.empresa = current
+
+    def save(self, *args, **kwargs):
+        self.ensure_empresa()
+        super().save(*args, **kwargs)
 # TP_LUMINOVA-main/App_LUMINOVA/models.py
 
 from django.contrib.auth.models import Group, User
@@ -7,7 +84,8 @@ from django.utils import timezone  # Importar timezone
 
 
 # --- CATEGORÍAS Y ENTIDADES BASE ---
-class CategoriaProductoTerminado(models.Model):
+class CategoriaProductoTerminado(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("deposito",)
     nombre = models.CharField(
         max_length=100, verbose_name="Nombre Categoría PT"
     )  # Aumentado max_length
@@ -29,7 +107,8 @@ class CategoriaProductoTerminado(models.Model):
         return self.nombre
 
 
-class ProductoTerminado(models.Model):
+class ProductoTerminado(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("deposito", "categoria")
     descripcion = models.CharField(max_length=255)  # Aumentado max_length
     categoria = models.ForeignKey(
         CategoriaProductoTerminado,
@@ -101,7 +180,8 @@ class ProductoTerminado(models.Model):
         return self.produccion_habilitada and self.stock_objetivo > 0
 
 
-class CategoriaInsumo(models.Model):
+class CategoriaInsumo(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("deposito",)
     nombre = models.CharField(
         max_length=100, verbose_name="Nombre Categoría Insumo"
     )
@@ -123,7 +203,7 @@ class CategoriaInsumo(models.Model):
         return self.nombre
 
 
-class Proveedor(models.Model):
+class Proveedor(EmpresaScopedModel):
     nombre = models.CharField(max_length=100, unique=True)
     contacto = models.CharField(max_length=100, blank=True)
     telefono = models.CharField(max_length=25, blank=True)
@@ -132,8 +212,15 @@ class Proveedor(models.Model):
     def __str__(self):
         return self.nombre
 
+    def _infer_empresa_from_relations(self):
+        empresa = super()._infer_empresa_from_relations()
+        if empresa:
+            return empresa
+        orden = self.ordenes_de_compra_a_proveedor.filter(empresa__isnull=False).first()
+        return orden.empresa if orden else None
 
-class Fabricante(models.Model):
+
+class Fabricante(EmpresaScopedModel):
     nombre = models.CharField(max_length=100, unique=True)
     contacto = models.CharField(max_length=100, blank=True)
     telefono = models.CharField(max_length=25, blank=True)  # Aumentado max_length
@@ -142,8 +229,16 @@ class Fabricante(models.Model):
     def __str__(self):
         return self.nombre
 
+    def _infer_empresa_from_relations(self):
+        empresa = super()._infer_empresa_from_relations()
+        if empresa:
+            return empresa
+        insumo = self.insumos_fabricados.filter(empresa__isnull=False).first()
+        return insumo.empresa if insumo else None
 
-class Insumo(models.Model):
+
+class Insumo(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("deposito", "categoria")
     notificado_a_compras = models.BooleanField(default=False, help_text="¿Ya fue notificado a compras por stock bajo?")
     descripcion = models.CharField(max_length=255)
     categoria = models.ForeignKey(
@@ -175,7 +270,8 @@ class Insumo(models.Model):
 
 
 # --- NUEVO MODELO INTERMEDIO ---
-class OfertaProveedor(models.Model):
+class OfertaProveedor(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("insumo", "proveedor")
     insumo = models.ForeignKey(
         Insumo, on_delete=models.CASCADE, related_name="ofertas_de_proveedores"
     )
@@ -205,7 +301,8 @@ class OfertaProveedor(models.Model):
         return f"{self.insumo.descripcion} - {self.proveedor.nombre} (${self.precio_unitario_compra})"
 
 
-class ComponenteProducto(models.Model):
+class ComponenteProducto(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("producto_terminado", "insumo")
     producto_terminado = models.ForeignKey(
         ProductoTerminado,
         on_delete=models.CASCADE,
@@ -224,7 +321,7 @@ class ComponenteProducto(models.Model):
 
 
 # --- MODELOS DE GESTIÓN ---
-class Cliente(models.Model):
+class Cliente(EmpresaScopedModel):
     nombre = models.CharField(max_length=150, unique=True)
     direccion = models.TextField(blank=True)
     telefono = models.CharField(max_length=25, blank=True)
@@ -233,8 +330,16 @@ class Cliente(models.Model):
     def __str__(self):
         return self.nombre
 
+    def _infer_empresa_from_relations(self):
+        empresa = super()._infer_empresa_from_relations()
+        if empresa:
+            return empresa
+        ov = self.ordenes_venta.filter(empresa__isnull=False).first()
+        return ov.empresa if ov else None
 
-class OrdenVenta(models.Model):
+
+class OrdenVenta(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("cliente",)
     ESTADO_CHOICES = [
         ("PENDIENTE", "Pendiente Confirmación"),
         ("CONFIRMADA", "Confirmada (Esperando Producción)"),
@@ -262,6 +367,19 @@ class OrdenVenta(models.Model):
 
     def __str__(self):
         return f"OV: {self.numero_ov} - {self.cliente.nombre}"
+
+    def _infer_empresa_from_relations(self):
+        empresa = super()._infer_empresa_from_relations()
+        if empresa:
+            return empresa
+        item = self.items_ov.select_related("producto_terminado__deposito").first()
+        if item and item.producto_terminado:
+            producto = item.producto_terminado
+            if producto.empresa_id:
+                return producto.empresa
+            if producto.deposito and producto.deposito.empresa_id:
+                return producto.deposito.empresa
+        return None
 
     def actualizar_total(self):
         nuevo_total = sum(item.subtotal for item in self.items_ov.all())
@@ -403,7 +521,8 @@ class OrdenVenta(models.Model):
         return " | ".join(resumen_partes)
 
 
-class ItemOrdenVenta(models.Model):
+class ItemOrdenVenta(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("orden_venta", "producto_terminado")
     orden_venta = models.ForeignKey(
         OrdenVenta, on_delete=models.CASCADE, related_name="items_ov"
     )
@@ -423,20 +542,49 @@ class ItemOrdenVenta(models.Model):
 
 
 class EstadoOrden(models.Model):
-    nombre = models.CharField(max_length=50, unique=True)
+    """Catálogo de estados para órdenes de producción (multi-tenant)"""
+    nombre = models.CharField(max_length=50)
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='estados_orden',
+        null=True,
+        blank=True,
+        help_text='Empresa a la que pertenece este estado (null = compartido)'
+    )
+
+    class Meta:
+        unique_together = ('nombre', 'empresa')
+        verbose_name = "Estado de Orden"
+        verbose_name_plural = "Estados de Orden"
 
     def __str__(self):
         return self.nombre
 
 
 class SectorAsignado(models.Model):
-    nombre = models.CharField(max_length=50, unique=True)
+    """Catálogo de sectores de producción (multi-tenant)"""
+    nombre = models.CharField(max_length=50)
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='sectores',
+        null=True,
+        blank=True,
+        help_text='Empresa a la que pertenece este sector (null = compartido)'
+    )
+
+    class Meta:
+        unique_together = ('nombre', 'empresa')
+        verbose_name = "Sector Asignado"
+        verbose_name_plural = "Sectores Asignados"
 
     def __str__(self):
         return self.nombre
 
 
-class OrdenProduccion(models.Model):
+class OrdenProduccion(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("producto_a_producir", "orden_venta_origen")
     TIPO_OP_CHOICES = [
         ('MTO', 'Make to Order (Bajo Demanda)'),
         ('MTS', 'Make to Stock (Para Stock)'),
@@ -514,7 +662,8 @@ class OrdenProduccion(models.Model):
         return f"OP: {self.numero_op} ({tipo_display}) - {self.cantidad_a_producir} x {self.producto_a_producir.descripcion}"
 
 
-class Reportes(models.Model):
+class Reportes(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("orden_produccion_asociada",)
     orden_produccion_asociada = models.ForeignKey(
         OrdenProduccion,
         on_delete=models.SET_NULL,
@@ -556,7 +705,8 @@ class Reportes(models.Model):
         return f"Reporte {self.n_reporte} (OP: {op_num})"
 
 
-class Factura(models.Model):
+class Factura(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("orden_venta",)
     numero_factura = models.CharField(
         max_length=50, unique=True
     )  # Aumentado max_length
@@ -585,11 +735,28 @@ class RolDescripcion(models.Model):
 
 
 class AuditoriaAcceso(models.Model):
+    """Registro de auditoría de accesos al sistema (multi-tenant)"""
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='auditorias',
+        help_text='Empresa donde se realizó la acción auditada'
+    )
     accion = models.CharField(max_length=255)
     fecha_hora = models.DateTimeField(auto_now_add=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Auditoría de Acceso"
+        verbose_name_plural = "Auditorías de Acceso"
+        ordering = ['-fecha_hora']
+        indexes = [
+            models.Index(fields=['empresa', 'fecha_hora']),
+        ]
 
     def __str__(self):
         user_display = (
@@ -598,7 +765,8 @@ class AuditoriaAcceso(models.Model):
         return f"{user_display} - {self.accion} @ {self.fecha_hora.strftime('%Y-%m-%d %H:%M')}"
 
 
-class Orden(models.Model):
+class Orden(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("deposito", "insumo_principal")
     @staticmethod
     def pedidos_por_deposito(deposito_id):
         """
@@ -693,7 +861,8 @@ class Orden(models.Model):
         super().save(*args, **kwargs)
 
 
-class LoteProductoTerminado(models.Model):
+class LoteProductoTerminado(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("producto", "op_asociada", "deposito")
     producto = models.ForeignKey(
         ProductoTerminado, on_delete=models.PROTECT, related_name="lotes"
     )
@@ -716,7 +885,8 @@ class LoteProductoTerminado(models.Model):
         return f"Lote de {self.producto.descripcion} - OP {self.op_asociada.numero_op} ({self.cantidad})"
 
 
-class HistorialOV(models.Model):
+class HistorialOV(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("orden_venta",)
     orden_venta = models.ForeignKey(
         OrdenVenta, on_delete=models.CASCADE, related_name="historial"
     )
@@ -755,34 +925,77 @@ class PasswordChangeRequired(models.Model):
     def __str__(self):
         return f"El usuario {self.user.username} debe cambiar su contraseña."
 
-# Modelo para los depósitos
-class Deposito(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
-    ubicacion = models.CharField(max_length=255, blank=True)
-    descripcion = models.TextField(blank=True)
+
+# Modelo para empresas (multi-tenancy lógico)
+class Empresa(models.Model):
+    nombre = models.CharField(max_length=150, unique=True)
+    razon_social = models.CharField(max_length=255, blank=True)
+    cuit = models.CharField(max_length=20, blank=True)
+    direccion = models.CharField(max_length=255, blank=True)
+    telefono = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Empresa"
+        verbose_name_plural = "Empresas"
 
     def __str__(self):
         return self.nombre
 
+# Modelo para los depósitos
+class Deposito(models.Model):
+    nombre = models.CharField(max_length=100)
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, related_name="depositos")
+    ubicacion = models.CharField(max_length=255, blank=True)
+    descripcion = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ("nombre", "empresa")
+
+    def __str__(self):
+        return f"{self.nombre} ({self.empresa.nombre})"
+
 
 class UsuarioDeposito(models.Model):
-    """Modelo para gestionar permisos de usuarios por depósito"""
+    """Modelo para gestionar permisos de usuarios por depósito (multi-tenant)"""
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='depositos_asignados')
     deposito = models.ForeignKey(Deposito, on_delete=models.CASCADE, related_name='usuarios_asignados')
+    empresa = models.ForeignKey(
+        'Empresa',
+        on_delete=models.CASCADE,
+        related_name='usuarios_depositos',
+        null=True,
+        blank=True,
+        help_text='Empresa a la que pertenece esta asignación'
+    )
     puede_transferir = models.BooleanField(default=True, help_text="Puede realizar transferencias desde/hacia este depósito")
     puede_entradas = models.BooleanField(default=True, help_text="Puede registrar entradas de stock")
     puede_salidas = models.BooleanField(default=True, help_text="Puede registrar salidas de stock")
     fecha_asignacion = models.DateTimeField(auto_now_add=True)
 
+    EMPRESA_FALLBACK_FIELDS = ("deposito",)
+
     class Meta:
         unique_together = ('usuario', 'deposito')
         verbose_name = "Asignación Usuario-Depósito"
         verbose_name_plural = "Asignaciones Usuario-Depósito"
+        indexes = [
+            models.Index(fields=['empresa']),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Auto-asignar empresa desde el depósito si no está establecida
+        if not self.empresa_id and self.deposito_id:
+            self.empresa = self.deposito.empresa
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.usuario.username} - {self.deposito.nombre}"
 
-class StockInsumo(models.Model):
+class StockInsumo(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("insumo", "deposito")
     insumo = models.ForeignKey('Insumo', on_delete=models.CASCADE)
     deposito = models.ForeignKey('Deposito', on_delete=models.CASCADE)
     cantidad = models.IntegerField(default=0)
@@ -790,7 +1003,8 @@ class StockInsumo(models.Model):
     class Meta:
         unique_together = ('insumo', 'deposito')
 
-class StockProductoTerminado(models.Model):
+class StockProductoTerminado(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = ("producto", "deposito")
     producto = models.ForeignKey('ProductoTerminado', on_delete=models.CASCADE)
     deposito = models.ForeignKey('Deposito', on_delete=models.CASCADE)
     cantidad = models.IntegerField(default=0)
@@ -798,7 +1012,13 @@ class StockProductoTerminado(models.Model):
     class Meta:
         unique_together = ('producto', 'deposito')
 
-class MovimientoStock(models.Model):
+class MovimientoStock(EmpresaScopedModel):
+    EMPRESA_FALLBACK_FIELDS = (
+        "deposito_origen",
+        "deposito_destino",
+        "insumo",
+        "producto",
+    )
     insumo = models.ForeignKey('Insumo', on_delete=models.CASCADE, null=True, blank=True)
     producto = models.ForeignKey('ProductoTerminado', on_delete=models.CASCADE, null=True, blank=True)
     deposito_origen = models.ForeignKey('Deposito', on_delete=models.CASCADE, related_name='movimientos_salida', null=True, blank=True)
@@ -810,7 +1030,7 @@ class MovimientoStock(models.Model):
     motivo = models.CharField(max_length=255, blank=True)
 
 
-class NotificacionSistema(models.Model):
+class NotificacionSistema(EmpresaScopedModel):
     """Sistema de notificaciones entre módulos para mantener separación de responsabilidades"""
     TIPOS_NOTIFICACION = [
         ('stock_bajo', 'Stock Bajo'),

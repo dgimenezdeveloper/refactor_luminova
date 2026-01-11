@@ -1,0 +1,153 @@
+{% extends 'padre.html' %}
+{% load static %}
+
+{% block title %}Importación de Datos - Luminova{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="bi bi-cloud-upload"></i> Importación Masiva de Datos</h2>
+            <p class="text-muted">Carga datos desde archivos CSV o Excel</p>
+        </div>
+    </div>
+
+    {% if empresa_actual %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> <strong>Empresa actual:</strong> {{ empresa_actual.nombre }}
+                <br><small>Los datos importados se asociarán a esta empresa.</small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Card: Importar Insumos -->
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-box-seam text-primary"></i> Importar Insumos
+                    </h5>
+                    <p class="card-text">
+                        Carga masiva de materias primas, ingredientes o insumos.
+                    </p>
+                    <ul class="small text-muted">
+                        <li>Soporta CSV y Excel</li>
+                        <li>Creación automática de categorías</li>
+                        <li>Validación de datos</li>
+                    </ul>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{% url 'App_LUMINOVA:descargar_plantilla_insumos' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-download"></i> Descargar Plantilla
+                    </a>
+                    <a href="{% url 'App_LUMINOVA:importar_insumos' %}" class="btn btn-primary btn-sm float-end">
+                        <i class="bi bi-upload"></i> Importar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card: Importar Productos -->
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-gift text-success"></i> Importar Productos Terminados
+                    </h5>
+                    <p class="card-text">
+                        Carga masiva de productos terminados para ventas.
+                    </p>
+                    <ul class="small text-muted">
+                        <li>Soporta CSV y Excel</li>
+                        <li>Gestión de precios y stocks</li>
+                        <li>Categorías automáticas</li>
+                    </ul>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{% url 'App_LUMINOVA:descargar_plantilla_productos' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-download"></i> Descargar Plantilla
+                    </a>
+                    <a href="{% url 'App_LUMINOVA:importar_productos' %}" class="btn btn-success btn-sm float-end">
+                        <i class="bi bi-upload"></i> Importar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de Ayuda -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-question-circle"></i> Guía de Importación</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>📋 Pasos para importar:</h6>
+                            <ol class="small">
+                                <li>Descarga la plantilla correspondiente</li>
+                                <li>Completa los datos en el archivo</li>
+                                <li>Guarda como CSV o Excel</li>
+                                <li>Haz clic en "Importar" y sube el archivo</li>
+                                <li>Revisa el resultado de la importación</li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>⚠️ Recomendaciones:</h6>
+                            <ul class="small">
+                                <li>Usa nombres de columnas flexibles (ej: "descripcion", "nombre", "producto")</li>
+                                <li>Los campos obligatorios están marcados en la plantilla</li>
+                                <li>Las categorías inexistentes se crearán automáticamente</li>
+                                <li>Revisa los mensajes de error para corregir datos</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historial (si existe) -->
+    {% if historial %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <h5>Importaciones Recientes</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Registros</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in historial %}
+                        <tr>
+                            <td>{{ item.fecha }}</td>
+                            <td>{{ item.tipo }}</td>
+                            <td>{{ item.registros }}</td>
+                            <td>
+                                {% if item.exitoso %}
+                                <span class="badge bg-success">Exitoso</span>
+                                {% else %}
+                                <span class="badge bg-danger">Con errores</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

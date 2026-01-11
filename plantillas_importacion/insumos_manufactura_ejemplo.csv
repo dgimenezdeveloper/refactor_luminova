@@ -1,0 +1,6 @@
+descripcion,categoria,stock,unidad,codigo,fabricante,precio_unitario,stock_minimo,ubicacion
+"Madera de Roble Premium","Maderas",150,"m2","MAD-001","Maderas del Norte",4500.00,50,"Depósito Principal - A1"
+"Barniz Transparente Industrial","Químicos",80,"litros","QUI-010","Pinturas SA",890.50,20,"Depósito Principal - B3"
+"Tornillos Acero Inoxidable 5cm","Herrajes",5000,"unidades","HER-150","Ferretería Industrial",2.50,500,"Depósito Principal - C2"
+"Lija Grano Fino 220","Abrasivos",200,"unidades","ABR-220","Abrasivos López",45.00,50,"Depósito Principal - D1"
+"Cola Vinílica Industrial","Adhesivos",120,"litros","ADH-001","Adhesivos Tech",350.00,30,"Depósito Principal - B1"

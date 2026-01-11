@@ -40,6 +40,12 @@ from .signals import get_client_ip
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
 from .utils import es_admin, es_admin_o_rol
+from .empresa_filters import (
+    get_depositos_empresa,
+    filter_ordenes_venta_por_empresa,
+    filter_productos_por_empresa,
+    filter_clientes_por_empresa
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +56,8 @@ def lista_clientes_view(request):
         messages.error(request, "Acceso denegado.")
         return redirect("App_LUMINOVA:dashboard")
 
-    clientes = Cliente.objects.all().order_by("nombre")
+    # FILTRO POR EMPRESA: Solo clientes de la empresa
+    clientes = filter_clientes_por_empresa(request, Cliente.objects.all()).order_by("nombre")
     form_para_crear = ClienteForm()  # Instancia para el modal de creación
 
     context = {
@@ -159,7 +166,10 @@ def ventas_lista_ov_view(request):
         ("COMPLETADA", "Completada/Entregada"),
         ("CANCELADA", "Cancelada"),
     ])
-    ordenes_de_venta_query = (
+    
+    # FILTRO POR EMPRESA: Solo OVs de productos de esta empresa
+    ordenes_de_venta_query = filter_ordenes_venta_por_empresa(
+        request,
         OrdenVenta.objects.select_related("cliente")
         .prefetch_related(
             "items_ov__producto_terminado",
@@ -300,11 +310,85 @@ def ventas_crear_ov_view(request):
 
 @login_required
 def ventas_detalle_ov_view(request, ov_id):
+    # FILTRO POR EMPRESA: Solo permitir ver OVs de la empresa
     orden_venta = get_object_or_404(
-        OrdenVenta.objects.select_related("cliente").prefetch_related(
-            "items_ov__producto_terminado",
-            "ops_generadas__estado_op",  # Necesitamos el estado de cada OP
-            "factura_asociada",
+        filter_ordenes_venta_por_empresa(
+            request,
+            OrdenVenta.objects.select_related("cliente").prefetch_related(
+                "items_ov__producto_terminado",
+                "ops_generadas__estado_op",
+                "factura_asociada",
+            )
+        ),
+        id=ov_id,
+    )
+
+    factura_form = None
+    puede_facturar = False
+    detalle_cancelacion_factura = ""
+
+    if not hasattr(orden_venta, "factura_asociada") or not orden_venta.factura_asociada:
+        # Lógica para determinar si se puede facturar
+        ops_asociadas = orden_venta.ops_generadas.all()
+        if not ops_asociadas.exists() and orden_venta.estado == "CONFIRMADA":
+            # Si no hay OPs (ej. productos solo de stock) y está confirmada, podría facturarse.
+            # Esto depende de tu flujo si una OV puede no generar OPs.
+            # Por ahora, asumimos que OVs CONFIRMADAS sin OPs son para productos ya en stock.
+            puede_facturar = True  # O cambiar estado a LISTA_ENTREGA primero
+        elif ops_asociadas.exists():
+            ops_completadas = ops_asociadas.filter(
+                estado_op__nombre__iexact="Completada"
+            ).count()
+            ops_canceladas = ops_asociadas.filter(
+                estado_op__nombre__iexact="Cancelada"
+            ).count()
+            ops_totales = ops_asociadas.count()
+
+            # Se puede facturar si todas las OPs no canceladas están completadas
+            if ops_completadas + ops_canceladas == ops_totales and ops_completadas > 0:
+                puede_facturar = True
+                if ops_canceladas > 0:
+                    detalle_cancelacion_factura = f"Nota: {ops_canceladas} orden(es) de producción asociada(s) fueron canceladas."
+            elif (
+                orden_venta.estado == "PRODUCCION_CON_PROBLEMAS"
+                and ops_completadas > 0
+                and (ops_completadas + ops_canceladas == ops_totales)
+            ):
+                # Caso específico donde la OV está con problemas pero hay partes completadas
+                puede_facturar = True
+                detalle_cancelacion_factura = f"Facturación parcial. Nota: {ops_canceladas} orden(es) de producción asociada(s) fueron canceladas."
+            elif orden_venta.estado == "LISTA_ENTREGA":  # Ya está explícitamente lista
+                puede_facturar = True
+
+        if puede_facturar:
+            factura_form = FacturaForm()
+            # Si hay detalle de cancelación, podrías pasarlo al form o al contexto
+            # para incluirlo en notas de la factura si el form lo permite.
+            # form.fields['notas_factura'].initial = detalle_cancelacion_factura (si tuvieras ese campo)
+
+    context = {
+        "ov": orden_venta,
+        "items_ov": orden_venta.items_ov.all(),
+        "factura_form": factura_form,
+        "puede_facturar": puede_facturar,  # Para la plantilla
+        "detalle_cancelacion_factura": detalle_cancelacion_factura,  # Para la plantilla
+        "titulo_seccion": f"Detalle Orden de Venta: {orden_venta.numero_ov}",
+    }
+    return render(request, "ventas/ventas_detalle_ov.html", context)
+
+
+@login_required
+@transaction.atomic
+def ventas_generar_factura_view(request, ov_id):
+    # FILTRO POR EMPRESA: Verificar que la OV pertenece a la empresa
+    orden_venta = get_object_or_404(
+        filter_ordenes_venta_por_empresa(
+            request,
+            OrdenVenta.objects.select_related("cliente").prefetch_related(
+                "items_ov__producto_terminado",
+                "ops_generadas__estado_op",
+                "factura_asociada",
+            )
         ),
         id=ov_id,
     )
@@ -371,9 +455,13 @@ def ventas_generar_factura_view(request, ov_id):
     Esta vista ahora solo genera la factura sin cambiar el estado final de la OV.
     El estado final a 'COMPLETADA' se gestiona desde el envío en depósito.
     """
+    # FILTRO POR EMPRESA: Solo permitir facturar OVs de la empresa
     orden_venta = get_object_or_404(
-        OrdenVenta.objects.prefetch_related(
-            "items_ov__producto_terminado", "ops_generadas__estado_op"
+        filter_ordenes_venta_por_empresa(
+            request,
+            OrdenVenta.objects.prefetch_related(
+                "items_ov__producto_terminado", "ops_generadas__estado_op"
+            )
         ),
         id=ov_id,
     )
@@ -478,9 +566,13 @@ def ventas_generar_factura_view(request, ov_id):
 @login_required
 @transaction.atomic
 def ventas_editar_ov_view(request, ov_id):
+    # FILTRO POR EMPRESA: Solo permitir editar OVs de la empresa
     orden_venta = get_object_or_404(
-        OrdenVenta.objects.prefetch_related(
-            "ops_generadas__estado_op", "items_ov__producto_terminado"
+        filter_ordenes_venta_por_empresa(
+            request,
+            OrdenVenta.objects.prefetch_related(
+                "ops_generadas__estado_op", "items_ov__producto_terminado"
+            )
         ),
         id=ov_id,
     )
@@ -657,8 +749,12 @@ def ventas_cancelar_ov_view(request, ov_id):
     # if not es_admin_o_rol(request.user, ['ventas', 'administrador']):
     #     messages.error(request, "Acción no permitida.")
     #     return redirect('App_LUMINOVA:ventas_lista_ov')
-
-    orden_venta = get_object_or_404(OrdenVenta, id=ov_id)
+    
+    # FILTRO POR EMPRESA: Solo permitir cancelar OVs de la empresa
+    orden_venta = get_object_or_404(
+        filter_ordenes_venta_por_empresa(request),
+        id=ov_id
+    )
 
     if orden_venta.estado in ["COMPLETADA", "CANCELADA"]:
         messages.warning(

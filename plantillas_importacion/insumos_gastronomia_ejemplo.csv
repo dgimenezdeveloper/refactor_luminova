@@ -1,0 +1,8 @@
+ingrediente,categoria,stock,unidad,codigo,fabricante,precio_unitario,stock_minimo,ubicacion
+"Harina 000 Premium","Harinas y Panificación",250,"kg","HAR-000","Molinos del Sur",180.00,100,"Almacén de Ingredientes - A1"
+"Tomate Perita Triturado","Conservas",180,"kg","CON-TOM","La Huerta SA",350.00,50,"Almacén de Ingredientes - B2"
+"Muzzarella en Barra","Lácteos",80,"kg","LAC-MUZ","Tambos Unidos",1200.00,30,"Cámara Fría - Lácteos"
+"Aceite de Oliva Extra Virgen","Aceites",45,"litros","ACE-OLI","Olivares Mendocinos",1850.00,20,"Almacén de Ingredientes - C1"
+"Lechuga Mantecosa Fresca","Vegetales",25,"kg","VEG-LEC","Verduras Frescas",280.00,15,"Cámara Fría - Vegetales"
+"Pollo Suprema sin Piel","Carnes",120,"kg","CAR-POL","Granja del Valle",890.00,40,"Cámara Fría - Carnes"
+"Sal Gruesa Marina","Condimentos",50,"kg","CON-SAL","Sal del Plata",95.00,20,"Almacén de Ingredientes - D3"
