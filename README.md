@@ -44,10 +44,10 @@ https://github.com/tu-usuario/tu-repositorio.git
 
 ## Flujo de trabajo para colaboradores
 
-1. **Haz un fork del repositorio (si no tienes acceso directo)😗*
+1. **Haz un fork del repositorio (si no tienes acceso directo)*
    - Ve a la página del repositorio en GitHub y haz clic en el botón "Fork".
 
-2. **Clona el repositorio (o tu fork)😗*
+2. **Clona el repositorio (o tu fork)*
    ```bash
    git clone
 https://github.com/tu-usuario/tu-repositorio.git
@@ -55,23 +55,23 @@ https://github.com/tu-usuario/tu-repositorio.git
    cd tu-repositorio
    ```
 
-3. **Crea una rama para tu funcionalidad o corrección😗*
+3. **Crea una rama para tu funcionalidad o corrección*
    ```bash
    git checkout -b nombre-de-la-rama
    ```
 
-4. **Realiza tus cambios y haz commits😗*
+4. **Realiza tus cambios y haz commits*
    ```bash
    git add .
    git commit -m "Descripción de los cambios realizados"
    ```
 
-5. **Envía tus cambios al repositorio remoto😗*
+5. **Envía tus cambios al repositorio remoto*
    ```bash
    git push origin nombre-de-la-rama
    ```
 
-6. **Abre un Pull Request😗*
+6. **Abre un Pull Request*
    - Ve al repositorio en GitHub y abre un Pull Request desde tu rama.
 
 ## Buenas prácticas para colaborar
