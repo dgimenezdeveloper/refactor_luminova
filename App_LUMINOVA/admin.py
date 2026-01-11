@@ -1,7 +1,15 @@
+
+
+
+
+
+
+# Registro de Empresa y PerfilUsuario en el admin
+from django.contrib import admin, messages
+from .models import Empresa, PerfilUsuario
+
 # TP_LUMINOVA-main/App_LUMINOVA/admin.py
 
-
-from django.contrib import admin, messages
 
 from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAsignado
     AuditoriaAcceso,
@@ -31,6 +39,15 @@ from .models import (  # Usando tus nombres actuales para EstadoOrden y SectorAs
     NotificacionSistema,
 )
 
+@admin.register(Empresa)
+class EmpresaAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "razon_social", "cuit", "activa")
+    search_fields = ("nombre", "razon_social", "cuit")
+
+@admin.register(PerfilUsuario)
+class PerfilUsuarioAdmin(admin.ModelAdmin):
+    list_display = ("user", "empresa", "fecha_asignacion")
+    search_fields = ("user__username", "empresa__nombre")
 
 class OfertaProveedorInline(admin.TabularInline):  # O admin.StackedInline
     model = OfertaProveedor
