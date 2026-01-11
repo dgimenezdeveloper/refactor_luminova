@@ -710,6 +710,7 @@ def deposito_dashboard_view(request):
         
     if es_admin_user and deposito_id == "-1":  # -1 significa "todos los depósitos"
         # Dashboard global para admin con información detallada de todos los depósitos
+        # IMPORTANTE: Solo superusuarios ven TODAS las empresas, admins de empresa solo ven su empresa
         from .models import EstadoOrden
         
         # Obtener empresa actual
@@ -720,17 +721,36 @@ def deposito_dashboard_view(request):
             insumos_count = Insumo.objects.filter(empresa=empresa_actual).count()
             productos_count = ProductoTerminado.objects.filter(empresa=empresa_actual).count()
             depositos_count = Deposito.objects.filter(empresa=empresa_actual).count()
+        elif request.user.is_superuser:
+            # Solo superusuarios pueden ver todo sin filtro de empresa
+            insumos_count = Insumo.objects.count()
+            productos_count = ProductoTerminado.objects.count()
+            depositos_count = Deposito.objects.count()
         else:
             insumos_count = productos_count = depositos_count = 0
         
-        # OCs en tránsito (recepción pendiente)
-        ocs_en_transito = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO").select_related("proveedor", "insumo_principal", "deposito")
+        # Base querysets - SIEMPRE filtrar por empresa para usuarios no-superusuario
+        if empresa_actual:
+            base_ordenes = Orden.objects.filter(empresa=empresa_actual)
+            base_ops = OrdenProduccion.objects.filter(empresa=empresa_actual)
+            depositos_empresa = Deposito.objects.filter(empresa=empresa_actual)
+        elif request.user.is_superuser:
+            base_ordenes = Orden.objects.all()
+            base_ops = OrdenProduccion.objects.all()
+            depositos_empresa = Deposito.objects.all()
+        else:
+            base_ordenes = Orden.objects.none()
+            base_ops = OrdenProduccion.objects.none()
+            depositos_empresa = Deposito.objects.none()
+        
+        # OCs en tránsito (recepción pendiente) - FILTRADO POR EMPRESA
+        ocs_en_transito = base_ordenes.filter(tipo="compra", estado="EN_TRANSITO").select_related("proveedor", "insumo_principal", "deposito")
         ocs_en_transito_count = ocs_en_transito.count()
         
-        # Solicitudes de insumos pendientes (OPs)
+        # Solicitudes de insumos pendientes (OPs) - FILTRADO POR EMPRESA
         try:
             estado_sol = EstadoOrden.objects.get(nombre__iexact="Insumos Solicitados")
-            ops_solicitudes = OrdenProduccion.objects.filter(estado_op=estado_sol).select_related("producto_a_producir__deposito")
+            ops_solicitudes = base_ops.filter(estado_op=estado_sol).select_related("producto_a_producir__deposito")
             ops_solicitudes_count = ops_solicitudes.count()
         except EstadoOrden.DoesNotExist:
             ops_solicitudes = OrdenProduccion.objects.none()
@@ -739,7 +759,6 @@ def deposito_dashboard_view(request):
         # Stock crítico por depósito
         UMBRAL_STOCK_BAJO = 15000
         depositos_con_stock_critico = []
-        depositos_empresa = Deposito.objects.filter(empresa=empresa_actual) if empresa_actual else Deposito.objects.none()
         for deposito in depositos_empresa:
             insumos_criticos = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO)
             if insumos_criticos.exists():
@@ -749,11 +768,11 @@ def deposito_dashboard_view(request):
                     'insumos_criticos': insumos_criticos[:5]  # Primeros 5 más críticos
                 })
         
-        # OCs por aprobar (estado BORRADOR)
-        ocs_por_aprobar = Orden.objects.filter(tipo="compra", estado="BORRADOR").select_related("proveedor", "insumo_principal", "deposito")
+        # OCs por aprobar (estado BORRADOR) - FILTRADO POR EMPRESA
+        ocs_por_aprobar = base_ordenes.filter(tipo="compra", estado="BORRADOR").select_related("proveedor", "insumo_principal", "deposito")
         ocs_por_aprobar_count = ocs_por_aprobar.count()
         
-        # Resumen por depósito
+        # Resumen por depósito (ya está filtrado porque depositos_empresa está filtrado)
         depositos_resumen = []
         for deposito in depositos_empresa:
             # OCs en tránsito para este depósito
@@ -1174,34 +1193,54 @@ def deposito_view(request):
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
     if es_admin_user and deposito_id == "-1":  # -1 significa "todos los depósitos"
-        # Dashboard global para admin con información detallada de todos los depósitos        
-        # Información básica
-        insumos_count = Insumo.objects.count()
-        productos_count = ProductoTerminado.objects.count()
-        depositos_count = Deposito.objects.count()
+        # Dashboard global para admin con información detallada de todos los depósitos
+        # IMPORTANTE: Solo superusuarios ven TODAS las empresas, admins de empresa solo ven su empresa
         
-        # OCs en tránsito (recepción pendiente)
-        ocs_en_transito = Orden.objects.filter(tipo="compra", estado="EN_TRANSITO").select_related("proveedor", "insumo_principal", "deposito")
+        # Obtener empresa actual desde el middleware
+        empresa_actual = request.empresa_actual
+        
+        # Base querysets - SIEMPRE filtrar por empresa para usuarios no-superusuario
+        if empresa_actual:
+            base_insumos = Insumo.objects.filter(empresa=empresa_actual)
+            base_productos = ProductoTerminado.objects.filter(empresa=empresa_actual)
+            base_depositos = Deposito.objects.filter(empresa=empresa_actual)
+            base_ordenes = Orden.objects.filter(empresa=empresa_actual)
+            base_ops = OrdenProduccion.objects.filter(empresa=empresa_actual)
+        elif request.user.is_superuser:
+            # Solo superusuarios pueden ver todo sin filtro de empresa
+            base_insumos = Insumo.objects.all()
+            base_productos = ProductoTerminado.objects.all()
+            base_depositos = Deposito.objects.all()
+            base_ordenes = Orden.objects.all()
+            base_ops = OrdenProduccion.objects.all()
+        else:
+            base_insumos = Insumo.objects.none()
+            base_productos = ProductoTerminado.objects.none()
+            base_depositos = Deposito.objects.none()
+            base_ordenes = Orden.objects.none()
+            base_ops = OrdenProduccion.objects.none()
+        
+        # Información básica - FILTRADO POR EMPRESA
+        insumos_count = base_insumos.count()
+        productos_count = base_productos.count()
+        depositos_count = base_depositos.count()
+        
+        # OCs en tránsito (recepción pendiente) - FILTRADO POR EMPRESA
+        ocs_en_transito = base_ordenes.filter(tipo="compra", estado="EN_TRANSITO").select_related("proveedor", "insumo_principal", "deposito")
         ocs_en_transito_count = ocs_en_transito.count()
         
-        # Solicitudes de insumos pendientes (OPs)
+        # Solicitudes de insumos pendientes (OPs) - FILTRADO POR EMPRESA
         try:
             estado_sol = EstadoOrden.objects.get(nombre__iexact="Insumos Solicitados")
-            ops_solicitudes = OrdenProduccion.objects.filter(estado_op=estado_sol).select_related("producto_a_producir__deposito")
+            ops_solicitudes = base_ops.filter(estado_op=estado_sol).select_related("producto_a_producir__deposito")
             ops_solicitudes_count = ops_solicitudes.count()
         except EstadoOrden.DoesNotExist:
             ops_solicitudes = OrdenProduccion.objects.none()
             ops_solicitudes_count = 0
         
-        # Stock crítico por depósito
+        # Stock crítico por depósito (ya filtrado)
         UMBRAL_STOCK_BAJO = 15000
-        # Filtrar depósitos por empresa del usuario
-        empresa_usuario = None
-        if hasattr(request.user, 'perfil'):
-            empresa_usuario = request.user.perfil.empresa
-        depositos_empresa = Deposito.objects.all()
-        if empresa_usuario:
-            depositos_empresa = depositos_empresa.filter(empresa=empresa_usuario)
+        depositos_empresa = base_depositos
 
         depositos_con_stock_critico = []
         for deposito in depositos_empresa:
@@ -1213,11 +1252,11 @@ def deposito_view(request):
                     'insumos_criticos': insumos_criticos[:5]  # Primeros 5 más críticos
                 })
         
-        # OCs por aprobar (estado BORRADOR)
-        ocs_por_aprobar = Orden.objects.filter(tipo="compra", estado="BORRADOR").select_related("proveedor", "insumo_principal", "deposito")
+        # OCs por aprobar (estado BORRADOR) - FILTRADO POR EMPRESA
+        ocs_por_aprobar = base_ordenes.filter(tipo="compra", estado="BORRADOR").select_related("proveedor", "insumo_principal", "deposito")
         ocs_por_aprobar_count = ocs_por_aprobar.count()
         
-        # Resumen por depósito
+        # Resumen por depósito (ya está filtrado porque depositos_empresa está filtrado)
         depositos_resumen = []
         for deposito in depositos_empresa:
             # OCs en tránsito para este depósito
