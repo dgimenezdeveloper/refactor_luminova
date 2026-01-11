@@ -133,12 +133,17 @@ def puede_ver_deposito_sidebar(request):
     """
     Context processor para determinar si el usuario puede ver el sidebar de depósito.
     Filtra por empresa actual.
+    Los administradores siempre tienen acceso al sidebar de depósito.
     """
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
         return {'puede_ver_deposito_sidebar': False}
     
     if user.is_superuser:
+        return {'puede_ver_deposito_sidebar': True}
+    
+    # Los administradores de empresa tienen acceso completo al sidebar de depósito
+    if es_admin_func(user):
         return {'puede_ver_deposito_sidebar': True}
     
     # Obtener empresa actual
