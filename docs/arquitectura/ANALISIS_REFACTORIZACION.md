@@ -5,68 +5,68 @@
 
 El proyecto LUMINOVA es un sistema Django para gestión de inventarios, producción y ventas que presenta una base funcional sólida pero requiere mejoras significativas en arquitectura, organización del código y escalabilidad. Este análisis identifica las áreas críticas que necesitan refactorización para transformarlo en un sistema de calidad empresarial.
 
-## 📋 Estado Actual del Proyecto
+##  Estado Actual del Proyecto
 
 ### Fortalezas Identificadas
-- ✅ Modelo de datos comprehensivo y bien relacionado
-- ✅ Sistema de autenticación y autorización por roles implementado
-- ✅ Funcionalidades core completas (inventario, órdenes, producción)
-- ✅ Interfaz web funcional con Bootstrap
-- ✅ Sistema de notificaciones implementado
-- ✅ Manejo de depósitos multi-ubicación
+-  Modelo de datos comprehensivo y bien relacionado
+-  Sistema de autenticación y autorización por roles implementado
+-  Funcionalidades core completas (inventario, órdenes, producción)
+-  Interfaz web funcional con Bootstrap
+-  Sistema de notificaciones implementado
+-  Manejo de depósitos multi-ubicación
 
 ### Problemas Críticos Identificados
-- ❌ **Violación masiva del principio DRY** (Don't Repeat Yourself)
-- ❌ **Archivos de vista monolíticos** (1000+ líneas)
-- ❌ **Falta de separación de responsabilidades**
-- ❌ **Ausencia de patrones de diseño**
-- ❌ **Código duplicado en múltiples archivos**
-- ❌ **Falta de tests unitarios sistemáticos**
-- ❌ **Configuración hardcodeada**
+-  **Violación masiva del principio DRY** (Don't Repeat Yourself)
+-  **Archivos de vista monolíticos** (1000+ líneas)
+-  **Falta de separación de responsabilidades**
+-  **Ausencia de patrones de diseño**
+-  **Código duplicado en múltiples archivos**
+-  **Falta de tests unitarios sistemáticos**
+-  **Configuración hardcodeada**
 
 ---
 
-## 🏗️ Plan de Refactorización
+##  Plan de Refactorización
 
 ### Todo List de Mejoras Prioritarias
 
 ```markdown
-## Fase 1: Arquitectura y Estructura 🏗️
+## Fase 1: Arquitectura y Estructura 
 - [ ] Implementar arquitectura hexagonal/clean architecture
 - [ ] Crear capa de servicios (Service Layer)
 - [ ] Implementar patrón Repository para acceso a datos
 - [ ] Separar lógica de negocio de las vistas
 - [ ] Crear DTOs (Data Transfer Objects)
 
-## Fase 2: Modularización 📦
+## Fase 2: Modularización 
 - [ ] Dividir views.py monolíticos en módulos específicos
 - [ ] Crear managers personalizados para modelos complejos
 - [ ] Implementar mixins para funcionalidades compartidas
 - [ ] Separar formularios por dominio
 - [ ] Crear utilities específicas por módulo
 
-## Fase 3: Patrones de Diseño 🎯
+## Fase 3: Patrones de Diseño 
 - [ ] Implementar patrón Strategy para diferentes tipos de órdenes
 - [ ] Aplicar patrón Observer para notificaciones
 - [ ] Usar patrón Factory para creación de objetos complejos
 - [ ] Implementar patrón Command para operaciones de stock
 - [ ] Aplicar patrón State para manejo de estados de órdenes
 
-## Fase 4: Base de Datos 🗄️
+## Fase 4: Base de Datos 
 - [ ] Normalizar completamente la base de datos
 - [ ] Optimizar queries con select_related/prefetch_related
 - [ ] Implementar índices de base de datos
 - [ ] Crear vistas materializadas para reportes
 - [ ] Implementar soft deletes
 
-## Fase 5: Testing y Calidad 🧪
+## Fase 5: Testing y Calidad 
 - [ ] Implementar suite completa de tests unitarios
 - [ ] Crear tests de integración
 - [ ] Implementar tests de rendimiento
 - [ ] Configurar coverage reporting
 - [ ] Implementar linting y formateo automático
 
-## Fase 6: Configuración y Despliegue 🚀
+## Fase 6: Configuración y Despliegue 
 - [ ] Externalizarar configuración con variables de entorno
 - [ ] Crear configuraciones por ambiente (dev/staging/prod)
 - [ ] Implementar logging estructurado
@@ -76,7 +76,7 @@ El proyecto LUMINOVA es un sistema Django para gestión de inventarios, producci
 
 ---
 
-## 🔧 Refactorizaciones Específicas
+##  Refactorizaciones Específicas
 
 ### 1. Arquitectura Hexagonal
 
@@ -223,7 +223,7 @@ class EstadoPendiente(EstadoOrdenVenta):
 
 ---
 
-## 📂 Nueva Estructura de Proyecto Propuesta
+##  Nueva Estructura de Proyecto Propuesta
 
 ```
 TP_LUMINOVA-main/
@@ -280,7 +280,7 @@ TP_LUMINOVA-main/
 
 ---
 
-## 🧪 Estrategia de Testing
+##  Estrategia de Testing
 
 ### Tests Unitarios Faltantes
 
@@ -315,7 +315,7 @@ class TestDashboardPerformance(TestCase):
 
 ---
 
-## 🔧 Configuración Externalizada
+##  Configuración Externalizada
 
 ### Variables de Entorno
 
@@ -343,7 +343,7 @@ EMAIL_PORT=587
 
 ---
 
-## 📊 Métricas y Monitoreo
+##  Métricas y Monitoreo
 
 ### Logging Estructurado
 
@@ -380,7 +380,7 @@ class OrdenVenta(MetricaMixin, models.Model):
 
 ---
 
-## 🚀 Plan de Migración
+##  Plan de Migración
 
 ### Fase 1: Preparación (2 semanas)
 1. **Configurar entorno de desarrollo**
@@ -439,26 +439,26 @@ class OrdenVenta(MetricaMixin, models.Model):
 
 ---
 
-## 🎯 Beneficios Esperados
+##  Beneficios Esperados
 
 ### Inmediatos
-- ✅ **Mantenibilidad**: Código más fácil de entender y modificar
-- ✅ **Escalabilidad**: Arquitectura preparada para crecimiento
-- ✅ **Confiabilidad**: Menos bugs por mejor separación de responsabilidades
+-  **Mantenibilidad**: Código más fácil de entender y modificar
+-  **Escalabilidad**: Arquitectura preparada para crecimiento
+-  **Confiabilidad**: Menos bugs por mejor separación de responsabilidades
 
 ### A Mediano Plazo
-- ✅ **Rendimiento**: Queries optimizadas y cache implementado
-- ✅ **Productividad**: Desarrollo más rápido con arquitectura clara
-- ✅ **Calidad**: Suite de tests garantiza estabilidad
+-  **Rendimiento**: Queries optimizadas y cache implementado
+-  **Productividad**: Desarrollo más rápido con arquitectura clara
+-  **Calidad**: Suite de tests garantiza estabilidad
 
 ### A Largo Plazo
-- ✅ **Flexibilidad**: Fácil adaptación a nuevos requerimientos
-- ✅ **Escalabilidad**: Preparado para microservicios si es necesario
-- ✅ **Mantenimiento**: Costo reducido de mantener el sistema
+-  **Flexibilidad**: Fácil adaptación a nuevos requerimientos
+-  **Escalabilidad**: Preparado para microservicios si es necesario
+-  **Mantenimiento**: Costo reducido de mantener el sistema
 
 ---
 
-## 🚨 Riesgos y Mitigaciones
+##  Riesgos y Mitigaciones
 
 ### Riesgos Identificados
 1. **Regresiones durante refactoring**
@@ -477,7 +477,7 @@ class OrdenVenta(MetricaMixin, models.Model):
 
 ---
 
-## 📚 Recursos y Referencias
+##  Recursos y Referencias
 
 ### Documentación Técnica Recomendada
 - [Django Best Practices](https://django-best-practices.readthedocs.io/)
@@ -492,7 +492,7 @@ class OrdenVenta(MetricaMixin, models.Model):
 
 ---
 
-## 💡 Conclusiones
+##  Conclusiones
 
 El proyecto LUMINOVA tiene una base funcional sólida pero requiere una refactorización significativa para alcanzar estándares de calidad empresarial. La implementación de las mejoras propuestas transformará el sistema en una aplicación mantenible, escalable y robusta.
 
