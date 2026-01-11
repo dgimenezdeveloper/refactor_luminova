@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.models import User
 from .models import Deposito, UsuarioDeposito
-from .utils import es_admin
+from .utils import es_admin, tiene_rol
 
 
 @login_required
@@ -16,7 +16,7 @@ def gestionar_permisos_deposito_view(request, usuario_id):
     usuario = get_object_or_404(User, id=usuario_id)
     
     # Verificar que el usuario tenga rol de depósito
-    if not usuario.groups.filter(name='Depósito').exists():
+    if not tiene_rol(usuario, 'Depósito'):
         messages.error(request, "Este usuario no tiene rol de depósito.")
         return redirect("App_LUMINOVA:lista_usuarios")
     

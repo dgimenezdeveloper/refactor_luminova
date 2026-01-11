@@ -4,6 +4,7 @@ Context processors para LUMINOVA con soporte multi-tenancy.
 Todos los queries deben filtrar por empresa del usuario actual.
 """
 from .models import Insumo, Orden, OrdenProduccion, Reportes, UsuarioDeposito
+from .utils import es_admin as es_admin_func, tiene_rol
 
 
 def notificaciones_context(request):
@@ -18,7 +19,7 @@ def notificaciones_context(request):
     empresa_actual = getattr(request, 'empresa_actual', None)
     
     deposito_id = request.session.get("deposito_seleccionado")
-    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
+    es_admin = es_admin_func(request.user)
 
     # Base querysets filtrados por empresa
     base_reportes = Reportes.objects.all()
@@ -150,7 +151,7 @@ def puede_ver_deposito_sidebar(request):
     
     tiene_depositos = usuario_depositos.exists()
     
-    if user.groups.filter(name='Depósito').exists() and tiene_depositos:
+    if tiene_rol(user, 'Depósito') and tiene_depositos:
         return {'puede_ver_deposito_sidebar': True}
     
     return {'puede_ver_deposito_sidebar': False}

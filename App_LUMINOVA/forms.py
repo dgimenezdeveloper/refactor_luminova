@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group, Permission
 from django.db.models import Q, F
 from django.utils import timezone
 
+from .utils import es_admin as es_admin_func, tiene_rol
 from .models import (
     CategoriaInsumo,
     CategoriaProductoTerminado,
@@ -942,7 +943,7 @@ class TransferenciaInsumoForm(forms.Form):
         from .models import UsuarioDeposito, Deposito
         
         # Superusuarios y administradores pueden acceder a todos los depósitos
-        if user.is_superuser or user.groups.filter(name='administrador').exists():
+        if es_admin_func(user):
             return Deposito.objects.all()
         
         # Buscar depósitos específicamente asignados al usuario
@@ -955,7 +956,7 @@ class TransferenciaInsumoForm(forms.Form):
             return Deposito.objects.filter(id__in=depositos_asignados)
         
         # Si no hay asignaciones específicas y tiene rol 'deposito', todos los depósitos
-        if user.groups.filter(name='Depósito').exists():
+        if tiene_rol(user, 'Depósito'):
             return Deposito.objects.all()
         
         # Por defecto, ningún depósito
@@ -1005,7 +1006,7 @@ class TransferenciaProductoForm(forms.Form):
         from .models import UsuarioDeposito, Deposito
         
         # Superusuarios y administradores pueden acceder a todos los depósitos
-        if user.is_superuser or user.groups.filter(name='administrador').exists():
+        if es_admin_func(user):
             return Deposito.objects.all()
         
         # Buscar depósitos específicamente asignados al usuario
@@ -1018,7 +1019,7 @@ class TransferenciaProductoForm(forms.Form):
             return Deposito.objects.filter(id__in=depositos_asignados)
         
         # Si no hay asignaciones específicas y tiene rol 'deposito', todos los depósitos
-        if user.groups.filter(name='Depósito').exists():
+        if tiene_rol(user, 'Depósito'):
             return Deposito.objects.all()
         
         # Por defecto, ningún depósito

@@ -10,12 +10,12 @@ from django.http import HttpResponseForbidden
 from .services.notification_service import NotificationService
 from .empresa_filters import get_depositos_empresa, filter_ordenes_compra_por_empresa
 # --- TRANSFERENCIA DE INSUMOS ENTRE DEPÓSITOS ---
-from .utils import es_admin_o_rol, redirigir_segun_rol
+from .utils import es_admin_o_rol, redirigir_segun_rol, es_admin, tiene_rol
 
 def _usuario_puede_acceder_deposito(user, deposito, accion="transferir"):
     """Verifica si el usuario puede acceder al depósito especificado para la acción dada"""
     # Administradores y superusuarios tienen acceso total
-    if user.is_superuser or user.groups.filter(name='administrador').exists():
+    if es_admin(user):
         return True
     
     from .models import UsuarioDeposito
@@ -671,18 +671,18 @@ def seleccionar_deposito_view(request):
         depositos = Deposito.objects.none()
     
     sin_permisos = False
-    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
-    if not es_admin and not request.user.groups.filter(name='Depósito').exists():
+    es_admin_user = es_admin(request.user)
+    if not es_admin_user and not tiene_rol(request.user, 'Depósito'):
         sin_permisos = True
     if request.method == "POST":
         deposito_id = request.POST.get("deposito_id")
         # Validar que el deposito_id sea válido
-        if deposito_id == "ALL" and es_admin:
+        if deposito_id == "ALL" and es_admin_user:
             request.session["deposito_seleccionado"] = "-1"  # Usar -1 en lugar de ALL
         elif deposito_id and deposito_id.isdigit():
             # Verificar que el depósito existe Y pertenece a la empresa del usuario
             deposito_existe = Deposito.objects.filter(id=deposito_id, empresa=empresa_actual).exists()
-            if deposito_existe or es_admin:  # Admin puede acceder a cualquiera
+            if deposito_existe or es_admin_user:  # Admin puede acceder a cualquiera
                 request.session["deposito_seleccionado"] = deposito_id
             else:
                 messages.error(request, "No tienes acceso a ese depósito")
@@ -690,7 +690,7 @@ def seleccionar_deposito_view(request):
         else:
             return redirect("App_LUMINOVA:seleccionar_deposito")
         return redirect("App_LUMINOVA:deposito_view")
-    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos, "sin_permisos": sin_permisos, "es_admin": es_admin})
+    return render(request, "deposito/seleccionar_deposito.html", {"depositos": depositos, "sin_permisos": sin_permisos, "es_admin": es_admin_user})
 
 
 @login_required
@@ -703,12 +703,12 @@ def deposito_dashboard_view(request):
         return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
     
     deposito_id = request.session.get("deposito_seleccionado")
-    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
+    es_admin_user = es_admin(request.user)
     
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
         
-    if es_admin and deposito_id == "-1":  # -1 significa "todos los depósitos"
+    if es_admin_user and deposito_id == "-1":  # -1 significa "todos los depósitos"
         # Dashboard global para admin con información detallada de todos los depósitos
         from .models import EstadoOrden
         
@@ -1066,9 +1066,9 @@ def recepcion_pedidos_view(request):
     from .models import UsuarioDeposito
     deposito_id = request.session.get("deposito_seleccionado")
     deposito = None
-    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
-    mostrar_todos = es_admin and (deposito_id == "-1")
-    if not es_admin:
+    es_admin_user = es_admin(request.user)
+    mostrar_todos = es_admin_user and (deposito_id == "-1")
+    if not es_admin_user:
         asignaciones = UsuarioDeposito.objects.filter(usuario=request.user)
         if asignaciones.exists():
             if deposito_id:
@@ -1091,7 +1091,7 @@ def recepcion_pedidos_view(request):
     
     if mostrar_todos:
         pass  # Ya está filtrado por empresa
-    elif not es_admin and deposito:
+    elif not es_admin_user and deposito:
         qs = qs.filter(deposito=deposito)
     elif es_admin and deposito_id and deposito_id != "-1":
         qs = qs.filter(deposito_id=deposito_id)
@@ -1170,10 +1170,10 @@ def deposito_view(request):
         return render(request, "deposito/seleccionar_deposito.html", {"sin_permisos": True})
 
     deposito_id = request.session.get("deposito_seleccionado")
-    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
+    es_admin_user = es_admin(request.user)
     if not deposito_id:
         return redirect("App_LUMINOVA:seleccionar_deposito")
-    if es_admin and deposito_id == "-1":  # -1 significa "todos los depósitos"
+    if es_admin_user and deposito_id == "-1":  # -1 significa "todos los depósitos"
         # Dashboard global para admin con información detallada de todos los depósitos        
         # Información básica
         insumos_count = Insumo.objects.count()
@@ -1354,9 +1354,9 @@ def deposito_solicitudes_insumos_view(request):
     from .models import UsuarioDeposito
     deposito = None
     deposito_id = request.session.get("deposito_seleccionado")
-    es_admin = request.user.is_superuser or request.user.groups.filter(name='administrador').exists()
-    mostrar_todos = es_admin and (deposito_id == "-1")
-    if not es_admin:
+    es_admin_user = es_admin(request.user)
+    mostrar_todos = es_admin_user and (deposito_id == "-1")
+    if not es_admin_user:
         asignaciones = UsuarioDeposito.objects.filter(usuario=request.user)
         if asignaciones.exists():
             if deposito_id:
@@ -1380,9 +1380,9 @@ def deposito_solicitudes_insumos_view(request):
         qs = OrdenProduccion.objects.filter(estado_op=estado_objetivo)
         if mostrar_todos:
             pass
-        elif not es_admin and deposito:
+        elif not es_admin_user and deposito:
             qs = qs.filter(producto_a_producir__deposito=deposito)
-        elif es_admin and deposito_id and deposito_id != "-1":
+        elif es_admin_user and deposito_id and deposito_id != "-1":
             qs = qs.filter(producto_a_producir__deposito_id=deposito_id)
         ops_necesitan_insumos = qs.select_related(
             "producto_a_producir", "estado_op", "orden_venta_origen__cliente"
@@ -1634,7 +1634,7 @@ def _obtener_deposito_actual(request, usuario=None):
             asignacion = UsuarioDeposito.objects.filter(usuario=usuario).first()
             if asignacion:
                 deposito = asignacion.deposito
-            elif usuario.groups.filter(name='Depósito').exists():
+            elif tiene_rol(usuario, 'Depósito'):
                 # Si tiene rol general pero no asignación específica
                 deposito = Deposito.objects.first()
         
