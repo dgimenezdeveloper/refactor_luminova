@@ -1,7 +1,7 @@
 {% extends 'padre.html' %}
 {% load static %}
 
-{% block title %}Importar Insumos - Luminova{% endblock %}
+{% block title %}Importar Clientes - Luminova{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -10,17 +10,17 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'App_LUMINOVA:importacion_principal' %}">Importación</a></li>
-                    <li class="breadcrumb-item active">Importar Insumos</li>
+                    <li class="breadcrumb-item active">Importar Clientes</li>
                 </ol>
             </nav>
-            <h2><i class="bi bi-box-seam"></i> Importar Insumos</h2>
+            <h2><i class="bi bi-people"></i> Importar Clientes</h2>
         </div>
     </div>
 
     <div class="row">
         <div class="col-lg-8">
             <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header bg-info text-white">
                     <h5 class="mb-0"><i class="bi bi-cloud-upload"></i> Cargar Archivo</h5>
                 </div>
                 <div class="card-body">
@@ -35,31 +35,15 @@
                             </div>
                         </div>
 
-                        {% if depositos %}
-                        <div class="mb-3">
-                            <label for="deposito" class="form-label">Depósito destino</label>
-                            <select class="form-select" id="deposito" name="deposito">
-                                {% for dep in depositos %}
-                                <option value="{{ dep.id }}" {% if deposito_seleccionado == dep.id %}selected{% endif %}>
-                                    {{ dep.nombre }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <div class="form-text">
-                                Los insumos se asociarán a este depósito
-                            </div>
-                        </div>
-                        {% endif %}
-
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="actualizar_existentes" name="actualizar_existentes">
                             <label class="form-check-label" for="actualizar_existentes">
-                                Actualizar insumos existentes (por código o nombre)
+                                Actualizar clientes existentes (por nombre)
                             </label>
                         </div>
 
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg">
+                            <button type="submit" class="btn btn-info btn-lg">
                                 <i class="bi bi-upload"></i> Iniciar Importación
                             </button>
                         </div>
@@ -68,7 +52,7 @@
                     <div id="progressContainer" class="mt-4" style="display: none;">
                         <h6>Procesando...</h6>
                         <div class="progress">
-                            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                            <div id="progressBar" class="progress-bar bg-info progress-bar-striped progress-bar-animated" 
                                  role="progressbar" style="width: 0%"></div>
                         </div>
                         <p id="progressText" class="text-center mt-2 text-muted">0%</p>
@@ -139,28 +123,23 @@
                 <div class="card-body">
                     <h6>Columnas requeridas:</h6>
                     <ul class="small">
-                        <li><strong>Descripción</strong> (o nombre, insumo, material)</li>
-                        <li><strong>Categoría</strong></li>
-                        <li><strong>Stock</strong></li>
-                        <li><strong>Unidad</strong> (kg, litros, unidades, etc.)</li>
+                        <li><strong>Nombre</strong> (o cliente, razon_social)</li>
                     </ul>
 
                     <h6 class="mt-3">Columnas opcionales:</h6>
                     <ul class="small">
-                        <li>Código / SKU</li>
-                        <li>Fabricante</li>
-                        <li>Precio unitario</li>
-                        <li>Stock mínimo</li>
-                        <li>Ubicación</li>
+                        <li>Dirección / Domicilio</li>
+                        <li>Teléfono / Celular</li>
+                        <li>Email / Correo</li>
                     </ul>
 
                     <div class="alert alert-info mt-3 small">
-                        <i class="bi bi-lightbulb"></i> <strong>Tip:</strong> Puedes usar nombres de columnas flexibles. 
-                        Por ejemplo, "ingrediente", "materia prima" o "insumo" funcionan igual.
+                        <i class="bi bi-lightbulb"></i> <strong>Tip:</strong> Los clientes existentes con el mismo nombre 
+                        serán actualizados si marcas la opción correspondiente.
                     </div>
 
                     <div class="d-grid">
-                        <a href="{% url 'App_LUMINOVA:descargar_plantilla_insumos' %}" class="btn btn-outline-primary">
+                        <a href="{% url 'App_LUMINOVA:descargar_plantilla_clientes' %}" class="btn btn-outline-info">
                             <i class="bi bi-download"></i> Descargar Plantilla
                         </a>
                     </div>
@@ -176,7 +155,6 @@
 <script>
 document.getElementById('formImportacion').addEventListener('submit', function() {
     document.getElementById('progressContainer').style.display = 'block';
-    // Simulación simple de progreso
     let progress = 0;
     const interval = setInterval(() => {
         progress += 10;

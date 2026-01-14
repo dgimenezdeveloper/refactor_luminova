@@ -1335,3 +1335,97 @@ class NotificacionSistema(EmpresaScopedModel):
             'general': 'bi-info-circle-fill'
         }
         return mapping.get(self.tipo, 'bi-bell-fill')
+
+
+# --- MODELO PARA HISTORIAL DE IMPORTACIONES ---
+class HistorialImportacion(EmpresaScopedModel):
+    """
+    Registra el historial de importaciones masivas realizadas.
+    Permite auditar y revisar las importaciones realizadas.
+    """
+    TIPO_IMPORTACION_CHOICES = [
+        ('insumos', 'Insumos'),
+        ('productos', 'Productos Terminados'),
+        ('clientes', 'Clientes'),
+        ('proveedores', 'Proveedores'),
+    ]
+    
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='importaciones_realizadas'
+    )
+    tipo_importacion = models.CharField(
+        max_length=50,
+        choices=TIPO_IMPORTACION_CHOICES,
+        verbose_name="Tipo de Importación"
+    )
+    nombre_archivo = models.CharField(
+        max_length=255,
+        verbose_name="Nombre del Archivo"
+    )
+    fecha_importacion = models.DateTimeField(
+        default=timezone.now,
+        verbose_name="Fecha de Importación"
+    )
+    registros_importados = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Registros Importados"
+    )
+    registros_actualizados = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Registros Actualizados"
+    )
+    registros_con_error = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Registros con Error"
+    )
+    exitoso = models.BooleanField(
+        default=False,
+        verbose_name="Importación Exitosa"
+    )
+    deposito = models.ForeignKey(
+        'Deposito',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='importaciones'
+    )
+    errores_detalle = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Detalle de Errores",
+        help_text="Lista de errores encontrados durante la importación"
+    )
+    warnings_detalle = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Detalle de Advertencias"
+    )
+    
+    class Meta:
+        verbose_name = "Historial de Importación"
+        verbose_name_plural = "Historial de Importaciones"
+        ordering = ['-fecha_importacion']
+        indexes = [
+            models.Index(fields=['empresa', 'fecha_importacion']),
+            models.Index(fields=['tipo_importacion']),
+            models.Index(fields=['usuario']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_tipo_importacion_display()} - {self.fecha_importacion.strftime('%d/%m/%Y %H:%M')}"
+    
+    @property
+    def total_procesados(self):
+        """Total de registros procesados"""
+        return self.registros_importados + self.registros_actualizados + self.registros_con_error
+    
+    @property
+    def porcentaje_exito(self):
+        """Porcentaje de éxito de la importación"""
+        total = self.total_procesados
+        if total == 0:
+            return 0
+        return round((self.registros_importados + self.registros_actualizados) / total * 100, 1)

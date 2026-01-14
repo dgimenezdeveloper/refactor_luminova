@@ -1,0 +1,195 @@
+{% extends 'padre.html' %}
+{% load static %}
+
+{% block title %}Historial de Importaciones - Luminova{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'App_LUMINOVA:importacion_principal' %}">Importación</a></li>
+                    <li class="breadcrumb-item active">Historial</li>
+                </ol>
+            </nav>
+            <h2><i class="bi bi-clock-history"></i> Historial de Importaciones</h2>
+        </div>
+    </div>
+
+    {% if empresa_actual %}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-building"></i> <strong>Empresa:</strong> {{ empresa_actual.nombre }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-ul"></i> Importaciones Realizadas</h5>
+                    <a href="{% url 'App_LUMINOVA:importacion_principal' %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle"></i> Nueva Importación
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if historial %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Archivo</th>
+                                    <th>Importados</th>
+                                    <th>Actualizados</th>
+                                    <th>Errores</th>
+                                    <th>Estado</th>
+                                    <th>Usuario</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in historial %}
+                                <tr>
+                                    <td>
+                                        <small>{{ item.fecha_importacion|date:"d/m/Y H:i" }}</small>
+                                    </td>
+                                    <td>
+                                        {% if item.tipo_importacion == 'insumos' %}
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-box-seam"></i> Insumos
+                                        </span>
+                                        {% elif item.tipo_importacion == 'productos' %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-gift"></i> Productos
+                                        </span>
+                                        {% elif item.tipo_importacion == 'clientes' %}
+                                        <span class="badge bg-info">
+                                            <i class="bi bi-people"></i> Clientes
+                                        </span>
+                                        {% elif item.tipo_importacion == 'proveedores' %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-truck"></i> Proveedores
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ item.tipo_importacion }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ item.nombre_archivo|truncatechars:30 }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="text-success fw-bold">{{ item.registros_importados }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-warning fw-bold">{{ item.registros_actualizados }}</span>
+                                    </td>
+                                    <td>
+                                        {% if item.registros_con_error > 0 %}
+                                        <span class="text-danger fw-bold">{{ item.registros_con_error }}</span>
+                                        {% else %}
+                                        <span class="text-muted">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.exitoso %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Exitoso
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-x-circle"></i> Con errores
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ item.usuario.username }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginación si hay muchos registros -->
+                    {% if is_paginated %}
+                    <nav aria-label="Navegación del historial">
+                        <ul class="pagination justify-content-center">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+                            </li>
+                            {% endif %}
+                            
+                            <li class="page-item disabled">
+                                <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                            </li>
+                            
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    
+                    {% else %}
+                    <!-- Estado vacío -->
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox display-1 text-muted"></i>
+                        <h4 class="mt-3 text-muted">No hay importaciones registradas</h4>
+                        <p class="text-muted">Las importaciones que realices aparecerán aquí</p>
+                        <a href="{% url 'App_LUMINOVA:importacion_principal' %}" class="btn btn-primary mt-2">
+                            <i class="bi bi-cloud-upload"></i> Realizar primera importación
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas resumen -->
+    {% if estadisticas %}
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ estadisticas.total_importaciones }}</h3>
+                    <small>Total Importaciones</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>{{ estadisticas.total_registros }}</h3>
+                    <small>Registros Importados</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning">
+                <div class="card-body text-center">
+                    <h3>{{ estadisticas.total_actualizados }}</h3>
+                    <small>Registros Actualizados</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h3>{{ estadisticas.total_errores }}</h3>
+                    <small>Errores</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

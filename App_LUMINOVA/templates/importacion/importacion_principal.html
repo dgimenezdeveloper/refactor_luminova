@@ -25,7 +25,7 @@
 
     <div class="row g-4">
         <!-- Card: Importar Insumos -->
-        <div class="col-md-6">
+        <div class="col-md-6 col-lg-3">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title">
@@ -42,7 +42,7 @@
                 </div>
                 <div class="card-footer bg-transparent">
                     <a href="{% url 'App_LUMINOVA:descargar_plantilla_insumos' %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-download"></i> Descargar Plantilla
+                        <i class="bi bi-download"></i> Plantilla
                     </a>
                     <a href="{% url 'App_LUMINOVA:importar_insumos' %}" class="btn btn-primary btn-sm float-end">
                         <i class="bi bi-upload"></i> Importar
@@ -52,11 +52,11 @@
         </div>
 
         <!-- Card: Importar Productos -->
-        <div class="col-md-6">
+        <div class="col-md-6 col-lg-3">
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title">
-                        <i class="bi bi-gift text-success"></i> Importar Productos Terminados
+                        <i class="bi bi-gift text-success"></i> Importar Productos
                     </h5>
                     <p class="card-text">
                         Carga masiva de productos terminados para ventas.
@@ -69,13 +69,76 @@
                 </div>
                 <div class="card-footer bg-transparent">
                     <a href="{% url 'App_LUMINOVA:descargar_plantilla_productos' %}" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-download"></i> Descargar Plantilla
+                        <i class="bi bi-download"></i> Plantilla
                     </a>
                     <a href="{% url 'App_LUMINOVA:importar_productos' %}" class="btn btn-success btn-sm float-end">
                         <i class="bi bi-upload"></i> Importar
                     </a>
                 </div>
             </div>
+        </div>
+
+        <!-- Card: Importar Clientes -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-people text-info"></i> Importar Clientes
+                    </h5>
+                    <p class="card-text">
+                        Carga masiva de clientes para ventas.
+                    </p>
+                    <ul class="small text-muted">
+                        <li>Soporta CSV y Excel</li>
+                        <li>Datos de contacto</li>
+                        <li>Actualización automática</li>
+                    </ul>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{% url 'App_LUMINOVA:descargar_plantilla_clientes' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-download"></i> Plantilla
+                    </a>
+                    <a href="{% url 'App_LUMINOVA:importar_clientes' %}" class="btn btn-info btn-sm float-end">
+                        <i class="bi bi-upload"></i> Importar
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card: Importar Proveedores -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-truck text-warning"></i> Importar Proveedores
+                    </h5>
+                    <p class="card-text">
+                        Carga masiva de proveedores para compras.
+                    </p>
+                    <ul class="small text-muted">
+                        <li>Soporta CSV y Excel</li>
+                        <li>Datos de contacto</li>
+                        <li>Actualización automática</li>
+                    </ul>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{% url 'App_LUMINOVA:descargar_plantilla_proveedores' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-download"></i> Plantilla
+                    </a>
+                    <a href="{% url 'App_LUMINOVA:importar_proveedores' %}" class="btn btn-warning btn-sm float-end">
+                        <i class="bi bi-upload"></i> Importar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enlace al historial -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{% url 'App_LUMINOVA:historial_importaciones' %}" class="btn btn-outline-primary">
+                <i class="bi bi-clock-history"></i> Ver Historial de Importaciones
+            </a>
         </div>
     </div>
 

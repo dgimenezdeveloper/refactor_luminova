@@ -35,6 +35,22 @@
                             </div>
                         </div>
 
+                        {% if depositos %}
+                        <div class="mb-3">
+                            <label for="deposito" class="form-label">Depósito destino</label>
+                            <select class="form-select" id="deposito" name="deposito">
+                                {% for dep in depositos %}
+                                <option value="{{ dep.id }}" {% if deposito_seleccionado == dep.id %}selected{% endif %}>
+                                    {{ dep.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">
+                                Los productos se asociarán a este depósito
+                            </div>
+                        </div>
+                        {% endif %}
+
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="actualizar_existentes" name="actualizar_existentes">
                             <label class="form-check-label" for="actualizar_existentes">
