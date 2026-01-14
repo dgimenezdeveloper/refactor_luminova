@@ -6,4 +6,5 @@ env/
 __pycache__/
 migrations/__pycache__/
 staticfiles/db.sqlite3
+
 .env
