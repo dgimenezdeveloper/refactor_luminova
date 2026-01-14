@@ -15,6 +15,7 @@
 | 14/01/2026 | APIs REST con Django REST Framework | ✅ Completado | [IMPLEMENTACION_API_REST.md](IMPLEMENTACION_API_REST.md) |
 | 14/01/2026 | Corrección de queries de stock post-normalización | ✅ Completado | [IMPLEMENTACION_API_REST.md](IMPLEMENTACION_API_REST.md#problemas-resueltos-durante-la-implementación) |
 | 14/01/2026 | Normalización de Base de Datos (Fase 2) - Totales calculados | ✅ Completado | [PLAN_NORMALIZACION_FASE2.md](PLAN_NORMALIZACION_FASE2.md) |
+| 14/01/2026 | Normalización de Base de Datos (Fase 3) - Índices de Performance | ✅ Completado | [PLAN_NORMALIZACION_FASE3.md](PLAN_NORMALIZACION_FASE3.md) |
 
 ---
 

@@ -149,6 +149,16 @@ class ProductoTerminado(EmpresaScopedModel):
         help_text="Depósito al que pertenece este producto terminado",
     )
 
+    class Meta:
+        verbose_name = "Producto Terminado"
+        verbose_name_plural = "Productos Terminados"
+        ordering = ['descripcion']
+        indexes = [
+            models.Index(fields=['empresa', 'deposito']),
+            models.Index(fields=['empresa', 'categoria']),
+            models.Index(fields=['deposito', 'categoria']),
+        ]
+
     def __str__(self):
         return f"{self.descripcion} (Modelo: {self.modelo or 'N/A'})"
     
@@ -234,6 +244,10 @@ class Proveedor(EmpresaScopedModel):
         unique_together = ('nombre', 'empresa')
         verbose_name = "Proveedor"
         verbose_name_plural = "Proveedores"
+        ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['empresa', 'nombre']),
+        ]
 
     def __str__(self):
         return self.nombre
@@ -256,6 +270,10 @@ class Fabricante(EmpresaScopedModel):
         unique_together = ('nombre', 'empresa')
         verbose_name = "Fabricante"
         verbose_name_plural = "Fabricantes"
+        ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['empresa', 'nombre']),
+        ]
 
     def __str__(self):
         return self.nombre
@@ -295,6 +313,16 @@ class Insumo(EmpresaScopedModel):
         blank=True,
         help_text="Depósito al que pertenece este insumo",
     )
+
+    class Meta:
+        verbose_name = "Insumo"
+        verbose_name_plural = "Insumos"
+        ordering = ['descripcion']
+        indexes = [
+            models.Index(fields=['empresa', 'deposito']),
+            models.Index(fields=['empresa', 'categoria']),
+            models.Index(fields=['deposito', 'categoria']),
+        ]
 
     def __str__(self):
         return self.descripcion
@@ -347,6 +375,11 @@ class OfertaProveedor(EmpresaScopedModel):
         verbose_name = "Oferta de Proveedor por Insumo"
         verbose_name_plural = "Ofertas de Proveedores por Insumos"
         ordering = ["insumo__descripcion", "proveedor__nombre"]
+        indexes = [
+            models.Index(fields=['empresa']),
+            models.Index(fields=['insumo']),
+            models.Index(fields=['proveedor']),
+        ]
 
     def __str__(self):
         return f"{self.insumo.descripcion} - {self.proveedor.nombre} (${self.precio_unitario_compra})"
@@ -366,6 +399,10 @@ class ComponenteProducto(EmpresaScopedModel):
         unique_together = ("producto_terminado", "insumo")
         verbose_name = "Componente de Producto (BOM)"
         verbose_name_plural = "Componentes de Productos (BOM)"
+        indexes = [
+            models.Index(fields=['producto_terminado']),
+            models.Index(fields=['empresa']),
+        ]
 
     def __str__(self):
         return f"{self.cantidad_necesaria} x {self.insumo.descripcion} para {self.producto_terminado.descripcion}"
@@ -385,6 +422,10 @@ class Cliente(EmpresaScopedModel):
         )
         verbose_name = "Cliente"
         verbose_name_plural = "Clientes"
+        ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['empresa', 'nombre']),
+        ]
 
     def __str__(self):
         return self.nombre
@@ -421,6 +462,16 @@ class OrdenVenta(EmpresaScopedModel):
     )
     # FASE 2: total_ov ahora es @property calculada (eliminado campo DecimalField)
     notas = models.TextField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Orden de Venta"
+        verbose_name_plural = "Órdenes de Venta"
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['empresa', 'estado']),
+            models.Index(fields=['empresa', 'fecha_creacion']),
+            models.Index(fields=['estado', 'fecha_creacion']),
+        ]
 
     def __str__(self):
         return f"OV: {self.numero_ov} - {self.cliente.nombre}"
@@ -594,6 +645,14 @@ class ItemOrdenVenta(EmpresaScopedModel):
     )
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
 
+    class Meta:
+        verbose_name = "Item de Orden de Venta"
+        verbose_name_plural = "Items de Órdenes de Venta"
+        indexes = [
+            models.Index(fields=['orden_venta']),
+            models.Index(fields=['empresa']),
+        ]
+
     def save(self, *args, **kwargs):
         self.subtotal = self.cantidad * self.precio_unitario_venta
         super().save(*args, **kwargs)
@@ -696,6 +755,17 @@ class OrdenProduccion(EmpresaScopedModel):
     )
     notas = models.TextField(null=True, blank=True, verbose_name="Notas")
 
+    class Meta:
+        verbose_name = "Orden de Producción"
+        verbose_name_plural = "Órdenes de Producción"
+        ordering = ['-fecha_solicitud']
+        indexes = [
+            models.Index(fields=['empresa', 'estado_op']),
+            models.Index(fields=['producto_a_producir', 'estado_op']),
+            models.Index(fields=['orden_venta_origen']),
+            models.Index(fields=['empresa', 'fecha_solicitud']),
+        ]
+
     def clean(self):
         """Validaciones personalizadas del modelo"""
         super().clean()
@@ -756,6 +826,16 @@ class Reportes(EmpresaScopedModel):
         blank=True,
         related_name="reportes_originados_aqui",
     )
+
+    class Meta:
+        verbose_name = "Reporte de Incidencia"
+        verbose_name_plural = "Reportes de Incidencias"
+        ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['empresa', 'resuelto']),
+            models.Index(fields=['empresa', 'fecha']),
+            models.Index(fields=['orden_produccion_asociada']),
+        ]
 
     def __str__(self):
         op_num = (
@@ -907,6 +987,17 @@ class Orden(EmpresaScopedModel):
     numero_tracking = models.CharField(max_length=50, null=True, blank=True)
     notas = models.TextField(blank=True, null=True)
 
+    class Meta:
+        verbose_name = "Orden de Compra"
+        verbose_name_plural = "Órdenes de Compra"
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['empresa', 'estado']),
+            models.Index(fields=['empresa', 'deposito']),
+            models.Index(fields=['estado', 'fecha_creacion']),
+            models.Index(fields=['proveedor', 'estado']),
+        ]
+
     def __str__(self):
         return f"OC: {self.numero_orden} - Proveedor: {self.proveedor.nombre}"
 
@@ -945,6 +1036,16 @@ class LoteProductoTerminado(EmpresaScopedModel):
         help_text="Depósito donde se encuentra el lote",
     )
 
+    class Meta:
+        verbose_name = "Lote de Producto Terminado"
+        verbose_name_plural = "Lotes de Productos Terminados"
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['empresa', 'op_asociada']),
+            models.Index(fields=['empresa', 'producto']),
+            models.Index(fields=['enviado']),
+        ]
+
     def __str__(self):
         return f"Lote de {self.producto.descripcion} - OP {self.op_asociada.numero_op} ({self.cantidad})"
 
@@ -970,6 +1071,10 @@ class HistorialOV(EmpresaScopedModel):
         ordering = ["-fecha_evento"]  # Ordenar del más reciente al más antiguo
         verbose_name = "Historial de Orden de Venta"
         verbose_name_plural = "Historiales de Órdenes de Venta"
+        indexes = [
+            models.Index(fields=['orden_venta', 'fecha_evento']),
+            models.Index(fields=['empresa']),
+        ]
 
     def __str__(self):
         return f"{self.fecha_evento.strftime('%d/%m/%Y %H:%M')} - {self.orden_venta.numero_ov}: {self.descripcion}"
@@ -1066,6 +1171,12 @@ class StockInsumo(EmpresaScopedModel):
 
     class Meta:
         unique_together = ('insumo', 'deposito')
+        verbose_name = "Stock de Insumo"
+        verbose_name_plural = "Stocks de Insumos"
+        indexes = [
+            models.Index(fields=['empresa']),
+            models.Index(fields=['insumo']),
+        ]
 
 class StockProductoTerminado(EmpresaScopedModel):
     EMPRESA_FALLBACK_FIELDS = ("producto", "deposito")
@@ -1075,6 +1186,12 @@ class StockProductoTerminado(EmpresaScopedModel):
 
     class Meta:
         unique_together = ('producto', 'deposito')
+        verbose_name = "Stock de Producto Terminado"
+        verbose_name_plural = "Stocks de Productos Terminados"
+        indexes = [
+            models.Index(fields=['empresa']),
+            models.Index(fields=['producto']),
+        ]
 
 class MovimientoStock(EmpresaScopedModel):
     EMPRESA_FALLBACK_FIELDS = (
@@ -1092,6 +1209,17 @@ class MovimientoStock(EmpresaScopedModel):
     fecha = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     motivo = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = "Movimiento de Stock"
+        verbose_name_plural = "Movimientos de Stock"
+        ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['empresa', 'fecha']),
+            models.Index(fields=['empresa', 'tipo']),
+            models.Index(fields=['deposito_origen', 'fecha']),
+            models.Index(fields=['deposito_destino', 'fecha']),
+        ]
 
 
 class NotificacionSistema(EmpresaScopedModel):
