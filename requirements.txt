@@ -6,7 +6,9 @@ charset-normalizer==3.4.2
 click==8.2.1
 Django==5.2.1
 django-bootstrap5==25.1
+django-tenants==3.9.0
 djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
 django-filter==23.5
 drf-spectacular==0.27.0
 et_xmlfile==2.0.0
@@ -20,6 +22,8 @@ pandas==2.3.3
 pathspec==0.12.1
 pillow==11.2.1
 platformdirs==4.3.8
+psycopg2-binary==2.9.11
+PyJWT==2.10.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 pytz==2025.2

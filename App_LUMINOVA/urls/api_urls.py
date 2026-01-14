@@ -7,6 +7,12 @@ todas las rutas de la API v1.
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+    TokenBlacklistView,
+)
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -114,10 +120,27 @@ urlpatterns = [
     # API versión 1
     path('v1/', include(router.urls)),
     
-    # Autenticación por token
+    # ==========================================================================
+    # JWT Authentication (Simple JWT)
+    # ==========================================================================
+    # Obtener tokens (access + refresh) con username/password
+    path('v1/auth/jwt/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # Refrescar token de acceso usando refresh token
+    path('v1/auth/jwt/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # Verificar si un token es válido
+    path('v1/auth/jwt/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
+    # Invalidar refresh token (logout)
+    path('v1/auth/jwt/token/blacklist/', TokenBlacklistView.as_view(), name='token_blacklist'),
+    
+    # ==========================================================================
+    # Legacy Token Authentication (DRF Token)
+    # ==========================================================================
+    # Autenticación por token DRF (legacy, mantener para compatibilidad)
     path('v1/auth/token/', CustomAuthToken.as_view(), name='api-token-auth'),
     
-    # Documentación OpenAPI
+    # ==========================================================================
+    # API Documentation (OpenAPI/Swagger)
+    # ==========================================================================
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     path('docs/', SpectacularSwaggerView.as_view(url_name='api:schema'), name='swagger-ui'),
     path('redoc/', SpectacularRedocView.as_view(url_name='api:schema'), name='redoc'),
