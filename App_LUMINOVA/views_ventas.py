@@ -645,7 +645,7 @@ def ventas_editar_ov_view(request, ov_id):
                             )
 
                         formset_items.save()
-                        ov_actualizada.actualizar_total()
+                        # FASE 2: total_ov ahora es @property calculada, no necesita actualizar_total()
                         ov_actualizada.save()
 
                         estado_op_inicial = EstadoOrden.objects.filter(

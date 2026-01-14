@@ -419,13 +419,19 @@ class OrdenVenta(EmpresaScopedModel):
     estado = models.CharField(
         max_length=50, choices=ESTADO_CHOICES, default="PENDIENTE"
     )
-    total_ov = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0.00, verbose_name="Total OV"
-    )
+    # FASE 2: total_ov ahora es @property calculada (eliminado campo DecimalField)
     notas = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"OV: {self.numero_ov} - {self.cliente.nombre}"
+
+    @property
+    def total_ov(self):
+        """Total calculado dinámicamente desde items de la orden de venta."""
+        from decimal import Decimal
+        from django.db.models import Sum
+        total = self.items_ov.aggregate(total=Sum('subtotal'))['total']
+        return total or Decimal('0.00')
 
     def _infer_empresa_from_relations(self):
         empresa = super()._infer_empresa_from_relations()
@@ -440,11 +446,7 @@ class OrdenVenta(EmpresaScopedModel):
                 return producto.deposito.empresa
         return None
 
-    def actualizar_total(self):
-        nuevo_total = sum(item.subtotal for item in self.items_ov.all())
-        if self.total_ov != nuevo_total:
-            self.total_ov = nuevo_total
-            self.save(update_fields=["total_ov"])
+    # FASE 2: actualizar_total() ya no es necesario - total_ov es @property
 
     def actualizar_estado_por_ops(self):
         """
@@ -899,9 +901,7 @@ class Orden(EmpresaScopedModel):
         help_text='Depósito que origina la solicitud de compra',
     )
 
-    total_orden_compra = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0.00
-    )
+    # FASE 2: total_orden_compra ahora es @property calculada (eliminado campo DecimalField)
 
     fecha_estimada_entrega = models.DateField(null=True, blank=True)
     numero_tracking = models.CharField(max_length=50, null=True, blank=True)
@@ -913,16 +913,16 @@ class Orden(EmpresaScopedModel):
     def get_estado_display_custom(self):
         return dict(self.ESTADO_ORDEN_COMPRA_CHOICES).get(self.estado, self.estado)
 
-    def save(self, *args, **kwargs):
-        if (
-            self.insumo_principal
-            and self.cantidad_principal
-            and self.precio_unitario_compra is not None
-        ):
-            self.total_orden_compra = (
-                self.cantidad_principal * self.precio_unitario_compra
-            )
-        super().save(*args, **kwargs)
+    @property
+    def total_orden_compra(self):
+        """Total calculado dinámicamente desde cantidad y precio unitario."""
+        from decimal import Decimal
+        if (self.insumo_principal and self.cantidad_principal 
+            and self.precio_unitario_compra is not None):
+            return Decimal(self.cantidad_principal) * self.precio_unitario_compra
+        return Decimal('0.00')
+
+    # FASE 2: save() ya no necesita calcular total_orden_compra
 
 
 class LoteProductoTerminado(EmpresaScopedModel):

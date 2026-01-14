@@ -327,6 +327,8 @@ class OrdenVentaListSerializer(serializers.ModelSerializer):
     """Serializador simplificado para listados de órdenes de venta."""
     cliente_nombre = serializers.CharField(source='cliente.nombre', read_only=True)
     cantidad_items = serializers.SerializerMethodField()
+    # FASE 2: total_ov es @property, se define como SerializerMethodField
+    total_ov = serializers.SerializerMethodField()
     
     class Meta:
         model = OrdenVenta
@@ -338,6 +340,10 @@ class OrdenVentaListSerializer(serializers.ModelSerializer):
     def get_cantidad_items(self, obj) -> int:
         """Retorna la cantidad de items en la orden de venta."""
         return obj.items_ov.count()
+    
+    def get_total_ov(self, obj) -> str:
+        """Retorna el total calculado de la orden de venta."""
+        return str(obj.total_ov)
 
 
 class OrdenVentaSerializer(serializers.ModelSerializer):
@@ -345,6 +351,8 @@ class OrdenVentaSerializer(serializers.ModelSerializer):
     cliente_nombre = serializers.CharField(source='cliente.nombre', read_only=True)
     items = ItemOrdenVentaSerializer(source='items_ov', many=True, read_only=True)
     resumen_estados_ops = serializers.CharField(source='get_resumen_estados_ops', read_only=True)
+    # FASE 2: total_ov es @property, se define como SerializerMethodField
+    total_ov = serializers.SerializerMethodField()
     
     class Meta:
         model = OrdenVenta
@@ -354,6 +362,10 @@ class OrdenVentaSerializer(serializers.ModelSerializer):
             'items', 'resumen_estados_ops', 'empresa'
         ]
         read_only_fields = ['id', 'empresa', 'numero_ov', 'total_ov']
+    
+    def get_total_ov(self, obj) -> str:
+        """Retorna el total calculado de la orden de venta."""
+        return str(obj.total_ov)
 
 
 class OrdenVentaCreateSerializer(serializers.ModelSerializer):
@@ -510,6 +522,8 @@ class OrdenCompraListSerializer(serializers.ModelSerializer):
     )
     deposito_nombre = serializers.CharField(source='deposito.nombre', read_only=True, allow_null=True)
     estado_display = serializers.CharField(source='get_estado_display_custom', read_only=True)
+    # FASE 2: total_orden_compra es @property, se define como SerializerMethodField
+    total_orden_compra = serializers.SerializerMethodField()
     
     class Meta:
         model = Orden
@@ -519,6 +533,10 @@ class OrdenCompraListSerializer(serializers.ModelSerializer):
             'insumo_descripcion', 'cantidad_principal', 'total_orden_compra',
             'deposito', 'deposito_nombre'
         ]
+    
+    def get_total_orden_compra(self, obj) -> str:
+        """Retorna el total calculado de la orden de compra."""
+        return str(obj.total_orden_compra)
 
 
 class OrdenCompraSerializer(serializers.ModelSerializer):
@@ -529,6 +547,8 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
     )
     deposito_nombre = serializers.CharField(source='deposito.nombre', read_only=True, allow_null=True)
     estado_display = serializers.CharField(source='get_estado_display_custom', read_only=True)
+    # FASE 2: total_orden_compra es @property, se define como SerializerMethodField
+    total_orden_compra = serializers.SerializerMethodField()
     
     class Meta:
         model = Orden
@@ -540,6 +560,10 @@ class OrdenCompraSerializer(serializers.ModelSerializer):
             'fecha_estimada_entrega', 'numero_tracking', 'notas', 'empresa'
         ]
         read_only_fields = ['id', 'empresa', 'numero_orden', 'total_orden_compra']
+    
+    def get_total_orden_compra(self, obj) -> str:
+        """Retorna el total calculado de la orden de compra."""
+        return str(obj.total_orden_compra)
 
 
 # =============================================================================
