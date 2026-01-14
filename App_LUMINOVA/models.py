@@ -1,11 +1,18 @@
 
 
 from django.conf import settings
-
 from django.contrib.auth.models import Group, User
-
-# Asegurar import de models antes de definir modelos personalizados
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Sum, F
+from django.utils import timezone
+
+# Django-tenants para multi-tenancy
+from django_tenants.models import TenantMixin, DomainMixin
+
+from .threadlocals import get_current_empresa
+
+
 class RolEmpresa(models.Model):
     empresa = models.ForeignKey('Empresa', on_delete=models.CASCADE, related_name='roles_empresa')
     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='roles_empresa')
@@ -19,12 +26,6 @@ class RolEmpresa(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.empresa.nombre})"
-from django.core.exceptions import ValidationError
-from django.db import models
-from django.db.models import Sum, F
-from django.utils import timezone  # Importar timezone
-
-from .threadlocals import get_current_empresa
 
 # Perfil extendido para asociar usuario a empresa
 class PerfilUsuario(models.Model):
@@ -1096,7 +1097,16 @@ class PasswordChangeRequired(models.Model):
 
 
 # Modelo para empresas (multi-tenancy lógico)
-class Empresa(models.Model):
+class Empresa(TenantMixin):
+    """
+    Modelo de Tenant para multi-tenancy con django-tenants.
+    Cada Empresa tiene su propio schema en PostgreSQL.
+    
+    Hereda de TenantMixin que proporciona:
+    - schema_name: nombre del schema PostgreSQL
+    - auto_create_schema: crear schema automáticamente
+    - auto_drop_schema: eliminar schema al borrar tenant
+    """
     nombre = models.CharField(max_length=150, unique=True)
     razon_social = models.CharField(max_length=255, blank=True)
     cuit = models.CharField(max_length=20, blank=True)
@@ -1105,6 +1115,10 @@ class Empresa(models.Model):
     email = models.EmailField(blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     activa = models.BooleanField(default=True)
+    
+    # Campos de django-tenants
+    auto_create_schema = True  # Crear schema automáticamente al guardar
+    auto_drop_schema = True   # Eliminar schema al borrar empresa
 
     class Meta:
         verbose_name = "Empresa"
@@ -1112,6 +1126,18 @@ class Empresa(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class Domain(DomainMixin):
+    """
+    Modelo de Domain para django-tenants.
+    Mapea dominios/subdominios a tenants (Empresas).
+    
+    Ejemplos:
+    - luminova.localhost -> Empresa LUMINOVA (public schema)
+    - cliente1.luminova.localhost -> Empresa Cliente1 (schema cliente1)
+    """
+    pass
 
 # Modelo para los depósitos
 class Deposito(models.Model):
