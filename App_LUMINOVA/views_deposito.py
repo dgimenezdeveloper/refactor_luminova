@@ -10,7 +10,7 @@ from django.http import HttpResponseForbidden
 from .services.notification_service import NotificationService
 from .empresa_filters import get_depositos_empresa, filter_ordenes_compra_por_empresa
 # --- TRANSFERENCIA DE INSUMOS ENTRE DEPÓSITOS ---
-from .utils import es_admin_o_rol, redirigir_segun_rol, es_admin, tiene_rol
+from .utils import es_admin_o_rol, redirigir_segun_rol, es_admin, tiene_rol, annotate_insumo_stock
 
 def _usuario_puede_acceder_deposito(user, deposito, accion="transferir"):
     """Verifica si el usuario puede acceder al depósito especificado para la acción dada"""
@@ -240,11 +240,8 @@ def transferir_insumo_a_deposito(insumo, deposito_origen, deposito_destino, cant
     stock_destino.cantidad += cantidad
     stock_destino.save(update_fields=['cantidad'])
 
-    # Sincronizar campo stock directo
-    insumo.stock = stock_origen.cantidad
-    insumo.save(update_fields=['stock'])
-    insumo_destino.stock = stock_destino.cantidad
-    insumo_destino.save(update_fields=['stock'])
+    # NOTA: stock ahora es una @property calculada desde StockInsumo
+    # Ya no es necesario sincronizar manualmente
 
     return insumo_destino
 
@@ -292,10 +289,8 @@ def transferir_producto_a_deposito(producto, deposito_origen, deposito_destino, 
     stock_destino.cantidad += cantidad
     stock_destino.save(update_fields=['cantidad'])
 
-    producto.stock = stock_origen.cantidad
-    producto.save(update_fields=['stock'])
-    producto_destino.stock = stock_destino.cantidad
-    producto_destino.save(update_fields=['stock'])
+    # NOTA: stock ahora es una @property calculada desde StockProductoTerminado
+    # Ya no es necesario sincronizar manualmente
 
     return producto_destino
 @login_required
@@ -389,10 +384,7 @@ def entrada_stock_insumo(request, insumo_id, deposito_id):
             stock.cantidad += cantidad
             stock.save()
             
-            # Sincronizar campo stock del insumo si existe
-            if hasattr(insumo, 'stock'):
-                insumo.stock = stock.cantidad
-                insumo.save(update_fields=["stock"])
+            # NOTA: stock ahora es una @property calculada, no es necesario sincronizar
             
             # Auditar movimiento
             _auditar_movimiento(
@@ -439,10 +431,7 @@ def salida_stock_insumo(request, insumo_id, deposito_id):
                     stock.cantidad -= cantidad
                     stock.save()
                     
-                    # Sincronizar campo stock del insumo si existe
-                    if hasattr(insumo, 'stock'):
-                        insumo.stock = stock.cantidad
-                        insumo.save(update_fields=["stock"])
+                    # NOTA: stock ahora es una @property calculada, no es necesario sincronizar
                     
                     # Auditar movimiento
                     _auditar_movimiento(
@@ -494,10 +483,7 @@ def entrada_stock_producto(request, producto_id, deposito_id):
             stock.cantidad += cantidad
             stock.save()
             
-            # Sincronizar campo stock del producto si existe
-            if hasattr(producto, 'stock'):
-                producto.stock = stock.cantidad
-                producto.save(update_fields=["stock"])
+            # NOTA: stock ahora es una @property calculada, no es necesario sincronizar
             
             # Auditar movimiento
             _auditar_movimiento(
@@ -544,10 +530,7 @@ def salida_stock_producto(request, producto_id, deposito_id):
                     stock.cantidad -= cantidad
                     stock.save()
                     
-                    # Sincronizar campo stock del producto si existe
-                    if hasattr(producto, 'stock'):
-                        producto.stock = stock.cantidad
-                        producto.save(update_fields=["stock"])
+                    # NOTA: stock ahora es una @property calculada, no es necesario sincronizar
                     
                     # Auditar movimiento
                     _auditar_movimiento(
@@ -760,7 +743,9 @@ def deposito_dashboard_view(request):
         UMBRAL_STOCK_BAJO = 15000
         depositos_con_stock_critico = []
         for deposito in depositos_empresa:
-            insumos_criticos = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO)
+            insumos_criticos = annotate_insumo_stock(
+                Insumo.objects.filter(deposito=deposito)
+            ).filter(stock_calculado__lt=UMBRAL_STOCK_BAJO)
             if insumos_criticos.exists():
                 depositos_con_stock_critico.append({
                     'deposito': deposito,
@@ -780,7 +765,9 @@ def deposito_dashboard_view(request):
             # OPs solicitando insumos para este depósito
             ops_deposito = ops_solicitudes.filter(producto_a_producir__deposito=deposito).count()
             # Insumos críticos en este depósito
-            criticos_deposito = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO).count()
+            criticos_deposito = annotate_insumo_stock(
+                Insumo.objects.filter(deposito=deposito)
+            ).filter(stock_calculado__lt=UMBRAL_STOCK_BAJO).count()
             
             depositos_resumen.append({
                 'deposito': deposito,
@@ -1147,15 +1134,22 @@ def recibir_pedido_oc_view(request, oc_id):
 
     insumo_recibido = orden_a_recibir.insumo_principal
     cantidad_recibida = orden_a_recibir.cantidad_principal
+    deposito_destino = orden_a_recibir.deposito
 
-    if insumo_recibido and cantidad_recibida:
-        # 1. Incrementar el stock del insumo
-        insumo_recibido.stock = F("stock") + cantidad_recibida
+    if insumo_recibido and cantidad_recibida and deposito_destino:
+        # 1. Incrementar el stock del insumo en StockInsumo (normalizado)
+        stock_record, created = StockInsumo.objects.get_or_create(
+            insumo=insumo_recibido,
+            deposito=deposito_destino,
+            defaults={'cantidad': 0, 'empresa': deposito_destino.empresa}
+        )
+        stock_record.cantidad = F("cantidad") + cantidad_recibida
+        stock_record.save(update_fields=["cantidad"])
 
         # 2. Decrementar la cantidad en pedido
         insumo_recibido.cantidad_en_pedido = F("cantidad_en_pedido") - cantidad_recibida
-
-        insumo_recibido.save(update_fields=["stock", "cantidad_en_pedido"])
+        insumo_recibido.save(update_fields=["cantidad_en_pedido"])
+        
         logger.info(
             f"Stock de '{insumo_recibido.descripcion}' actualizado (+{cantidad_recibida}) y 'en pedido' actualizado (-{cantidad_recibida})."
         )
@@ -1244,7 +1238,9 @@ def deposito_view(request):
 
         depositos_con_stock_critico = []
         for deposito in depositos_empresa:
-            insumos_criticos = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO)
+            insumos_criticos = annotate_insumo_stock(
+                Insumo.objects.filter(deposito=deposito)
+            ).filter(stock_calculado__lt=UMBRAL_STOCK_BAJO)
             if insumos_criticos.exists():
                 depositos_con_stock_critico.append({
                     'deposito': deposito,
@@ -1264,7 +1260,9 @@ def deposito_view(request):
             # OPs solicitando insumos para este depósito
             ops_deposito = ops_solicitudes.filter(producto_a_producir__deposito=deposito).count()
             # Insumos críticos en este depósito
-            criticos_deposito = Insumo.objects.filter(deposito=deposito, stock__lt=UMBRAL_STOCK_BAJO).count()
+            criticos_deposito = annotate_insumo_stock(
+                Insumo.objects.filter(deposito=deposito)
+            ).filter(stock_calculado__lt=UMBRAL_STOCK_BAJO).count()
             depositos_resumen.append({
                 'deposito': deposito,
                 'ocs_en_transito': ocs_deposito,
@@ -1341,7 +1339,7 @@ def deposito_view(request):
     UMBRAL_STOCK_BAJO_INSUMOS = 15000
 
     insumos_del_deposito = Insumo.objects.filter(deposito=deposito)
-    insumos_con_stock_bajo = insumos_del_deposito.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+    insumos_con_stock_bajo = annotate_insumo_stock(insumos_del_deposito).filter(stock_calculado__lt=UMBRAL_STOCK_BAJO_INSUMOS)
 
     ESTADOS_OC_EN_PROCESO = [
         "APROBADA",
@@ -1362,7 +1360,7 @@ def deposito_view(request):
             .first()
         )
         if oc_en_proceso:
-            insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso, "stock_real": insumo.stock})
+            insumos_en_pedido.append({"insumo": insumo, "oc": oc_en_proceso, "stock_real": insumo.stock_calculado})
         elif insumo.notificado_a_compras:
             insumos_a_gestionar.append(insumo)
         else:

@@ -80,12 +80,13 @@ from .models import (
     Reportes,
     RolDescripcion,
     SectorAsignado,
+    StockProductoTerminado,  # Añadido para normalización de stock
 )
 from .signals import get_client_ip
 
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
-from .utils import es_admin, es_admin_o_rol
+from .utils import es_admin, es_admin_o_rol, annotate_producto_stock
 from .empresa_filters import (
     get_depositos_empresa,
     filter_ordenes_produccion_por_empresa,
@@ -498,12 +499,23 @@ def produccion_detalle_op_view(request, op_id):
                 cantidad_producida = op_actualizada.cantidad_a_producir
                 if producto_terminado_obj and cantidad_producida > 0:
                     try:
-                        # 1. Actualizar el stock principal del ProductoTerminado
-                        producto_terminado_obj.stock = F("stock") + cantidad_producida
-                        producto_terminado_obj.save(update_fields=["stock"])
-                        logger.info(
-                            f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida}."
-                        )
+                        # 1. Actualizar el stock en StockProductoTerminado (normalizado)
+                        deposito_producto = producto_terminado_obj.deposito
+                        if deposito_producto:
+                            stock_record, created = StockProductoTerminado.objects.get_or_create(
+                                producto=producto_terminado_obj,
+                                deposito=deposito_producto,
+                                defaults={'cantidad': 0, 'empresa': deposito_producto.empresa}
+                            )
+                            stock_record.cantidad = F("cantidad") + cantidad_producida
+                            stock_record.save(update_fields=["cantidad"])
+                            logger.info(
+                                f"Stock de '{producto_terminado_obj.descripcion}' incrementado en {cantidad_producida} (StockProductoTerminado)."
+                            )
+                        else:
+                            logger.warning(
+                                f"Producto '{producto_terminado_obj.descripcion}' no tiene depósito asignado. Stock no actualizado."
+                            )
 
                         # 2. Crear el lote para registro y envío
                         try:
@@ -838,15 +850,18 @@ def produccion_stock_dashboard_view(request):
             Q(categoria__nombre__icontains=buscar)
         )
     
+    # Anotar con stock calculado para poder filtrar
+    productos_queryset = annotate_producto_stock(productos_queryset)
+    
     # Aplicar filtros específicos
     if filtro == 'stock_bajo':
         productos_queryset = productos_queryset.filter(
-            stock__lte=F('stock_minimo'),
+            stock_calculado__lte=F('stock_minimo'),
             stock_minimo__gt=0
         )
     elif filtro == 'necesita_reposicion':
         productos_queryset = productos_queryset.filter(
-            stock__lte=(F('stock_minimo') * 0.5),
+            stock_calculado__lte=(F('stock_minimo') * 0.5),
             stock_minimo__gt=0
         )
     
@@ -855,7 +870,7 @@ def produccion_stock_dashboard_view(request):
     
     # Productos que necesitan reposición (stock <= stock_minimo)
     productos_con_stock_bajo = productos_queryset.filter(
-        stock__lte=F('stock_minimo'),
+        stock_calculado__lte=F('stock_minimo'),
         stock_minimo__gt=0
     ).select_related('categoria', 'deposito')
     

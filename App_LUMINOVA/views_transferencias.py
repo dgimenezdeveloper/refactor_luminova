@@ -1,7 +1,10 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.db.models import Q
-from .models import MovimientoStock, Deposito, Insumo, ProductoTerminado, CategoriaProductoTerminado
+from .models import (
+    MovimientoStock, Deposito, Insumo, ProductoTerminado, 
+    CategoriaProductoTerminado, StockInsumo, StockProductoTerminado
+)
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db import transaction  # Ensure this import is present
@@ -67,35 +70,55 @@ def historial_transferencias_view(request):
             with transaction.atomic():
                 if tipo_item == "insumo":
                     insumo = Insumo.objects.get(id=item_id)
+                    
+                    # Obtener o crear registro de stock en origen
+                    stock_origen, _ = StockInsumo.objects.get_or_create(
+                        insumo=insumo,
+                        deposito=deposito_origen,
+                        defaults={'cantidad': 0, 'empresa': deposito_origen.empresa}
+                    )
 
                     # Verificar stock suficiente en el depósito origen
-                    if insumo.stock >= cantidad:
-                        insumo.stock -= cantidad
-                        insumo.save(update_fields=["stock"])
+                    if stock_origen.cantidad >= cantidad:
+                        # Restar del origen
+                        stock_origen.cantidad -= cantidad
+                        stock_origen.save(update_fields=["cantidad"])
 
-                        # Actualizar o crear stock en el depósito destino
-                        insumo_destino, created = Insumo.objects.get_or_create(
-                            id=insumo.id, defaults={"stock": 0, "deposito": deposito_destino}
+                        # Sumar al destino
+                        stock_destino, _ = StockInsumo.objects.get_or_create(
+                            insumo=insumo,
+                            deposito=deposito_destino,
+                            defaults={'cantidad': 0, 'empresa': deposito_destino.empresa}
                         )
-                        insumo_destino.stock += cantidad
-                        insumo_destino.save(update_fields=["stock"])
+                        stock_destino.cantidad += cantidad
+                        stock_destino.save(update_fields=["cantidad"])
                     else:
                         raise ValueError("Stock insuficiente en el depósito origen para el insumo.")
 
                 elif tipo_item == "producto":
                     producto = ProductoTerminado.objects.get(id=item_id)
+                    
+                    # Obtener o crear registro de stock en origen
+                    stock_origen, _ = StockProductoTerminado.objects.get_or_create(
+                        producto=producto,
+                        deposito=deposito_origen,
+                        defaults={'cantidad': 0, 'empresa': deposito_origen.empresa}
+                    )
 
                     # Verificar stock suficiente en el depósito origen
-                    if producto.stock >= cantidad:
-                        producto.stock -= cantidad
-                        producto.save(update_fields=["stock"])
+                    if stock_origen.cantidad >= cantidad:
+                        # Restar del origen
+                        stock_origen.cantidad -= cantidad
+                        stock_origen.save(update_fields=["cantidad"])
 
-                        # Actualizar o crear stock en el depósito destino
-                        producto_destino, created = ProductoTerminado.objects.get_or_create(
-                            id=producto.id, defaults={"stock": 0, "deposito": deposito_destino}
+                        # Sumar al destino
+                        stock_destino, _ = StockProductoTerminado.objects.get_or_create(
+                            producto=producto,
+                            deposito=deposito_destino,
+                            defaults={'cantidad': 0, 'empresa': deposito_destino.empresa}
                         )
-                        producto_destino.stock += cantidad
-                        producto_destino.save(update_fields=["stock"])
+                        stock_destino.cantidad += cantidad
+                        stock_destino.save(update_fields=["cantidad"])
                     else:
                         raise ValueError("Stock insuficiente en el depósito origen para el producto terminado.")
 

@@ -90,28 +90,27 @@ for deposito in Deposito.objects.all():
     print(f"- {deposito.nombre}: {insumos_del_deposito.count()} insumos, {insumos_bajo_stock.count()} críticos")
 
 # 8. Corregir cantidades de stock de insumos y productos en todos los depósitos
-print("\n8. CORRIGIENDO STOCK DE INSUMOS EN TODOS LOS DEPÓSITOS:")
+print("\n8. VERIFICANDO STOCK DE INSUMOS EN TODOS LOS DEPÓSITOS (property calculada):")
 with transaction.atomic():
     for deposito in Deposito.objects.all():
         insumos_stock = StockInsumo.objects.filter(deposito=deposito)
         for stock_insumo in insumos_stock:
-            # Actualizar el campo stock del insumo para ese depósito
+            # NOTA: Desde normalización Fase 1 (enero 2026), stock es una @property
+            # Ya no es necesario sincronizar manualmente
             insumo = stock_insumo.insumo
             if insumo.deposito == deposito:
-                insumo.stock = stock_insumo.cantidad
-                insumo.save(update_fields=["stock"])
-                print(f"  - {insumo.descripcion} en {deposito.nombre}: stock corregido a {insumo.stock}")
+                print(f"  - {insumo.descripcion} en {deposito.nombre}: stock={insumo.stock} (calculado desde StockInsumo)")
 
-print("\n9. CORRIGIENDO STOCK DE PRODUCTOS TERMINADOS EN TODOS LOS DEPÓSITOS:")
+print("\n9. VERIFICANDO STOCK DE PRODUCTOS TERMINADOS EN TODOS LOS DEPÓSITOS:")
 with transaction.atomic():
     for deposito in Deposito.objects.all():
         productos_stock = StockProductoTerminado.objects.filter(deposito=deposito)
         for stock_producto in productos_stock:
+            # NOTA: Desde normalización Fase 1 (enero 2026), stock es una @property
+            # Ya no es necesario sincronizar manualmente
             producto = stock_producto.producto
             if producto.deposito == deposito:
-                producto.stock = stock_producto.cantidad
-                producto.save(update_fields=["stock"])
-                print(f"  - {producto.descripcion} en {deposito.nombre}: stock corregido a {producto.stock}")
+                print(f"  - {producto.descripcion} en {deposito.nombre}: stock={producto.stock} (calculado desde StockProductoTerminado)")
 
 print("\n=== STOCK DEPOSITOS CORREGIDO ===")
 print("\n=== CORRECCIÓN COMPLETADA ===")

@@ -8,6 +8,8 @@ from App_LUMINOVA.views import *
 urlpatterns = [
     path("", include("App_LUMINOVA.urls")),
     path("admin/", admin.site.urls),
+    # API REST
+    path("api/", include("App_LUMINOVA.urls.api_urls", namespace="api")),
 ]
 
 if settings.DEBUG:

@@ -256,7 +256,7 @@ from .signals import get_client_ip
 
 from .services.document_services import generar_siguiente_numero_documento
 from .services.pdf_services import generar_pdf_factura
-from .utils import es_admin, es_admin_o_rol
+from .utils import es_admin, es_admin_o_rol, annotate_insumo_stock
 from .empresa_filters import (
     get_depositos_empresa,
     filter_ordenes_compra_por_empresa,
@@ -357,9 +357,10 @@ def compras_desglose_view(request):
     insumos_con_oc_suficiente = []
     
     # FILTRO POR EMPRESA: Solo evaluar insumos de la empresa
+    # Usar anotación de stock calculado para filtrar
     insumos_bajo_stock = filter_insumos_por_empresa(
         request,
-        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+        annotate_insumo_stock(Insumo.objects.all()).filter(stock_calculado__lt=UMBRAL_STOCK_BAJO_INSUMOS)
     )
     
     for insumo in insumos_bajo_stock:
@@ -373,7 +374,9 @@ def compras_desglose_view(request):
             Q(deposito=insumo.deposito) | Q(deposito__isnull=True)
         ).aggregate(total=Sum('cantidad_principal'))['total'] or 0
         # Si el stock actual + lo que viene en OCs >= umbral, no necesita más gestión
-        if (insumo.stock + total_en_ocs) >= UMBRAL_STOCK_BAJO_INSUMOS:
+        # Usar stock_calculado si está anotado, sino property stock
+        stock_actual = getattr(insumo, 'stock_calculado', insumo.stock)
+        if (stock_actual + total_en_ocs) >= UMBRAL_STOCK_BAJO_INSUMOS:
             insumos_con_oc_suficiente.append(insumo.id)
     
     insumos_ya_gestionados_ids = insumos_con_oc_suficiente
@@ -385,7 +388,7 @@ def compras_desglose_view(request):
     # Debug detallado para verificar cada insumo - FILTRADO POR EMPRESA
     all_insumos_bajo_stock = filter_insumos_por_empresa(
         request,
-        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+        annotate_insumo_stock(Insumo.objects.all()).filter(stock_calculado__lt=UMBRAL_STOCK_BAJO_INSUMOS)
     )
     logger.info(f"=== DEBUG DESGLOSE DE COMPRAS ===")
     logger.info(f"Umbral de stock bajo: {UMBRAL_STOCK_BAJO_INSUMOS}")
@@ -401,11 +404,12 @@ def compras_desglose_view(request):
             insumo_principal=insumo
         )
         total_en_ocs = ocs_activas.aggregate(total=Sum('cantidad_principal'))['total'] or 0
-        stock_final = insumo.stock + total_en_ocs
+        stock_actual = getattr(insumo, 'stock_calculado', insumo.stock)
+        stock_final = stock_actual + total_en_ocs
         necesita_compra = stock_final < UMBRAL_STOCK_BAJO_INSUMOS
         
         logger.info(f"  Insumo '{insumo.descripcion}' (ID: {insumo.id}):")
-        logger.info(f"    Stock actual: {insumo.stock}")
+        logger.info(f"    Stock actual: {stock_actual}")
         logger.info(f"    En OCs activas: {total_en_ocs}")
         logger.info(f"    Stock proyectado: {stock_final}")
         logger.info(f"    Necesita compra: {necesita_compra}")
@@ -420,9 +424,11 @@ def compras_desglose_view(request):
     from collections import defaultdict
     
     # FILTRO POR EMPRESA: Solo insumos críticos de la empresa
+    # Usamos annotate_insumo_stock porque 'stock' ahora es una propiedad calculada
     insumos_criticos_qs = filter_insumos_por_empresa(
         request,
-        Insumo.objects.filter(stock__lt=UMBRAL_STOCK_BAJO_INSUMOS)
+        annotate_insumo_stock(Insumo.objects.all())
+        .filter(stock_calculado__lt=UMBRAL_STOCK_BAJO_INSUMOS)
         .exclude(id__in=insumos_ya_gestionados_ids)
         .select_related("categoria", "deposito")
         .order_by("descripcion")
@@ -430,6 +436,7 @@ def compras_desglose_view(request):
     insumos_dict = {}
     for insumo in insumos_criticos_qs:
         key = (insumo.descripcion, insumo.categoria_id)
+        stock_actual = getattr(insumo, 'stock_calculado', 0)
         if key not in insumos_dict:
             insumos_dict[key] = {
                 "id": insumo.id,
@@ -440,10 +447,10 @@ def compras_desglose_view(request):
                 "desglose_depositos": [],
                 "tiene_oc_borrador": False,
             }
-        insumos_dict[key]["stock_total"] += insumo.stock
+        insumos_dict[key]["stock_total"] += stock_actual
         insumos_dict[key]["desglose_depositos"].append({
             "deposito": insumo.deposito.nombre if insumo.deposito else "Sin depósito",
-            "stock": insumo.stock,
+            "stock": stock_actual,
         })
         # Si algún depósito tiene OC en borrador, marcarlo
         tiene_oc_borrador = Orden.objects.filter(

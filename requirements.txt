@@ -6,6 +6,9 @@ charset-normalizer==3.4.2
 click==8.2.1
 Django==5.2.1
 django-bootstrap5==25.1
+djangorestframework==3.14.0
+django-filter==23.5
+drf-spectacular==0.27.0
 et_xmlfile==2.0.0
 idna==3.10
 isort==6.0.1

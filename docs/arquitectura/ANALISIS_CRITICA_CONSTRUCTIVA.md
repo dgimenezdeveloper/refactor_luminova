@@ -2,7 +2,18 @@
 ## Sistema ERP Multi-depósito hacia SaaS Escalable
 
 **Fecha**: 25 de agosto de 2025  
+**Última actualización**: 14 de enero de 2026  
 **Objetivo**: Transformar LUMINOVA en un SaaS multi-empresarial escalable dirigido a parques industriales
+
+---
+
+## 📋 Registro de Implementaciones
+
+| Fecha | Mejora Implementada | Estado | Documentación |
+|-------|---------------------|--------|---------------|
+| Enero 2026 | Normalización de Base de Datos | ✅ Completado | [PLAN_NORMALIZACION_BD.md](PLAN_NORMALIZACION_BD.md) |
+| 14/01/2026 | APIs REST con Django REST Framework | ✅ Completado | [IMPLEMENTACION_API_REST.md](IMPLEMENTACION_API_REST.md) |
+| 14/01/2026 | Corrección de queries de stock post-normalización | ✅ Completado | [IMPLEMENTACION_API_REST.md](IMPLEMENTACION_API_REST.md#problemas-resueltos-durante-la-implementación) |
 
 ---
 
@@ -174,13 +185,26 @@ class InventoryService:
 
 ### 3. API y Integraciones
 
-#### Estado Actual 
-- Sin APIs REST estructuradas
-- Lógica en vistas de Django tradicionales
-- Sin documentación de API
-- Sin versionado
+#### Estado Actual ✅ IMPLEMENTADO
+- ✅ APIs REST estructuradas con Django REST Framework
+- ✅ ViewSets completos para todos los modelos principales
+- ✅ Autenticación por Token y Session
+- ✅ Documentación automática con OpenAPI/Swagger
+- ✅ Filtros avanzados y paginación
+- ✅ Aislamiento multi-tenant en todos los endpoints
+- 📄 **Documentación**: [IMPLEMENTACION_API_REST.md](IMPLEMENTACION_API_REST.md)
 
-#### Recomendaciones 
+#### Endpoints Implementados
+- `/api/v1/productos/` - Gestión de productos terminados
+- `/api/v1/insumos/` - Gestión de insumos
+- `/api/v1/ordenes-venta/` - Órdenes de venta
+- `/api/v1/ordenes-produccion/` - Órdenes de producción
+- `/api/v1/ordenes-compra/` - Órdenes de compra
+- `/api/v1/notificaciones/` - Sistema de notificaciones
+- `/api/docs/` - Documentación Swagger UI
+- `/api/redoc/` - Documentación ReDoc
+
+#### Recomendaciones Pendientes 
 
 **3.1 Django REST Framework + API Versionada**
 ```python

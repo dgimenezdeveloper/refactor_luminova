@@ -3,7 +3,7 @@ from datetime import timedelta, timezone
 
 from django import apps, forms
 from django.contrib.auth.models import Group, Permission
-from django.db.models import Q, F
+from django.db.models import Q, F, Subquery, OuterRef
 from django.utils import timezone
 
 from .utils import es_admin as es_admin_func, tiene_rol
@@ -532,14 +532,14 @@ class ProductoTerminadoForm(forms.ModelForm):
     class Meta:
         model = ProductoTerminado
         fields = [
-            "descripcion", "categoria", "precio_unitario", "stock", "modelo",
-            "potencia", "acabado", "color_luz", "material", "deposito", "imagen"
+            "descripcion", "categoria", "precio_unitario", "modelo",
+            "potencia", "acabado", "color_luz", "material", "deposito", "imagen",
+            "stock_minimo", "stock_objetivo", "produccion_habilitada"
         ]
         widgets = {
             "descripcion": forms.TextInput(attrs={"class": "form-control"}),
             "categoria": forms.Select(attrs={"class": "form-select"}),
             "precio_unitario": forms.NumberInput(attrs={"class": "form-control"}),
-            "stock": forms.NumberInput(attrs={"class": "form-control"}),
             "modelo": forms.TextInput(attrs={"class": "form-control"}),
             "potencia": forms.NumberInput(attrs={"class": "form-control"}),
             "acabado": forms.TextInput(attrs={"class": "form-control"}),
@@ -547,9 +547,19 @@ class ProductoTerminadoForm(forms.ModelForm):
             "material": forms.TextInput(attrs={"class": "form-control"}),
             "deposito": forms.Select(attrs={"class": "form-select"}),
             "imagen": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "stock_minimo": forms.NumberInput(attrs={"class": "form-control"}),
+            "stock_objetivo": forms.NumberInput(attrs={"class": "form-control"}),
+            "produccion_habilitada": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
         labels = {
             "deposito": "Depósito",
+            "stock_minimo": "Stock Mínimo",
+            "stock_objetivo": "Stock Objetivo",
+            "produccion_habilitada": "Habilitado para Producción",
+        }
+        help_texts = {
+            "stock_minimo": "Cantidad mínima que debe mantenerse en inventario",
+            "stock_objetivo": "Cantidad deseada después de reabastecer",
         }
 
 
@@ -868,12 +878,12 @@ class InsumoForm(forms.ModelForm):
     class Meta:
         model = Insumo
         # Para edición, NO incluir el campo depósito (se preserva automáticamente)
-        fields = ["descripcion", "categoria", "fabricante", "stock", "imagen"]
+        # NOTA: stock se elimina porque ahora es una @property calculada
+        fields = ["descripcion", "categoria", "fabricante", "imagen"]
         widgets = {
             "descripcion": forms.TextInput(attrs={"class": "form-control"}),
             "categoria": forms.Select(attrs={"class": "form-select"}),
             "fabricante": forms.Select(attrs={"class": "form-select"}),
-            "stock": forms.NumberInput(attrs={"class": "form-control"}),
             "imagen": forms.ClearableFileInput(attrs={"class": "form-control"}),
         }
 
@@ -888,12 +898,12 @@ class InsumoCreateForm(forms.ModelForm):
 
     class Meta:
         model = Insumo
-        fields = ["descripcion", "categoria", "fabricante", "stock", "deposito", "imagen"]
+        # NOTA: stock se elimina porque ahora es una @property calculada
+        fields = ["descripcion", "categoria", "fabricante", "deposito", "imagen"]
         widgets = {
             "descripcion": forms.TextInput(attrs={"class": "form-control"}),
             "categoria": forms.Select(attrs={"class": "form-select"}),
             "fabricante": forms.Select(attrs={"class": "form-select"}),
-            "stock": forms.NumberInput(attrs={"class": "form-control"}),
             "deposito": forms.HiddenInput(),  # Ensure the widget is hidden
             "imagen": forms.ClearableFileInput(attrs={"class": "form-control"}),
         }
@@ -921,10 +931,16 @@ class TransferenciaInsumoForm(forms.Form):
         super().__init__(*args, **kwargs)
         
         if user and deposito_actual:
-            # Filtrar insumos por depósito actual
-            self.fields['insumo'].queryset = Insumo.objects.filter(
+            from .models import StockInsumo
+            # Filtrar insumos por depósito actual usando tabla StockInsumo
+            # (stock fue normalizado y ahora se calcula desde StockInsumo)
+            insumos_con_stock_ids = StockInsumo.objects.filter(
                 deposito=deposito_actual,
-                stock__gt=0
+                cantidad__gt=0
+            ).values_list('insumo_id', flat=True)
+            
+            self.fields['insumo'].queryset = Insumo.objects.filter(
+                id__in=insumos_con_stock_ids
             ).order_by('descripcion')
             
             # Configurar depósitos permitidos

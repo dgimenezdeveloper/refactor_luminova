@@ -1,3 +1,7 @@
+from django.db.models import Sum, Subquery, OuterRef, IntegerField, Value
+from django.db.models.functions import Coalesce
+
+
 def es_admin(user):
     """
     Verifica si un usuario es superusuario o pertenece al grupo 'administrador'.
@@ -109,3 +113,115 @@ def redirigir_segun_rol(user):
         return redirect('App_LUMINOVA:seleccionar_deposito')
     else:
         return redirect('/')
+
+
+# =============================================================================
+# HELPERS PARA STOCK CALCULADO (Normalización BD)
+# =============================================================================
+
+def annotate_insumo_stock(queryset):
+    """
+    Anota el queryset de Insumo con el stock calculado desde StockInsumo.
+    
+    Uso:
+        from App_LUMINOVA.utils import annotate_insumo_stock
+        insumos = annotate_insumo_stock(Insumo.objects.all())
+        insumos_criticos = insumos.filter(stock_calculado__lt=1000)
+    
+    Args:
+        queryset: QuerySet de Insumo
+        
+    Returns:
+        QuerySet anotado con campo 'stock_calculado'
+    """
+    from App_LUMINOVA.models import StockInsumo
+    
+    stock_subquery = StockInsumo.objects.filter(
+        insumo=OuterRef('pk')
+    ).values('insumo').annotate(
+        total=Sum('cantidad')
+    ).values('total')
+    
+    return queryset.annotate(
+        stock_calculado=Coalesce(Subquery(stock_subquery), Value(0), output_field=IntegerField())
+    )
+
+
+def annotate_producto_stock(queryset):
+    """
+    Anota el queryset de ProductoTerminado con el stock calculado desde StockProductoTerminado.
+    
+    Uso:
+        from App_LUMINOVA.utils import annotate_producto_stock
+        productos = annotate_producto_stock(ProductoTerminado.objects.all())
+        productos_bajo_stock = productos.filter(stock_calculado__lte=F('stock_minimo'))
+    
+    Args:
+        queryset: QuerySet de ProductoTerminado
+        
+    Returns:
+        QuerySet anotado con campo 'stock_calculado'
+    """
+    from App_LUMINOVA.models import StockProductoTerminado
+    
+    stock_subquery = StockProductoTerminado.objects.filter(
+        producto=OuterRef('pk')
+    ).values('producto').annotate(
+        total=Sum('cantidad')
+    ).values('total')
+    
+    return queryset.annotate(
+        stock_calculado=Coalesce(Subquery(stock_subquery), Value(0), output_field=IntegerField())
+    )
+
+
+def get_insumos_stock_bajo(depositos=None, umbral=15000, empresa=None):
+    """
+    Obtiene insumos con stock bajo el umbral especificado.
+    
+    Args:
+        depositos: QuerySet o lista de depósitos para filtrar (opcional)
+        umbral: Umbral de stock mínimo (default: 15000)
+        empresa: Empresa para filtrar (opcional)
+        
+    Returns:
+        QuerySet de Insumo con stock_calculado < umbral
+    """
+    from App_LUMINOVA.models import Insumo
+    
+    queryset = Insumo.objects.all()
+    
+    if depositos is not None:
+        queryset = queryset.filter(deposito__in=depositos)
+    
+    if empresa is not None:
+        queryset = queryset.filter(empresa=empresa)
+    
+    queryset = annotate_insumo_stock(queryset)
+    return queryset.filter(stock_calculado__lt=umbral).order_by('stock_calculado')
+
+
+def get_productos_necesitan_reposicion(depositos=None, empresa=None):
+    """
+    Obtiene productos que necesitan reposición (stock <= stock_minimo).
+    
+    Args:
+        depositos: QuerySet o lista de depósitos para filtrar (opcional)
+        empresa: Empresa para filtrar (opcional)
+        
+    Returns:
+        QuerySet de ProductoTerminado con stock_calculado <= stock_minimo
+    """
+    from App_LUMINOVA.models import ProductoTerminado
+    from django.db.models import F
+    
+    queryset = ProductoTerminado.objects.filter(stock_minimo__gt=0)
+    
+    if depositos is not None:
+        queryset = queryset.filter(deposito__in=depositos)
+    
+    if empresa is not None:
+        queryset = queryset.filter(empresa=empresa)
+    
+    queryset = annotate_producto_stock(queryset)
+    return queryset.filter(stock_calculado__lte=F('stock_minimo')).order_by('stock_calculado')

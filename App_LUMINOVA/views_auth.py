@@ -7,6 +7,7 @@ from django.db.models import Sum, F
 from datetime import timedelta
 
 from .models import AuditoriaAcceso, Reportes, OrdenProduccion, Orden, Insumo, OrdenVenta, Deposito
+from .utils import annotate_insumo_stock, get_insumos_stock_bajo
 
 def get_client_ip(request):
     """Obtener la IP del cliente desde el request."""
@@ -136,10 +137,11 @@ def dashboard_view(request):
         "RECIBIDA_TOTAL",
         "COMPLETADA",
     ]
-    insumos_criticos_query = Insumo.objects.filter(
-        stock__lt=UMBRAL_STOCK_BAJO,
-        deposito__in=depositos_empresa  # Filtrar por empresa
-    ).order_by("stock")
+    # Usar función helper para obtener insumos con stock bajo (anotación de subquery)
+    insumos_criticos_query = get_insumos_stock_bajo(
+        depositos=depositos_empresa,
+        umbral=UMBRAL_STOCK_BAJO
+    )
     insumos_criticos_filtrados = []
     for insumo in insumos_criticos_query:
         tiene_oc_activa = Orden.objects.filter(
@@ -149,7 +151,7 @@ def dashboard_view(request):
         ).exists()
         if not tiene_oc_activa:
             porcentaje_stock = (
-                int((insumo.stock / UMBRAL_STOCK_BAJO) * 100)
+                int((insumo.stock_calculado / UMBRAL_STOCK_BAJO) * 100)
                 if UMBRAL_STOCK_BAJO > 0
                 else 0
             )

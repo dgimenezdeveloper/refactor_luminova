@@ -21,6 +21,7 @@ class RolEmpresa(models.Model):
         return f"{self.nombre} ({self.empresa.nombre})"
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Sum, F
 from django.utils import timezone  # Importar timezone
 
 from .threadlocals import get_current_empresa
@@ -116,7 +117,7 @@ class ProductoTerminado(EmpresaScopedModel):
         related_name="productos_terminados",
     )
     precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    stock = models.IntegerField(default=0)
+    # NOTA: stock se calcula desde StockProductoTerminado (campo eliminado en migration)
     # Campos para gestión de stock
     stock_minimo = models.IntegerField(
         default=0, 
@@ -150,6 +151,26 @@ class ProductoTerminado(EmpresaScopedModel):
 
     def __str__(self):
         return f"{self.descripcion} (Modelo: {self.modelo or 'N/A'})"
+    
+    @property
+    def stock(self) -> int:
+        """Stock total del producto en todos sus depósitos (desde StockProductoTerminado)"""
+        # IMPORTANTE: Esta es una property, NO un campo de BD
+        result = StockProductoTerminado.objects.filter(
+            producto=self
+        ).aggregate(total=Sum('cantidad'))['total']
+        return result if result is not None else 0
+    
+    def get_stock_by_deposito(self, deposito: 'Deposito') -> int:
+        """Stock del producto en un depósito específico"""
+        try:
+            stock_record = StockProductoTerminado.objects.get(
+                producto=self,
+                deposito=deposito
+            )
+            return stock_record.cantidad
+        except StockProductoTerminado.DoesNotExist:
+            return 0
     
     @property
     def necesita_reposicion(self):
@@ -204,10 +225,15 @@ class CategoriaInsumo(EmpresaScopedModel):
 
 
 class Proveedor(EmpresaScopedModel):
-    nombre = models.CharField(max_length=100, unique=True)
+    nombre = models.CharField(max_length=100)  # ❌ Quitado unique=True (multi-tenant fix)
     contacto = models.CharField(max_length=100, blank=True)
     telefono = models.CharField(max_length=25, blank=True)
     email = models.EmailField(blank=True, null=True)
+    
+    class Meta:
+        unique_together = ('nombre', 'empresa')
+        verbose_name = "Proveedor"
+        verbose_name_plural = "Proveedores"
 
     def __str__(self):
         return self.nombre
@@ -221,10 +247,15 @@ class Proveedor(EmpresaScopedModel):
 
 
 class Fabricante(EmpresaScopedModel):
-    nombre = models.CharField(max_length=100, unique=True)
+    nombre = models.CharField(max_length=100)  # ❌ Quitado unique=True (multi-tenant fix)
     contacto = models.CharField(max_length=100, blank=True)
     telefono = models.CharField(max_length=25, blank=True)  # Aumentado max_length
     email = models.EmailField(blank=True, null=True)
+    
+    class Meta:
+        unique_together = ('nombre', 'empresa')
+        verbose_name = "Fabricante"
+        verbose_name_plural = "Fabricantes"
 
     def __str__(self):
         return self.nombre
@@ -252,7 +283,7 @@ class Insumo(EmpresaScopedModel):
         related_name="insumos_fabricados",
     )
     imagen = models.ImageField(null=True, blank=True, upload_to="insumos/")
-    stock = models.IntegerField(default=0)
+    # NOTA: stock se calcula desde StockInsumo (campo eliminado en migration)
     cantidad_en_pedido = models.PositiveIntegerField(
         default=0, verbose_name="Cantidad en Pedido", blank=True, null=True
     )
@@ -267,6 +298,26 @@ class Insumo(EmpresaScopedModel):
 
     def __str__(self):
         return self.descripcion
+    
+    @property
+    def stock(self) -> int:
+        """Stock total del insumo en todos sus depósitos (desde StockInsumo)"""
+        # IMPORTANTE: Esta es una property, NO un campo de BD
+        result = StockInsumo.objects.filter(
+            insumo=self
+        ).aggregate(total=Sum('cantidad'))['total']
+        return result if result is not None else 0
+    
+    def get_stock_by_deposito(self, deposito: 'Deposito') -> int:
+        """Stock del insumo en un depósito específico"""
+        try:
+            stock_record = StockInsumo.objects.get(
+                insumo=self,
+                deposito=deposito
+            )
+            return stock_record.cantidad
+        except StockInsumo.DoesNotExist:
+            return 0
 
 
 # --- NUEVO MODELO INTERMEDIO ---
@@ -322,10 +373,18 @@ class ComponenteProducto(EmpresaScopedModel):
 
 # --- MODELOS DE GESTIÓN ---
 class Cliente(EmpresaScopedModel):
-    nombre = models.CharField(max_length=150, unique=True)
+    nombre = models.CharField(max_length=150)  # ❌ Quitado unique=True (multi-tenant fix)
     direccion = models.TextField(blank=True)
     telefono = models.CharField(max_length=25, blank=True)
-    email = models.EmailField(unique=True, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)  # ❌ Quitado unique=True (multi-tenant fix)
+    
+    class Meta:
+        unique_together = (
+            ('nombre', 'empresa'),
+            ('email', 'empresa'),
+        )
+        verbose_name = "Cliente"
+        verbose_name_plural = "Clientes"
 
     def __str__(self):
         return self.nombre
@@ -708,7 +767,7 @@ class Reportes(EmpresaScopedModel):
 class Factura(EmpresaScopedModel):
     EMPRESA_FALLBACK_FIELDS = ("orden_venta",)
     numero_factura = models.CharField(
-        max_length=50, unique=True
+        max_length=50  # ❌ Quitado unique=True (multi-tenant fix)
     )  # Aumentado max_length
     orden_venta = models.OneToOneField(
         OrdenVenta, on_delete=models.PROTECT, related_name="factura_asociada"
@@ -719,6 +778,11 @@ class Factura(EmpresaScopedModel):
     total_facturado = models.DecimalField(
         max_digits=12, decimal_places=2
     )  # Aumentado max_digits
+    
+    class Meta:
+        unique_together = ('numero_factura', 'empresa')
+        verbose_name = "Factura"
+        verbose_name_plural = "Facturas"
 
     def __str__(self):
         return f"Factura {self.numero_factura} para OV {self.orden_venta.numero_ov}"

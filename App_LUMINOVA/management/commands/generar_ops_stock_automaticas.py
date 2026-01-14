@@ -4,6 +4,7 @@ from django.db.models import F
 from django.utils import timezone
 from App_LUMINOVA.models import ProductoTerminado, OrdenProduccion, EstadoOrden
 from App_LUMINOVA.services.document_services import generar_siguiente_numero_documento
+from App_LUMINOVA.utils import annotate_producto_stock
 
 
 class Command(BaseCommand):
@@ -38,10 +39,13 @@ class Command(BaseCommand):
         )
 
         # Filtrar productos que necesiten reposición
-        productos_query = ProductoTerminado.objects.filter(
+        # Usamos annotate_producto_stock porque 'stock' ahora es propiedad calculada
+        productos_base = ProductoTerminado.objects.filter(
             produccion_para_stock_activa=True,
-            stock__lte=F('stock_minimo'),
             stock_minimo__gt=0
+        )
+        productos_query = annotate_producto_stock(productos_base).filter(
+            stock_calculado__lte=F('stock_minimo')
         )
 
         if deposito_id:
@@ -95,11 +99,12 @@ class Command(BaseCommand):
                     continue
 
                 if dry_run:
+                    stock_actual = getattr(producto, 'stock_calculado', 0)
                     self.stdout.write(
                         self.style.SUCCESS(
                             f"  - [SIMULACIÓN] {producto.descripcion}: "
                             f"Se crearían {cantidad_a_producir} unidades "
-                            f"(Stock: {producto.stock}, Objetivo: {producto.stock_objetivo})"
+                            f"(Stock: {stock_actual}, Objetivo: {producto.stock_objetivo})"
                         )
                     )
                     ops_creadas += 1
@@ -108,6 +113,7 @@ class Command(BaseCommand):
                     with transaction.atomic():
                         numero_op = generar_siguiente_numero_documento(OrdenProduccion, 'OP', 'numero_op')
                         estado_inicial = EstadoOrden.objects.filter(nombre="Pendiente").first()
+                        stock_actual = getattr(producto, 'stock_calculado', 0)
 
                         op = OrdenProduccion.objects.create(
                             numero_op=numero_op,
@@ -116,7 +122,7 @@ class Command(BaseCommand):
                             cantidad_a_producir=cantidad_a_producir,
                             estado_op=estado_inicial,
                             notas=f"OP generada automáticamente para reposición de stock el {timezone.now().strftime('%d/%m/%Y %H:%M')}. "
-                                  f"Stock actual: {producto.stock}, Stock mínimo: {producto.stock_minimo}, "
+                                  f"Stock actual: {stock_actual}, Stock mínimo: {producto.stock_minimo}, "
                                   f"Stock objetivo: {producto.stock_objetivo}."
                         )
 

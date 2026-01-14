@@ -4,7 +4,7 @@ Context processors para LUMINOVA con soporte multi-tenancy.
 Todos los queries deben filtrar por empresa del usuario actual.
 """
 from .models import Insumo, Orden, OrdenProduccion, Reportes, UsuarioDeposito
-from .utils import es_admin as es_admin_func, tiene_rol
+from .utils import es_admin as es_admin_func, tiene_rol, annotate_insumo_stock
 
 
 def notificaciones_context(request):
@@ -97,9 +97,9 @@ def notificaciones_context(request):
         tipo="compra", estado__in=ESTADOS_OC_EN_PROCESO
     ).values_list("insumo_principal_id", flat=True)
 
-    # Filtrar insumos críticos por empresa
-    insumos_criticos_qs = base_insumos.filter(
-        stock__lt=UMBRAL_STOCK_BAJO
+    # Filtrar insumos críticos por empresa usando anotación de stock calculado
+    insumos_criticos_qs = annotate_insumo_stock(base_insumos).filter(
+        stock_calculado__lt=UMBRAL_STOCK_BAJO
     ).exclude(id__in=insumos_con_oc_en_firme)
     insumos_stock_bajo_count = insumos_criticos_qs.count()
 
