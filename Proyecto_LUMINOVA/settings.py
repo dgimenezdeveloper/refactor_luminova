@@ -32,7 +32,15 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,.localhos
 # Apps compartidas entre todos los tenants (schema public)
 SHARED_APPS = [
     'django_tenants',  # Debe ir primero
-    'App_LUMINOVA',  # App con el modelo Tenant (Empresa)
+    'App_LUMINOVA',  # App con el modelo Tenant (Empresa) - LEGACY
+    
+    # Nuevas apps modulares
+    'apps.core',
+    'apps.inventory',
+    'apps.sales',
+    'apps.production',
+    'apps.purchasing',
+    'apps.notifications',
     
     # Django core apps compartidas
     'django.contrib.contenttypes',
@@ -59,8 +67,16 @@ TENANT_APPS = [
     'django.contrib.auth',
     'django.contrib.admin',
     
-    # La app principal con los modelos de negocio
+    # La app principal con los modelos de negocio - LEGACY (mantener mientras se migran las vistas)
     'App_LUMINOVA',
+    
+    # Nuevas apps modulares (cada tenant tiene sus propios datos)
+    'apps.core',
+    'apps.inventory',
+    'apps.sales',
+    'apps.production',
+    'apps.purchasing',
+    'apps.notifications',
 ]
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
@@ -84,6 +100,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'App_LUMINOVA.middleware.EmpresaMiddleware',  # Agrega empresa_actual al request
     'App_LUMINOVA.middleware.PasswordChangeMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
