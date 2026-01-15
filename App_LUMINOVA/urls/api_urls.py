@@ -57,6 +57,8 @@ from App_LUMINOVA.api.viewsets import (
     NotificacionSistemaViewSet,
     AuditoriaAccesoViewSet,
     RolEmpresaViewSet,
+    # Dashboard
+    DashboardViewSet,
 )
 
 
@@ -105,6 +107,9 @@ router.register(r'usuarios-deposito', UsuarioDepositoViewSet, basename='usuario-
 router.register(r'notificaciones', NotificacionSistemaViewSet, basename='notificacion')
 router.register(r'auditorias', AuditoriaAccesoViewSet, basename='auditoria')
 router.register(r'roles-empresa', RolEmpresaViewSet, basename='rol-empresa')
+
+# Dashboard
+router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 
 # Usuario actual
 router.register(r'auth/user', CurrentUserViewSet, basename='current-user')

@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from django.utils import timezone
+from django.db import models
 from django.db.models import Sum
 
 from App_LUMINOVA.models import (
@@ -760,3 +761,170 @@ class RolEmpresaViewSet(EmpresaScopedViewSet):
     filterset_fields = ['empresa']
     search_fields = ['nombre', 'descripcion']
     ordering = ['nombre']
+
+
+class DashboardViewSet(viewsets.ViewSet):
+    """
+    ViewSet para el dashboard que retorna resúmenes de estadísticas.
+    Endpoint: GET /api/v1/dashboard/resumen/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get_empresa_depositos(self, request):
+        """Obtiene los depósitos de la empresa del usuario."""
+        empresa_actual = getattr(request, 'empresa_actual', None)
+        if empresa_actual:
+            return Deposito.objects.filter(empresa=empresa_actual)
+        return Deposito.objects.none()
+
+    @action(detail=False, methods=['get'])
+    def resumen(self, request):
+        """
+        Retorna el resumen del dashboard con estadísticas de:
+        - Inventario (productos e insumos)
+        - Ventas
+        - Producción
+        - Compras
+        """
+        from django.db.models import Subquery, OuterRef, IntegerField
+        from django.db.models.functions import Coalesce
+        
+        depositos_empresa = self.get_empresa_depositos(request)
+        
+        # ==================== INVENTARIO ====================
+        total_productos = ProductoTerminado.objects.filter(
+            deposito__in=depositos_empresa
+        ).count()
+        
+        total_insumos = Insumo.objects.filter(
+            deposito__in=depositos_empresa
+        ).count()
+        
+        # Productos con stock bajo (usando subquery para calcular stock)
+        # Calculamos el stock total desde StockProductoTerminado
+        stock_subquery = StockProductoTerminado.objects.filter(
+            producto=OuterRef('pk')
+        ).values('producto').annotate(
+            total=Sum('cantidad')
+        ).values('total')[:1]
+        
+        productos_con_stock = ProductoTerminado.objects.filter(
+            deposito__in=depositos_empresa
+        ).annotate(
+            stock_calculado=Coalesce(Subquery(stock_subquery), 0, output_field=IntegerField())
+        )
+        
+        # Contar productos con stock bajo (stock < stock_minimo y stock_minimo > 0)
+        productos_stock_bajo = productos_con_stock.filter(
+            stock_calculado__lt=models.F('stock_minimo'),
+            stock_minimo__gt=0
+        ).count()
+        
+        # Insumos con stock bajo
+        UMBRAL_STOCK_BAJO = 15000
+        insumos_stock_bajo = 0
+        try:
+            # Agrupar stock de insumos por insumo
+            stock_insumos = StockInsumo.objects.filter(
+                deposito__in=depositos_empresa
+            ).values('insumo').annotate(
+                total_stock=Sum('cantidad')
+            ).filter(total_stock__lt=UMBRAL_STOCK_BAJO)
+            insumos_stock_bajo = stock_insumos.count()
+        except Exception:
+            insumos_stock_bajo = 0
+        
+        # ==================== VENTAS ====================
+        ordenes_venta_empresa = OrdenVenta.objects.filter(
+            items_ov__producto_terminado__deposito__in=depositos_empresa
+        ).distinct()
+        
+        total_ordenes_venta = ordenes_venta_empresa.count()
+        # OrdenVenta usa campo 'estado' con valores como 'PENDIENTE', 'COMPLETADA', etc.
+        ordenes_pendientes_venta = ordenes_venta_empresa.filter(
+            estado='PENDIENTE'
+        ).count()
+        ordenes_completadas_venta = ordenes_venta_empresa.filter(
+            estado__in=['COMPLETADA', 'LISTA_ENTREGA']
+        ).count()
+        
+        # Total vendido - OrdenVenta usa propiedad total_ov, pero no podemos sumarla directamente
+        # Usamos una aproximación sumando subtotales de los items
+        from App_LUMINOVA.models import ItemOrdenVenta
+        total_vendido = ItemOrdenVenta.objects.filter(
+            orden_venta__in=ordenes_venta_empresa.filter(
+                estado__in=['COMPLETADA', 'LISTA_ENTREGA']
+            )
+        ).aggregate(total=Sum('subtotal'))['total'] or 0
+        
+        # ==================== PRODUCCIÓN ====================
+        ops_empresa = OrdenProduccion.objects.filter(
+            producto_a_producir__deposito__in=depositos_empresa
+        )
+        
+        # OrdenProduccion usa estado_op que es ForeignKey a EstadoOrden (tiene campo 'nombre')
+        ops_pendientes = ops_empresa.filter(
+            estado_op__nombre__iexact='Pendiente'
+        ).count()
+        
+        ops_en_proceso = ops_empresa.filter(
+            estado_op__nombre__in=['En Proceso', 'En Producción', 'Insumos Solicitados', 'Producción Iniciada']
+        ).count()
+        
+        ops_completadas = ops_empresa.filter(
+            estado_op__nombre__iexact='Completada'
+        ).count()
+        
+        # Reportes pendientes (no resueltos)
+        reportes_pendientes = Reportes.objects.filter(
+            resuelto=False,
+            orden_produccion_asociada__producto_a_producir__deposito__in=depositos_empresa
+        ).count()
+        
+        # ==================== COMPRAS ====================
+        ocs_empresa = Orden.objects.filter(
+            tipo='compra',
+            deposito__in=depositos_empresa
+        )
+        
+        ocs_pendientes = ocs_empresa.filter(
+            estado__in=['BORRADOR', 'APROBADA']
+        ).count()
+        
+        ocs_en_transito = ocs_empresa.filter(
+            estado__in=['EN_TRANSITO', 'ENVIADA_PROVEEDOR']
+        ).count()
+        
+        # OCs vencidas (fecha de entrega pasada y no completadas)
+        ocs_vencidas = ocs_empresa.filter(
+            fecha_estimada_entrega__lt=timezone.now().date()
+        ).exclude(
+            estado__in=['COMPLETADA', 'RECIBIDA_TOTAL', 'CANCELADA']
+        ).count()
+        
+        # ==================== RESPUESTA ====================
+        return Response({
+            'inventario': {
+                'total_productos': total_productos,
+                'total_insumos': total_insumos,
+                'productos_stock_bajo': productos_stock_bajo,
+                'insumos_stock_bajo': insumos_stock_bajo,
+            },
+            'ventas': {
+                'total_ordenes': total_ordenes_venta,
+                'ordenes_pendientes': ordenes_pendientes_venta,
+                'ordenes_completadas': ordenes_completadas_venta,
+                'total_vendido': float(total_vendido),
+            },
+            'produccion': {
+                'ordenes_pendientes': ops_pendientes,
+                'ordenes_en_proceso': ops_en_proceso,
+                'ordenes_completadas': ops_completadas,
+                'reportes_pendientes': reportes_pendientes,
+            },
+            'compras': {
+                'ordenes_pendientes': ocs_pendientes,
+                'ordenes_en_transito': ocs_en_transito,
+                'ordenes_vencidas': ocs_vencidas,
+            }
+        })
